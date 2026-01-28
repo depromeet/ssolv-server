@@ -13,7 +13,9 @@ class SearchPlaceLlmPromptService {
     fun createPlaceInsightPrompt(place: PlaceDetailsResponse): String {
         val name = place.displayName?.text ?: "알 수 없는 장소"
         val types = place.types?.joinToString(", ") ?: "정보 없음"
-        val address = place.formattedAddress ?: ""
+        val address = place.formattedAddress ?: "주소 정보 없음"
+        val rating = place.rating ?: 0.0
+        val reviewCount = place.userRatingCount ?: 0
 
         return """
         너는 장소 정보를 분석하여 사용자에게 유익한 정보를 제공하는 도우미야.
@@ -23,7 +25,7 @@ class SearchPlaceLlmPromptService {
         이름: $name
         유형: $types
         주소: $address
-        평점: ${place.rating} (리뷰 ${place.userRatingCount}개)
+        평점: $rating (리뷰 ${reviewCount}개)
 
         [응답 형식]
         {
@@ -69,7 +71,12 @@ class SearchPlaceLlmPromptService {
      */
     fun createBulkPlaceInsightPrompt(places: List<PlaceDetailsResponse>): String {
         val placesString = places.joinToString("\n---\n") { 
-            "id: ${it.id}, name: ${it.displayName?.text}, types: ${it.types?.joinToString(", ")}, address: ${it.formattedAddress ?: ""}, rating: ${it.rating ?: 0.0}" 
+            val id = it.id
+            val name = it.displayName?.text ?: "알 수 없는 장소"
+            val types = it.types?.joinToString(", ") ?: "정보 없음"
+            val address = it.formattedAddress ?: "주소 정보 없음"
+            val rating = it.rating ?: 0.0
+            "id: $id, name: $name, types: $types, address: $address, rating: $rating" 
         }
 
         return """

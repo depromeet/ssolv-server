@@ -5,7 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.llm.client.LlmClient
 import org.depromeet.team3.llm.properties.GeminiProperties
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -15,7 +14,6 @@ import kotlinx.coroutines.withTimeout
 import org.depromeet.team3.common.util.RetryUtil
 
 @Component
-@ConditionalOnProperty(prefix = "api.gemini", name = ["api-key"])
 class GeminiLlmClient(
     private val geminiProperties: GeminiProperties,
     private val geminiRestClient: RestClient

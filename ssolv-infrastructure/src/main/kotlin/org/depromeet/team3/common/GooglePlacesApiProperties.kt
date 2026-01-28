@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "api.google.places")
 data class GooglePlacesApiProperties(
-    val apiKey: String,
-    val baseUrl: String,
-    val proxyBaseUrl: String = "https://api.ssolv.site"
+    var apiKey: String = "",
+    var baseUrl: String = "https://places.googleapis.com",
+    var proxyBaseUrl: String = "https://api.ssolv.site"
 )

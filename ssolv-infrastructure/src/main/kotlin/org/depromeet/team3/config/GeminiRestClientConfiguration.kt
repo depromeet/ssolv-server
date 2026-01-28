@@ -4,7 +4,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.hc.client5.http.impl.classic.HttpClients
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager
 import org.depromeet.team3.llm.properties.GeminiProperties
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -16,7 +15,6 @@ import org.springframework.web.client.RestClient
 import java.time.Duration
 
 @Configuration
-@ConditionalOnProperty(prefix = "api.gemini", name = ["api-key"])
 @EnableConfigurationProperties(GeminiProperties::class)
 class GeminiRestClientConfiguration {
 
@@ -32,10 +30,30 @@ class GeminiRestClientConfiguration {
                 headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             }
             .defaultStatusHandler({ it.is4xxClientError }) { _, response ->
-                logger.error { "Gemini API client error. Status: ${response.statusCode}" }
+                val statusCode = response.statusCode
+                val statusText = response.statusText
+                logger.error { "Gemini API client error. Status: $statusCode $statusText" }
+                throw org.springframework.web.client.RestClientResponseException(
+                    "Gemini API client error: $statusCode $statusText",
+                    statusCode.value(),
+                    statusText,
+                    response.headers,
+                    response.body.readAllBytes(),
+                    null
+                )
             }
             .defaultStatusHandler({ it.is5xxServerError }) { _, response ->
-                logger.error { "Gemini API server error. Status: ${response.statusCode}" }
+                val statusCode = response.statusCode
+                val statusText = response.statusText
+                logger.error { "Gemini API server error. Status: $statusCode $statusText" }
+                throw org.springframework.web.client.RestClientResponseException(
+                    "Gemini API server error: $statusCode $statusText",
+                    statusCode.value(),
+                    statusText,
+                    response.headers,
+                    response.body.readAllBytes(),
+                    null
+                )
             }
             .build()
     }

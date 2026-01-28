@@ -27,10 +27,10 @@ app:
 api:
   google:
     places:
-      api-key: ${GOOGLE_PLACES_API_KEY}
+      api-key: ${GOOGLE_PLACES_API_KEY:}
       base-url: https://places.googleapis.com
   gemini:
-    api-key: ${GEMINI_API_KEY}
+    api-key: ${GEMINI_API_KEY:}
     base-url: https://generativelanguage.googleapis.com
     model: gemini-2.5-flash
 

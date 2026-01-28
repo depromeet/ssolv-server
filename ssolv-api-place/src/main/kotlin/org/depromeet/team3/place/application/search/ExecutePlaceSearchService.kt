@@ -73,17 +73,22 @@ class ExecutePlaceSearchService(
             val likesMap = rankPlaceSearchService.buildLikesMap(savedEntities.mapNotNull { it.googlePlaceId }, meetingPlaces, request.userId)
 
             // 6. 응답 DTO 변환 및 기본 데이터 매핑
-            val googleToDbId = savedEntities.associate { it.googlePlaceId!! to it.id!! }
-            val dbToGoogleId = savedEntities.associate { it.id!! to it.googlePlaceId!! }
+            val googleToDbId = savedEntities.mapNotNull { 
+                val gId = it.googlePlaceId ?: return@mapNotNull null
+                val dbId = it.id ?: return@mapNotNull null
+                gId to dbId 
+            }.toMap()
+            val dbToGoogleId = googleToDbId.entries.associate { it.value to it.key }
             val weightByDbId = searchResult.placeWeights.mapNotNull { (gId, w) -> googleToDbId[gId]?.let { it to w } }.toMap()
 
             val items = savedEntities.mapNotNull { entity ->
                 runCatching {
-                    val googleId = entity.googlePlaceId!!
+                    val googleId = entity.googlePlaceId ?: return@mapNotNull null
+                    val dbId = entity.id ?: return@mapNotNull null
                     val likeInfo = likesMap[googleId] ?: RankPlaceSearchService.PlaceLikeInfo(0, false)
 
                     PlacesSearchResponse.PlaceItem(
-                        placeId = entity.id!!,
+                        placeId = dbId,
                         name = entity.name ?: "",
                         address = entity.address?.replace("대한민국 ", "") ?: "",
                         rating = entity.rating,

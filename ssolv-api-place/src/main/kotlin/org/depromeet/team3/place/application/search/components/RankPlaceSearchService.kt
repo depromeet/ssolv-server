@@ -56,9 +56,11 @@ class RankPlaceSearchService(
         meetingPlaces: List<MeetingPlace>,
         userId: Long?
     ): Map<String, PlaceLikeInfo> = withContext(Dispatchers.IO) {
-        val placeDbIds = placeQuery.findByGooglePlaceIds(googlePlaceIds).associate { 
-            it.googlePlaceId!! to it.id!! 
-        }
+        val placeDbIds = placeQuery.findByGooglePlaceIds(googlePlaceIds).mapNotNull { 
+            val gId = it.googlePlaceId ?: return@mapNotNull null
+            val dbId = it.id ?: return@mapNotNull null
+            gId to dbId
+        }.toMap()
         val meetingPlaceIds = meetingPlaces.mapNotNull { it.id }
         if (meetingPlaceIds.isEmpty()) return@withContext emptyMap()
 

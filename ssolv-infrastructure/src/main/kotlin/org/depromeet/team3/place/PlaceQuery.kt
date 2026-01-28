@@ -3,13 +3,11 @@ package org.depromeet.team3.place
 import org.depromeet.team3.place.client.GooglePlacesClient
 import org.depromeet.team3.place.model.PlaceDetailsResponse
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Repository
-@ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class PlaceQuery(
     private val googlePlacesClient: GooglePlacesClient,
     private val placeJpaRepository: PlaceJpaRepository

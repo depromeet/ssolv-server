@@ -35,7 +35,7 @@ object RetryUtil {
                 if (statusCode == 429 || statusCode in 500..504) {
                     lastException = e
                     if (attempt < maxRetries - 1) {
-                        val jitter = Random.nextLong(0, jitterMaxMillis)
+                        val jitter = if (jitterMaxMillis > 0) Random.nextLong(0, jitterMaxMillis) else 0L
                         val totalDelay = delayMillis + jitter
                         logger.warn(e) {
                             "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 상태코드: $statusCode, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)"
