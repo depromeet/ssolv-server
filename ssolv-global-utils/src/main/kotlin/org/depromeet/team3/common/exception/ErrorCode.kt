@@ -45,6 +45,7 @@ enum class ErrorCode(
     MEETING_ALREADY_JOINED("C4098", "이미 참가한 모임입니다.", 409),
     MEETING_FULL("C4099", "모임 인원이 가득 찼습니다.", 409),
     DUPLICATE_NICKNAME("C4100", "이미 사용 중인 닉네임입니다.", 409),
+    CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS("C4101", "다른 참석자가 있는 모임을 호스팅 중이므로 탈퇴할 수 없습니다. 모임을 종료하거나 호스트를 이전한 후 다시 시도해주세요.", 409),
 
     // 5xx Server Errors
     INTERNAL_SERVER_ERROR("S001", "서버 내부 오류가 발생했습니다.", 500),

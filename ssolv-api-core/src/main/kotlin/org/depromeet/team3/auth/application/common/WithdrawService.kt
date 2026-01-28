@@ -7,6 +7,8 @@ import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.meeting.MeetingRepository
+import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,23 +20,29 @@ import org.springframework.transaction.annotation.Transactional
 class WithdrawService(
     private val userQueryRepository: UserQueryRepository,
     private val userCommandRepository: UserCommandRepository,
-    private val kakaoOAuthClient: KakaoOAuthClient
+    private val kakaoOAuthClient: KakaoOAuthClient,
+    private val meetingRepository: MeetingRepository,
+    private val meetingAttendeeRepository: MeetingAttendeeRepository
 ) {
     private val log = LoggerFactory.getLogger(WithdrawService::class.java)
 
     /**
      * 회원 탈퇴 처리
-     * 1. 로컬 데이터 삭제 (Transaction)
-     * 2. 소셜 플랫폼 연동 해제 (Transaction 외부)
+     * 1. 호스팅 중인 모임 검증 (다른 참석자가 있는 모임이 있으면 탈퇴 불가)
+     * 2. 로컬 데이터 삭제 (Transaction)
+     * 3. 소셜 플랫폼 연동 해제 (Transaction 외부)
      */
     fun withdraw(userId: Long) {
         val user = userQueryRepository.findById(userId)
             ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
 
-        // 1. 로컬 데이터 삭제 (트랜잭션 내부)
+        // 1. 호스팅 중인 모임 검증
+        validateHostedMeetings(userId)
+
+        // 2. 로컬 데이터 삭제 (트랜잭션 내부)
         deleteLocalUser(user)
 
-        // 2. 소셜 플랫폼 연동 해제 (트랜잭션 외부 호출로 지연 방지 및 장애 전파 최소화)
+        // 3. 소셜 플랫폼 연동 해제 (트랜잭션 외부 호출로 지연 방지 및 장애 전파 최소화)
         try {
             when (user.provider) {
                 AuthProvider.KAKAO -> kakaoOAuthClient.unlink(user.socialId)
@@ -47,8 +55,33 @@ class WithdrawService(
         }
     }
 
+    /**
+     * 호스팅 중인 모임 검증
+     * 다른 참석자가 있는 모임을 호스팅 중이면 탈퇴 불가
+     */
+    private fun validateHostedMeetings(userId: Long) {
+        val hostedMeetings = meetingRepository.findMeetingsByUserId(userId)
+        
+        for (meeting in hostedMeetings) {
+            val meetingId = meeting.id ?: continue
+            val attendees = meetingAttendeeRepository.findByMeetingId(meetingId)
+            
+            // 호스트 본인 외에 다른 참석자가 있는지 확인
+            val hasOtherAttendees = attendees.any { it.userId != userId }
+            
+            if (hasOtherAttendees) {
+                log.warn("탈퇴 시도 실패 - userId: {}, 다른 참석자가 있는 모임 호스팅 중: meetingId: {}", userId, meetingId)
+                throw AuthException(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
+            }
+        }
+    }
+
     @Transactional
     protected fun deleteLocalUser(user: User) {
+        // UserEntity의 cascade 설정에 의해 다음이 자동으로 삭제됨:
+        // 1. 호스팅 중인 모든 미팅 (meetings with cascade = ALL, orphanRemoval = true)
+        // 2. 각 미팅의 참석자 정보 (MeetingEntity.attendees with cascade = ALL, orphanRemoval = true)
+        // 3. 사용자의 참석 정보 (meetingAttendances with cascade = ALL, orphanRemoval = true)
         userCommandRepository.delete(user)
     }
 }

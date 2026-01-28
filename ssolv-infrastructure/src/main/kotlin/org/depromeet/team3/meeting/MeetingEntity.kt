@@ -34,6 +34,6 @@ class MeetingEntity(
     @JoinColumn(name = "station_id")
     val station: StationEntity,
     
-    @OneToMany(mappedBy = "meeting", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "meeting", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
     val attendees: MutableList<MeetingAttendeeEntity> = mutableListOf()
 ) : BaseTimeEntity()

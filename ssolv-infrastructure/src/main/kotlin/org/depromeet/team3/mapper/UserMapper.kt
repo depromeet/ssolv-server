@@ -30,9 +30,8 @@ class UserMapper : DomainMapper<User, UserEntity> {
             profileImage = domain.profileImage,
             refreshToken = domain.refreshToken,
             nickname = domain.nickname
-        ).apply {
-            this.createdAt = domain.createdAt
-            this.updatedAt = domain.updatedAt
-        }
+        )
+        // Note: createdAt and updatedAt are now managed by JPA auditing
+        // Do not manually set these fields to prevent audit integrity issues
     }
 }
