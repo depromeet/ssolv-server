@@ -24,7 +24,7 @@ class UserEntity(
     @Column(name = "social_id", nullable = false)
     var socialId: String = "",
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     var email: String = "",
 
     @Column(name = "profile_image")

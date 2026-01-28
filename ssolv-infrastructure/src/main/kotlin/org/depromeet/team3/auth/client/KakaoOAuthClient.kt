@@ -18,7 +18,8 @@ import org.springframework.web.client.RestTemplate
 @Component
 class KakaoOAuthClient(
     private val objectMapper: ObjectMapper,
-    private val kakaoProperties: KakaoProperties
+    private val kakaoProperties: KakaoProperties,
+    private val restTemplate: RestTemplate
 ) {
     private val log = LoggerFactory.getLogger(KakaoOAuthClient::class.java)
 
@@ -32,13 +33,13 @@ class KakaoOAuthClient(
         )
         
         val configUris = kakaoProperties.redirectUris.toSet()
+        val singleUri = setOfNotNull(kakaoProperties.redirectUri.takeIf { it.isNotBlank() })
         
-        return hardcodedUris + configUris
+        return hardcodedUris + configUris + singleUri
     }
 
     /**
      * 인가 코드를 이용해 카카오 서버로부터 OAuth 토큰 반환 받음.
-     * 추후 OAuth Token 을 이용해, 카카오 서버로부터 사용자 정보 반환
      */
     fun requestToken(accessCode: String, redirectUri: String): KakaoResponse.OAuthToken {
         val trimmedRedirectUri = redirectUri.trim()
@@ -49,11 +50,6 @@ class KakaoOAuthClient(
             throw AuthException(ErrorCode.KAKAO_INVALID_REDIRECT_URI)
         }
 
-
-        val decodedAccessCode = accessCode
-
-        // 요청 헤더 및 파라미터 구성
-        val restTemplate = RestTemplate()
         val headers = HttpHeaders().apply {
             add("Content-type", "application/x-www-form-urlencoded;charset=utf-8")
         }
@@ -62,57 +58,31 @@ class KakaoOAuthClient(
             add("grant_type", "authorization_code")
             add("client_id", kakaoProperties.clientId)
             add("redirect_uri", trimmedRedirectUri)
-            add("code", decodedAccessCode)
+            add("code", accessCode)
         }
 
-        log.info("카카오 토큰 요청 - redirect_uri: {}", trimmedRedirectUri)
-        log.info("카카오 토큰 요청 - client_id: {}", kakaoProperties.clientId)
-
-
-        val kakaoTokenRequest = HttpEntity(params, headers)
+        log.debug("카카오 토큰 요청 - redirect_uri: {}, client_id: {}", trimmedRedirectUri, kakaoProperties.clientId)
 
         return try {
             val response = restTemplate.exchange(
-                "https://kauth.kakao.com/oauth/token",
+                kakaoProperties.tokenUri,
                 HttpMethod.POST,
-                kakaoTokenRequest,
+                HttpEntity(params, headers),
                 String::class.java
             )
 
             objectMapper.readValue(response.body, KakaoResponse.OAuthToken::class.java)
 
         } catch (e: HttpClientErrorException) {
+            log.error("카카오 토큰 요청 에러 ({}): {}", e.statusCode, e.responseBodyAsString)
             when (e.statusCode.value()) {
-                400 -> {
-                    log.error("카카오 API Bad Request (400): {}", e.responseBodyAsString)
-                    throw AuthException(ErrorCode.KAKAO_INVALID_GRANT)
-                }
-                401 -> {
-                    log.error("카카오 인증 실패 (401): {}", e.responseBodyAsString)
-                    throw AuthException(ErrorCode.KAKAO_INVALID_GRANT)
-                }
-                429 -> {
-                    log.error("카카오 API Rate Limit 초과 (429): {}", e.responseBodyAsString)
-                    throw AuthException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)
-                }
-                else -> {
-                    log.error("카카오 API HTTP 에러 - 상태코드: {}", e.statusCode)
-                    throw AuthException(ErrorCode.KAKAO_API_ERROR)
-                }
+                400, 401 -> throw AuthException(ErrorCode.KAKAO_INVALID_GRANT)
+                429 -> throw AuthException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)
+                else -> throw AuthException(ErrorCode.KAKAO_API_ERROR)
             }
-        } catch (e: AuthException) {
-            throw e
         } catch (e: Exception) {
-            when (e.javaClass.simpleName) {
-                "JsonProcessingException" -> {
-                    log.error("카카오 응답 JSON 파싱 오류: {}", e.message)
-                    throw AuthException(ErrorCode.KAKAO_JSON_PARSE_ERROR)
-                }
-                else -> {
-                    log.error("카카오 API 호출 중 오류 발생: {}", e.message)
-                    throw AuthException(ErrorCode.KAKAO_API_ERROR)
-                }
-            }
+            log.error("카카오 API 호출 중 예외 발생: {}", e.message)
+            throw AuthException(ErrorCode.KAKAO_API_ERROR)
         }
     }
 
@@ -120,50 +90,31 @@ class KakaoOAuthClient(
      * access token 을 사용해 카카오 사용자 정보 요청
      */
     fun requestProfile(oAuthToken: KakaoResponse.OAuthToken?): KakaoResponse.KakaoProfile {
-        if (oAuthToken?.access_token == null) {
-            throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
-        }
+        val accessToken = oAuthToken?.access_token ?: throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
 
-        val restTemplate = RestTemplate()
         val headers = HttpHeaders().apply {
             add("Content-type", "application/x-www-form-urlencoded;charset=utf-8")
-            add("Authorization", "Bearer ${oAuthToken.access_token}")
+            add("Authorization", "Bearer $accessToken")
         }
-        val requestEntity = HttpEntity<Void>(headers)
 
         return try {
             val response = restTemplate.exchange(
-                "https://kapi.kakao.com/v2/user/me",
+                kakaoProperties.userInfoUri,
                 HttpMethod.GET,
-                requestEntity,
+                HttpEntity<Void>(headers),
                 String::class.java
             )
 
             objectMapper.readValue(response.body, KakaoResponse.KakaoProfile::class.java)
         } catch (e: HttpClientErrorException) {
+            log.error("카카오 프로필 요청 에러 ({}): {}", e.statusCode, e.responseBodyAsString)
             when (e.statusCode.value()) {
-                401 -> {
-                    log.error("카카오 프로필 조회 인증 실패 (401): {}", e.responseBodyAsString)
-                    throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
-                }
-                else -> {
-                    log.error("카카오 프로필 요청 중 HTTP 에러 - 상태코드: {}", e.statusCode)
-                    throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
-                }
+                401 -> throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
+                else -> throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
             }
-        } catch (e: AuthException) {
-            throw e
         } catch (e: Exception) {
-            when (e.javaClass.simpleName) {
-                "JsonProcessingException" -> {
-                    log.error("카카오 프로필 파싱 오류: {}", e.message)
-                    throw AuthException(ErrorCode.KAKAO_JSON_PARSE_ERROR)
-                }
-                else -> {
-                    log.error("카카오 프로필 요청 중 오류 발생: {}", e.message)
-                    throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
-                }
-            }
+            log.error("카카오 프로필 요청 중 예외 발생: {}", e.message)
+            throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
         }
     }
 
@@ -171,7 +122,6 @@ class KakaoOAuthClient(
      * 카카오 연결 끊기 (탈퇴 시 사용)
      */
     fun unlink(socialId: String) {
-        val restTemplate = RestTemplate()
         val headers = HttpHeaders().apply {
             add("Content-Type", "application/x-www-form-urlencoded")
             add("Authorization", "KakaoAK ${kakaoProperties.adminKey}")
@@ -182,18 +132,15 @@ class KakaoOAuthClient(
             add("target_id", socialId)
         }
 
-        val request = HttpEntity(params, headers)
-
         try {
             restTemplate.exchange(
                 "https://kapi.kakao.com/v1/user/unlink",
                 HttpMethod.POST,
-                request,
+                HttpEntity(params, headers),
                 String::class.java
             )
         } catch (e: Exception) {
             log.error("카카오 연결 끊기 실패 - socialId: {}, error: {}", socialId, e.message)
-            // 탈퇴 과정이므로 에러가 발생해도 로컬 데이터 삭제는 진행할 수 있도록 예외를 던지지 않거나 로그만 남김
         }
     }
 }

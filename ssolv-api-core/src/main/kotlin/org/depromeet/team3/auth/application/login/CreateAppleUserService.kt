@@ -49,7 +49,6 @@ class CreateAppleUserService(
         socialId: String
     ): User {
         val existingUser = userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)
-            ?: email?.let { userQueryRepository.findByEmail(it) }
 
         return existingUser ?: createNewUser(email, nickname, profileImage, socialId)
     }

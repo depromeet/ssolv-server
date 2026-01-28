@@ -42,7 +42,7 @@ class AppleOAuthService(
         val nickname = buildNickname(userInfo, email)
         val profileImage: String? = null
 
-        log.info("애플 로그인 - socialId: {}, email: {}, nickname: {}", socialId, email, nickname)
+        log.debug("애플 로그인 요청 처리 완료")
 
         // 5. DB 작업 위임
         return createAppleUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)

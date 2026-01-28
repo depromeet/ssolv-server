@@ -20,12 +20,13 @@ class CreateKakaoUserService(
 
     @Transactional(rollbackFor = [Exception::class])
     fun saveUserAndGenerateTokens(
-        email: String,
+        email: String?,
         nickname: String,
         profileImage: String?,
         socialId: String
     ): LoginResponse {
-        val user = findOrCreateUser(email, nickname, profileImage, socialId)
+        val userEmail = email ?: "kakao_${socialId}@kakao.com"
+        val user = findOrCreateUser(userEmail, nickname, profileImage, socialId)
         val tokens = generateAuthenticationTokens(user, profileImage)
 
         return LoginResponse(
@@ -46,7 +47,6 @@ class CreateKakaoUserService(
         socialId: String
     ): User {
         val existingUser = userQueryRepository.findByProviderAndSocialId(AuthProvider.KAKAO, socialId)
-            ?: userQueryRepository.findByEmail(email)
 
         return existingUser ?: createNewUser(email, nickname, profileImage, socialId)
     }

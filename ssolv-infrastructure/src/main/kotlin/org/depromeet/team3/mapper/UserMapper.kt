@@ -30,6 +30,9 @@ class UserMapper : DomainMapper<User, UserEntity> {
             profileImage = domain.profileImage,
             refreshToken = domain.refreshToken,
             nickname = domain.nickname
-        )
+        ).apply {
+            this.createdAt = domain.createdAt
+            this.updatedAt = domain.updatedAt
+        }
     }
 }

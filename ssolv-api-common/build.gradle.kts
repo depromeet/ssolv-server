@@ -16,9 +16,9 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-data-jpa")
 
     // JWT 관련
-    api("io.jsonwebtoken:jjwt-api:0.12.6")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
-    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    api(libs.jjwt.api)
+    runtimeOnly(libs.jjwt.impl)
+    runtimeOnly(libs.jjwt.jackson)
 
     api("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 

@@ -28,7 +28,7 @@ class KakaoLoginService(
 
         // 2. 카카오 프로필 정보 추출
         val socialId = kakaoProfile.id.toString()
-        val email = kakaoProfile.kakao_account.email ?: ""
+        val email = kakaoProfile.kakao_account.email
         val nickname = kakaoProfile.kakao_account.profile.nickname
         val profileImage = kakaoProfile.kakao_account.profile.profile_image_url
 
