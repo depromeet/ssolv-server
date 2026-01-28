@@ -16,6 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.application.common.WithdrawService
+import org.depromeet.team3.meeting.MeetingRepository
+import org.depromeet.team3.meeting.util.MeetingTestDataFactory
+import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
+import org.depromeet.team3.meetingattendee.util.MeetingAttendeeTestDataFactory
 
 @ExtendWith(MockitoExtension::class)
 class WithdrawServiceTest {
@@ -29,6 +33,12 @@ class WithdrawServiceTest {
     @Mock
     private lateinit var kakaoOAuthClient: KakaoOAuthClient
 
+    @Mock
+    private lateinit var meetingRepository: MeetingRepository
+
+    @Mock
+    private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
+
     private lateinit var withdrawService: WithdrawService
 
     @BeforeEach
@@ -36,7 +46,9 @@ class WithdrawServiceTest {
         withdrawService = WithdrawService(
             userQueryRepository,
             userCommandRepository,
-            kakaoOAuthClient
+            kakaoOAuthClient,
+            meetingRepository,
+            meetingAttendeeRepository
         )
     }
 
@@ -51,6 +63,7 @@ class WithdrawServiceTest {
             socialId = socialId
         )
         whenever(userQueryRepository.findById(userId)).thenReturn(user)
+        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
 
         // when
         withdrawService.withdraw(userId)
@@ -69,6 +82,7 @@ class WithdrawServiceTest {
             provider = AuthProvider.APPLE
         )
         whenever(userQueryRepository.findById(userId)).thenReturn(user)
+        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
 
         // when
         withdrawService.withdraw(userId)
@@ -89,5 +103,37 @@ class WithdrawServiceTest {
             withdrawService.withdraw(userId)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
+    }
+
+    @Test
+    fun `회원 탈퇴 실패 - 다른 참석자가 있는 모임 호스팅 중`() {
+        // given
+        val userId = 1L
+        val user = TestDataFactory.createUser(id = userId)
+        val meetingId = 100L
+        val meeting = MeetingTestDataFactory.createMeeting(
+            id = meetingId,
+            hostUserId = userId
+        )
+        val otherAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
+            id = 200L,
+            meetingId = meetingId,
+            userId = 2L // 다른 사용자
+        )
+        val hostAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
+            id = 201L,
+            meetingId = meetingId,
+            userId = userId
+        )
+
+        whenever(userQueryRepository.findById(userId)).thenReturn(user)
+        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(listOf(meeting))
+        whenever(meetingAttendeeRepository.findByMeetingId(meetingId)).thenReturn(listOf(hostAttendee, otherAttendee))
+
+        // when & then
+        val exception = assertThrows<AuthException> {
+            withdrawService.withdraw(userId)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
     }
 }

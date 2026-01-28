@@ -53,7 +53,6 @@ class CreateAppleUserServiceTest {
         )
 
         whenever(userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
-        whenever(userQueryRepository.findByEmail(email)).thenReturn(null)
         whenever(userCommandRepository.save(any())).thenReturn(user)
         whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
