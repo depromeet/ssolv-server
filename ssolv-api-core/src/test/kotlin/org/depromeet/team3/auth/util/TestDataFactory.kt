@@ -1,5 +1,6 @@
 package org.depromeet.team3.auth.util
 
+import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.User
 import org.depromeet.team3.auth.model.KakaoResponse
 import java.time.LocalDateTime
@@ -37,7 +38,7 @@ object TestDataFactory {
 
     fun createUser(
         id: Long? = null,
-        kakaoId: String = "12345",
+        provider: AuthProvider = AuthProvider.KAKAO,
         socialId: String = "12345",
         email: String = "test@example.com",
         nickname: String = "테스트사용자",
@@ -48,7 +49,7 @@ object TestDataFactory {
     ): User {
         return User(
             id = id,
-            kakaoId = kakaoId,
+            provider = provider,
             socialId = socialId,
             email = email,
             nickname = nickname,

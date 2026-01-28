@@ -29,4 +29,9 @@ class UserQueryRepositoryImpl(
     override fun existsByEmail(email: String): Boolean {
         return userJpaRepository.findByEmail(email) != null
     }
+
+    override fun findByProviderAndSocialId(provider: AuthProvider, socialId: String): User? {
+        return userJpaRepository.findByProviderAndSocialId(provider, socialId)
+            ?.let { userMapper.toDomain(it) }
+    }
 }
