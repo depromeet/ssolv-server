@@ -166,4 +166,34 @@ class KakaoOAuthClient(
             }
         }
     }
+
+    /**
+     * 카카오 연결 끊기 (탈퇴 시 사용)
+     */
+    fun unlink(socialId: String) {
+        val restTemplate = RestTemplate()
+        val headers = HttpHeaders().apply {
+            add("Content-Type", "application/x-www-form-urlencoded")
+            add("Authorization", "KakaoAK ${kakaoProperties.adminKey}")
+        }
+
+        val params: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
+            add("target_id_type", "user_id")
+            add("target_id", socialId)
+        }
+
+        val request = HttpEntity(params, headers)
+
+        try {
+            restTemplate.exchange(
+                "https://kapi.kakao.com/v1/user/unlink",
+                HttpMethod.POST,
+                request,
+                String::class.java
+            )
+        } catch (e: Exception) {
+            log.error("카카오 연결 끊기 실패 - socialId: {}, error: {}", socialId, e.message)
+            // 탈퇴 과정이므로 에러가 발생해도 로컬 데이터 삭제는 진행할 수 있도록 예외를 던지지 않거나 로그만 남김
+        }
+    }
 }

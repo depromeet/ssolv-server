@@ -10,5 +10,6 @@ data class KakaoProperties(
     var redirectUri: String = "",
     var redirectUris: List<String> = emptyList(),
     var tokenUri: String = "https://kauth.kakao.com/oauth/token",
-    var userInfoUri: String = "https://kapi.kakao.com/v2/user/me"
+    var userInfoUri: String = "https://kapi.kakao.com/v2/user/me",
+    var adminKey: String = ""
 )
