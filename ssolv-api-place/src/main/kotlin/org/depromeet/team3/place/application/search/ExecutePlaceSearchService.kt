@@ -112,7 +112,7 @@ class ExecutePlaceSearchService(
             }
 
             // 7. 최종 랭킹 산정(가중치 적용 정렬) 및 LLM 랜드마크 상세 분석 보충
-            val rankedItems = rankPlaceSearchService.rank(items, weightByDbId, filteredIds, dbToGoogleId).take(totalFetchSize)
+            val rankedItems = rankPlaceSearchService.rank(items, weightByDbId, filteredIds, dbToGoogleId).take(7)
             val enrichedItems = processPlaceLlmService.applyLlmDetails(rankedItems, savedEntities, filteredIds)
 
             val response = PlacesSearchResponse(enrichedItems)

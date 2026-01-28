@@ -19,6 +19,8 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import kotlin.random.Random
 
+import org.depromeet.team3.common.util.RetryUtil
+
 @Component
 @ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class GooglePlacesClient(
@@ -30,94 +32,6 @@ class GooglePlacesClient(
     
     // API 호출 타임아웃 설정 (5초)
     private val apiTimeoutMillis = 5_000L
-    
-    // 재시도 설정
-    private val maxRetries = 3  // 최대 3번 시도 (초기 1번 + 재시도 2번)
-    private val initialDelayMillis = 100L // 초기 지연 시간 (100ms)
-    private val maxDelayMillis = 2000L // 최대 지연 시간 (2초)
-    private val jitterMaxMillis = 100L // 지터 최대값 (0~100ms)
-
-    /**
-     * 지수 백오프 재시도 로직
-     * 일시적 오류(429, 500-504, 네트워크 오류)에 대해서만 재시도
-     */
-    private suspend fun <T> retryWithExponentialBackoff(
-        operation: String,
-        operationDetail: String = "",
-        block: suspend () -> T
-    ): T {
-        var lastException: Exception? = null
-        var delayMillis = initialDelayMillis
-
-        for (attempt in 0 until maxRetries) {
-            try {
-                return block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: HttpClientErrorException) {
-                val statusCode = e.statusCode.value()
-                if (statusCode in listOf(401, 404)) {
-                    throw e
-                }
-                if (statusCode == 429 || statusCode in 500..504) {
-                    lastException = e
-                    if (attempt < maxRetries - 1) {
-                        val jitter = Random.nextLong(0, jitterMaxMillis)
-                        val totalDelay = delayMillis + jitter
-                        logger.warn(e) { 
-                            "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 상태코드: $statusCode, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                        }
-                        delay(totalDelay)
-                        delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                    }
-                } else {
-                    throw e
-                }
-            } catch (e: RestClientException) {
-                lastException = e
-                if (attempt < maxRetries - 1) {
-                    val jitter = Random.nextLong(0, jitterMaxMillis)
-                    val totalDelay = delayMillis + jitter
-                    logger.warn(e) { 
-                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 네트워크 오류: ${e.message}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                    }
-                    delay(totalDelay)
-                    delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                }
-            } catch (e: Exception) {
-                lastException = e
-                if (attempt < maxRetries - 1) {
-                    val jitter = Random.nextLong(0, jitterMaxMillis)
-                    val totalDelay = delayMillis + jitter
-                    logger.warn(e) { 
-                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 예외: ${e.javaClass.simpleName}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                    }
-                    delay(totalDelay)
-                    delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                }
-            }
-        }
-
-        logger.error(lastException) { "$operation 최종 실패 (${maxRetries - 1}회 재시도 후), $operationDetail" }
-        when (val exception = lastException) {
-            is HttpClientErrorException -> {
-                throw PlaceSearchException(
-                    ErrorCode.PLACE_API_ERROR,
-                    detail = mapOf("statusCode" to exception.statusCode.value(), "detail" to operationDetail)
-                )
-            }
-            is RestClientException -> {
-                throw PlaceSearchException(
-                    ErrorCode.PLACE_API_ERROR,
-                    detail = mapOf("error" to exception.message, "detail" to operationDetail)
-                )
-            }
-            else -> throw exception ?: PlaceSearchException(
-                ErrorCode.PLACE_API_ERROR,
-                detail = mapOf("detail" to "$operation 실패")
-            )
-        }
-    }
 
     /**
      * 텍스트 검색
@@ -129,8 +43,9 @@ class GooglePlacesClient(
         longitude: Double? = null,
         radius: Double = 3000.0
     ): PlacesTextSearchResponse = withContext(Dispatchers.IO) {
-        retryWithExponentialBackoff(
+        RetryUtil.retryWithExponentialBackoff(
             operation = "텍스트 검색",
+            logger = logger,
             operationDetail = "query=$query"
         ) {
             withTimeout(apiTimeoutMillis) {
@@ -173,8 +88,9 @@ class GooglePlacesClient(
      * 사진 데이터 조회
      */
     suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(Dispatchers.IO) {
-        retryWithExponentialBackoff(
+        RetryUtil.retryWithExponentialBackoff(
             operation = "사진 데이터 조회",
+            logger = logger,
             operationDetail = "photoName=$photoName"
         ) {
             withTimeout(apiTimeoutMillis) {
@@ -196,8 +112,9 @@ class GooglePlacesClient(
      * 장소 상세 정보 조회
      */
     suspend fun getPlaceDetails(placeId: String): PlaceDetailsResponse? = withContext(Dispatchers.IO) {
-        retryWithExponentialBackoff(
+        RetryUtil.retryWithExponentialBackoff(
             operation = "장소 상세 조회",
+            logger = logger,
             operationDetail = "placeId=$placeId"
         ) {
             withTimeout(apiTimeoutMillis) {

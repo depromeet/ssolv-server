@@ -99,8 +99,22 @@ class PlaceQuery(
         landmarks: String? = null,
         reason: String? = null
     ) {
-        placeJpaRepository.findByGooglePlaceId(googlePlaceId)?.let { entity ->
-            val updated = PlaceEntity(
+        bulkUpdateLlmData(mapOf(googlePlaceId to LlmUpdateData(summary, landmarks, reason)))
+    }
+
+    /**
+     * LLM 관련 정보 일괄 업데이트
+     */
+    @Transactional
+    fun bulkUpdateLlmData(updateDataMap: Map<String, LlmUpdateData>) {
+        if (updateDataMap.isEmpty()) return
+
+        val googlePlaceIds = updateDataMap.keys.toList()
+        val entities = placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
+
+        val updatedEntities = entities.map { entity ->
+            val data = updateDataMap[entity.googlePlaceId] ?: return@map entity
+            PlaceEntity(
                 id = entity.id,
                 googlePlaceId = entity.googlePlaceId,
                 name = entity.name,
@@ -118,11 +132,18 @@ class PlaceQuery(
                 topReviewText = entity.topReviewText,
                 priceRangeStart = entity.priceRangeStart,
                 priceRangeEnd = entity.priceRangeEnd,
-                addressDescriptor = landmarks ?: entity.addressDescriptor,
-                llmSummary = summary ?: entity.llmSummary,
-                llmReason = reason ?: entity.llmReason
+                addressDescriptor = data.landmarks ?: entity.addressDescriptor,
+                llmSummary = data.summary ?: entity.llmSummary,
+                llmReason = data.reason ?: entity.llmReason
             )
-            placeJpaRepository.save(updated)
         }
+
+        placeJpaRepository.saveAll(updatedEntities)
     }
+
+    data class LlmUpdateData(
+        val summary: String? = null,
+        val landmarks: String? = null,
+        val reason: String? = null
+    )
 }
