@@ -1,5 +1,6 @@
 package org.depromeet.team3.meeting.util
 
+import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingEntity
@@ -14,7 +15,7 @@ object MeetingTestDataFactory {
 
     fun createUserEntity(
         id: Long? = null,
-        kakaoId: String = "test_kakao_id",
+        provider: AuthProvider = AuthProvider.KAKAO,
         socialId: String = "test_social_id",
         email: String = "test@example.com",
         nickname: String = "테스트사용자",
@@ -23,7 +24,7 @@ object MeetingTestDataFactory {
     ): UserEntity {
         return UserEntity(
             id = id,
-            kakaoId = kakaoId,
+            provider = provider,
             socialId = socialId,
             email = email,
             nickname = nickname,

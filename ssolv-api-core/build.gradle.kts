@@ -12,6 +12,10 @@ dependencies {
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
 
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
     testImplementation("org.mockito:mockito-core:5.1.1")
     testImplementation("org.mockito:mockito-junit-jupiter:5.1.1")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
