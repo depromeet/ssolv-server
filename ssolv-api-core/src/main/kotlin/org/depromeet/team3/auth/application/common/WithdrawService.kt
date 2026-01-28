@@ -12,6 +12,8 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * 회원 탈퇴 Service
@@ -30,19 +32,33 @@ class WithdrawService(
      * 회원 탈퇴 처리
      * 1. 호스팅 중인 모임 검증 (다른 참석자가 있는 모임이 있으면 탈퇴 불가)
      * 2. 로컬 데이터 삭제 (Transaction)
-     * 3. 소셜 플랫폼 연동 해제 (Transaction 외부)
+     * 3. 소셜 플랫폼 연동 해제 (Transaction 커밋 후 실행)
      */
+    @Transactional
     fun withdraw(userId: Long) {
         val user = userQueryRepository.findById(userId)
             ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
 
-        // 1. 호스팅 중인 모임 검증
+        // 1. 호스팅 중인 모임 검증 (트랜잭션 참여)
         validateHostedMeetings(userId)
 
-        // 2. 로컬 데이터 삭제 (트랜잭션 내부)
-        deleteLocalUser(user)
+        // 2. 로컬 데이터 삭제 (트랜잭션 참여)
+        // UserEntity의 cascade 설정에 의해 관련 데이터(미팅, 참석자 등)가 원자적으로 삭제됨
+        userCommandRepository.delete(user)
 
-        // 3. 소셜 플랫폼 연동 해제 (트랜잭션 외부 호출로 지연 방지 및 장애 전파 최소화)
+        // 3. 소셜 플랫폼 연동 해제 (트랜잭션 커밋 성공 후 비동기/지연 실행)
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCommit() {
+                    unlinkSocial(user)
+                }
+            })
+        } else {
+            unlinkSocial(user)
+        }
+    }
+
+    private fun unlinkSocial(user: User) {
         try {
             when (user.provider) {
                 AuthProvider.KAKAO -> kakaoOAuthClient.unlink(user.socialId)
@@ -51,7 +67,7 @@ class WithdrawService(
                 }
             }
         } catch (e: Exception) {
-            log.error("소셜 연동 해제 실패 - userId: {}, provider: {}, error: {}", userId, user.provider, e.message)
+            log.error("소셜 연동 해제 실패 - userId: {}, provider: {}, error: {}", user.id, user.provider, e.message)
         }
     }
 
@@ -74,14 +90,5 @@ class WithdrawService(
                 throw AuthException(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
             }
         }
-    }
-
-    @Transactional
-    protected fun deleteLocalUser(user: User) {
-        // UserEntity의 cascade 설정에 의해 다음이 자동으로 삭제됨:
-        // 1. 호스팅 중인 모든 미팅 (meetings with cascade = ALL, orphanRemoval = true)
-        // 2. 각 미팅의 참석자 정보 (MeetingEntity.attendees with cascade = ALL, orphanRemoval = true)
-        // 3. 사용자의 참석 정보 (meetingAttendances with cascade = ALL, orphanRemoval = true)
-        userCommandRepository.delete(user)
     }
 }
