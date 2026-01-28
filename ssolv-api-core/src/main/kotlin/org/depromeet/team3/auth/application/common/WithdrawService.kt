@@ -1,6 +1,7 @@
 package org.depromeet.team3.auth.application.common
 
 import org.depromeet.team3.auth.AuthProvider
+import org.depromeet.team3.auth.User
 import org.depromeet.team3.auth.UserCommandRepository
 import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.client.KakaoOAuthClient
