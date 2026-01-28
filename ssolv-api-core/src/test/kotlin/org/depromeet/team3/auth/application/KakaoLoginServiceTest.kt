@@ -13,9 +13,11 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.assertj.core.api.Assertions.assertThat
+import org.depromeet.team3.auth.application.login.CreateKakaoUserService
+import org.depromeet.team3.auth.application.login.KakaoLoginService
 
 @ExtendWith(MockitoExtension::class)
-class KakaoOAuthServiceTest {
+class KakaoLoginServiceTest {
 
     @Mock
     private lateinit var kakaoOAuthClient: KakaoOAuthClient
@@ -23,7 +25,7 @@ class KakaoOAuthServiceTest {
     @Mock
     private lateinit var createKakaoUserService: CreateKakaoUserService
 
-    private lateinit var kakaoOAuthService: KakaoOAuthService
+    private lateinit var kakaoLoginService: KakaoLoginService
 
     private lateinit var kakaoProfile: KakaoResponse.KakaoProfile
     private lateinit var oAuthToken: KakaoResponse.OAuthToken
@@ -33,7 +35,7 @@ class KakaoOAuthServiceTest {
         val kakaoProperties = KakaoProperties().apply {
             redirectUri = "http://localhost:8080/login/oauth2/code/kakao"
         }
-        kakaoOAuthService = KakaoOAuthService(
+        kakaoLoginService = KakaoLoginService(
             kakaoOAuthClient, 
             createKakaoUserService,
             kakaoProperties
@@ -69,7 +71,7 @@ class KakaoOAuthServiceTest {
         )).thenReturn(loginResponse)
 
         // when
-        val result = kakaoOAuthService.login(command)
+        val result = kakaoLoginService.login(command)
 
         // then
         assertThat(result).isInstanceOf(LoginResponse::class.java)
@@ -113,7 +115,7 @@ class KakaoOAuthServiceTest {
         )).thenReturn(loginResponse)
 
         // when
-        val result = kakaoOAuthService.login(command)
+        val result = kakaoLoginService.login(command)
 
         // then
         assertThat(result.accessToken).isEqualTo("access-token")

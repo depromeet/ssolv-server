@@ -45,6 +45,7 @@ enum class ErrorCode(
     MEETING_ALREADY_JOINED("C4098", "이미 참가한 모임입니다.", 409),
     MEETING_FULL("C4099", "모임 인원이 가득 찼습니다.", 409),
     DUPLICATE_NICKNAME("C4100", "이미 사용 중인 닉네임입니다.", 409),
+    CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS("C4101", "다른 참석자가 있는 모임을 호스팅 중이므로 탈퇴할 수 없습니다. 모임을 종료하거나 호스트를 이전한 후 다시 시도해주세요.", 409),
 
     // 5xx Server Errors
     INTERNAL_SERVER_ERROR("S001", "서버 내부 오류가 발생했습니다.", 500),
@@ -62,6 +63,17 @@ enum class ErrorCode(
     KAKAO_INVALID_REDIRECT_URI("O008", "허용되지 않은 redirect_uri입니다.", 400),
     KAKAO_PROFILE_REQUEST_FAILED("O009", "카카오 프로필 정보 요청에 실패했습니다.", 500),
     KAKAO_REDIRECT_URI_NOT_CONFIGURED("O010", "카카오 OAuth redirect URI가 설정되지 않았습니다.", 500),
+
+    // Apple OAuth 관련 에러 (O011~O020)
+    APPLE_INVALID_GRANT("O011", "애플 인증 코드가 유효하지 않습니다.", 401),
+    APPLE_AUTH_FAILED("O012", "애플 인증에 실패했습니다.", 401),
+    APPLE_JSON_PARSE_ERROR("O013", "애플 응답 데이터 파싱에 실패했습니다.", 500),
+    APPLE_API_ERROR("O014", "애플 API 호출 중 오류가 발생했습니다.", 500),
+    APPLE_INVALID_REDIRECT_URI("O015", "허용되지 않은 redirect_uri입니다.", 400),
+    APPLE_PROFILE_REQUEST_FAILED("O016", "애플 프로필 정보 요청에 실패했습니다.", 500),
+    APPLE_REDIRECT_URI_NOT_CONFIGURED("O017", "애플 OAuth redirect URI가 설정되지 않았습니다.", 500),
+    APPLE_INVALID_ID_TOKEN("O018", "유효하지 않은 애플 ID 토큰입니다.", 401),
+    APPLE_TOKEN_VERIFICATION_FAILED("O019", "애플 토큰 검증에 실패했습니다.", 401),
 
     // JWT 토큰 관련 에러 (J001~J099)
     JWT_TOKEN_MISSING("J001", "JWT 토큰이 누락되었습니다.", 401),

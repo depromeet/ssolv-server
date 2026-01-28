@@ -9,6 +9,9 @@ plugins {
     id("org.sonarqube") version "5.1.0.4882"
 }
 
+// 중복 의존성 관리 및 보안 버전 중앙화
+extra["jjwtVersion"] = "0.13.0"
+
 // 모든 프로젝트 공통 설정
 allprojects {
     group = "org.depromeet"

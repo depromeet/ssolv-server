@@ -1,8 +1,11 @@
 package org.depromeet.team3.auth.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.depromeet.team3.auth.application.KakaoOAuthService
-import org.depromeet.team3.auth.application.UpdateTokenService
+import org.depromeet.team3.auth.application.login.AppleOAuthService
+import org.depromeet.team3.auth.application.login.KakaoLoginService
+import org.depromeet.team3.auth.application.token.UpdateTokenService
+import org.depromeet.team3.auth.application.common.LogoutService
+import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.LoginResponse
@@ -12,6 +15,7 @@ import org.depromeet.team3.auth.dto.UserProfileResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.exception.GlobalExceptionHandler
+import org.depromeet.team3.config.TestUserIdArgumentResolver
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
@@ -29,19 +33,31 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 class AuthControllerTest {
 
     @Mock
-    private lateinit var kakaoOAuthService: KakaoOAuthService
+    private lateinit var kakaoLoginService: KakaoLoginService
+    
+    @Mock
+    private lateinit var appleOAuthService: AppleOAuthService
 
     @Mock
     private lateinit var updateTokenService: UpdateTokenService
+
+    @Mock
+    private lateinit var logoutService: LogoutService
+
+    @Mock
+    private lateinit var withdrawService: WithdrawService
 
     @InjectMocks
     private lateinit var authController: AuthController
 
     private val objectMapper = ObjectMapper()
     
+    private val testUserIdArgumentResolver = TestUserIdArgumentResolver()
+
     private val mockMvc: MockMvc by lazy {
         MockMvcBuilders.standaloneSetup(authController)
             .setControllerAdvice(GlobalExceptionHandler())
+            .setCustomArgumentResolvers(testUserIdArgumentResolver)
             .build()
     }
 
@@ -60,7 +76,7 @@ class AuthControllerTest {
             )
         )
         
-        whenever(kakaoOAuthService.login(any<KakaoLoginCommand>())).thenReturn(loginResponse)
+        whenever(kakaoLoginService.login(any<KakaoLoginCommand>())).thenReturn(loginResponse)
 
         // when & then
         mockMvc.perform(
@@ -196,5 +212,55 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(refreshTokenRequest))
         )
             .andExpect(status().isInternalServerError)
+    }
+
+    @Test
+    fun `로그아웃 성공 - 200 응답`() {
+        // given
+        val userId = 1L
+        testUserIdArgumentResolver.setTestUserId(userId)
+        doNothing().whenever(logoutService).logout(userId)
+
+        // when & then
+        mockMvc.perform(
+            post("/api/v1/auth/logout")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+        
+        verify(logoutService).logout(userId)
+    }
+
+    @Test
+    fun `회원 탈퇴 성공 - 200 응답`() {
+        // given
+        val userId = 1L
+        testUserIdArgumentResolver.setTestUserId(userId)
+        // Unit을 반환하는 메서드는 doNothing() 또는 그냥 놔둬도 됨 (mock이므로)
+
+        // when & then
+        mockMvc.perform(
+            delete("/api/v1/auth/withdraw")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            
+        verify(withdrawService).withdraw(userId)
+    }
+
+    @Test
+    fun `회원 탈퇴 실패 - 404 응답 (사용자 없음)`() {
+        // given
+        val userId = 1L
+        testUserIdArgumentResolver.setTestUserId(userId)
+        whenever(withdrawService.withdraw(any())).thenThrow(AuthException(ErrorCode.USER_NOT_FOUND))
+
+        // when & then
+        mockMvc.perform(
+            delete("/api/v1/auth/withdraw")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.error.code").value("C4051"))
     }
 }

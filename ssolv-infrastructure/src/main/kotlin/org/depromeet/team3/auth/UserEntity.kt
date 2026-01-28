@@ -3,21 +3,28 @@ package org.depromeet.team3.auth
 import jakarta.persistence.*
 import org.depromeet.team3.common.BaseTimeEntity
 import org.depromeet.team3.meeting.MeetingEntity
+import org.depromeet.team3.meetingattendee.MeetingAttendeeEntity
 
 @Entity
-@Table(name = "tb_users")
+@Table(
+    name = "tb_users",
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_user_social", columnNames = ["provider", "social_id"])
+    ]
+)
 class UserEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @Column(name = "kakao_id", nullable = false, unique = true)
-    var kakaoId: String = "",
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false)
+    var provider: AuthProvider = AuthProvider.KAKAO,
 
-    @Column(name = "social_id", nullable = false, unique = true)
+    @Column(name = "social_id", nullable = false)
     var socialId: String = "",
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     var email: String = "",
 
     @Column(name = "profile_image")
@@ -29,6 +36,9 @@ class UserEntity(
     @Column(nullable = false)
     var nickname: String = "",
 
-    @OneToMany(mappedBy = "hostUser", fetch = FetchType.LAZY)
-    val meetings: MutableList<MeetingEntity> = mutableListOf()
+    @OneToMany(mappedBy = "hostUser", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    val meetings: MutableList<MeetingEntity> = mutableListOf(),
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    val meetingAttendances: MutableList<MeetingAttendeeEntity> = mutableListOf()
 ) : BaseTimeEntity()

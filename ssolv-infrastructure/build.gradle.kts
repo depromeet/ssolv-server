@@ -45,6 +45,12 @@ dependencies {
     // Kotlin Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
 
+    // JWT
+    val jjwtVersion = rootProject.extra["jjwtVersion"]
+    implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
+
     // Test Dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

@@ -1,4 +1,4 @@
-package org.depromeet.team3.auth.application
+package org.depromeet.team3.auth.application.login
 
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.command.KakaoLoginCommand
@@ -10,11 +10,9 @@ import org.springframework.stereotype.Service
 
 /**
  * 카카오 로그인 Orchestrator
- * 외부 API 호출만 담당하고, DB 작업은 SaveService에 위임
- * 트랜잭션 없음 - DB 작업만 별도 트랜잭션으로 처리
  */
 @Service
-class KakaoOAuthService(
+class KakaoLoginService(
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val createKakaoUserService: CreateKakaoUserService,
     private val kakaoProperties: KakaoProperties
@@ -34,22 +32,15 @@ class KakaoOAuthService(
         val nickname = kakaoProfile.kakao_account.profile.nickname
         val profileImage = kakaoProfile.kakao_account.profile.profile_image_url
 
-        // 3. DB 작업만 SaveService에 위임 (별도 트랜잭션)
+        // 3. DB 작업 위임
         return createKakaoUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
     }
     
-    /**
-     * 환경에 따른 기본 redirect URI 선택
-     * 우선순위: redirectUris 배열 > redirectUri
-     * 설정이 없으면 AuthException 던짐
-     */
     private fun getDefaultRedirectUri(): String {
         return when {
             kakaoProperties.redirectUris.isNotEmpty() -> kakaoProperties.redirectUris.first()
             !kakaoProperties.redirectUri.isNullOrBlank() -> kakaoProperties.redirectUri
-            else -> throw AuthException(
-                errorCode = ErrorCode.KAKAO_REDIRECT_URI_NOT_CONFIGURED
-            )
+            else -> throw AuthException(errorCode = ErrorCode.KAKAO_REDIRECT_URI_NOT_CONFIGURED)
         }
     }
 }

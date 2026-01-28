@@ -17,6 +17,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.assertj.core.api.Assertions.assertThat
+import org.depromeet.team3.auth.application.token.UpdateTokenService
 import java.time.LocalDateTime
 
 @ExtendWith(MockitoExtension::class)

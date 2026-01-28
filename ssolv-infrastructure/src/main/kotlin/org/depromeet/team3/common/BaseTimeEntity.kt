@@ -11,12 +11,13 @@ import java.time.LocalDateTime
 abstract class BaseTimeEntity {
     
     @Column(name = "created_at", nullable = false, updatable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-    
+    var createdAt: LocalDateTime = LocalDateTime.now()
+        protected set
+
     @Column(name = "updated_at")
     var updatedAt: LocalDateTime? = null
         protected set
-    
+
     fun updateTimestamp() {
         updatedAt = LocalDateTime.now()
     }

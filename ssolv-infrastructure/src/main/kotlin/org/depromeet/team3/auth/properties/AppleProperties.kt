@@ -4,12 +4,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Component
 
 @Component
-@ConfigurationProperties(prefix = "kakao")
-data class KakaoProperties(
+@ConfigurationProperties(prefix = "apple")
+data class AppleProperties(
+    var teamId: String = "",
+    var keyId: String = "",
     var clientId: String = "",
     var redirectUri: String = "",
     var redirectUris: List<String> = emptyList(),
-    var tokenUri: String = "https://kauth.kakao.com/oauth/token",
-    var userInfoUri: String = "https://kapi.kakao.com/v2/user/me",
-    var adminKey: String = ""
+    var privateKey: String = "",
+    var tokenUri: String = "https://appleid.apple.com/auth/token"
 )

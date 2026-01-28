@@ -15,10 +15,11 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-actuator")
     api("org.springframework.boot:spring-boot-starter-data-jpa")
 
-    // JWT 관련
-    api("io.jsonwebtoken:jjwt-api:0.12.6")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
-    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    // JWT 관련 (Root build.gradle.kts에서 중앙 관리)
+    val jjwtVersion = rootProject.extra["jjwtVersion"]
+    api("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
 
     api("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 
