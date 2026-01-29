@@ -4,13 +4,13 @@ import org.depromeet.team3.common.ContextConstants.API_VERSION_V1
 import org.depromeet.team3.common.ContextConstants.BASE_DOMAIN
 import org.depromeet.team3.common.ContextConstants.HTTPS_PROTOCOL
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.ValidateInviteTokenResponse
 import org.depromeet.team3.meeting.exception.InvalidInviteTokenException
 import org.depromeet.team3.meeting.exception.MeetingException
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.util.DataEncoder
+import org.depromeet.team3.util.MeetingIdParser
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.ZoneOffset
@@ -77,6 +77,11 @@ class InviteTokenService(
         }
 
         return ValidateInviteTokenResponse(meetingId)
+    }
+
+    @Transactional(readOnly = true)
+    fun resolveMeetingId(identifier: String): Long {
+        return MeetingIdParser.parse(identifier)
     }
 
     private fun parseTokenData(token: String): Pair<Long, Long> {

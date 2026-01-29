@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.depromeet.team3.common.ContextConstants
+import org.depromeet.team3.common.annotation.MeetingId
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.common.response.DpmApiResponse
 import org.depromeet.team3.survey.application.CreateSurveyService
@@ -33,8 +34,8 @@ class SurveyController(
     )
     @PostMapping
     fun createSurvey(
-        @Parameter(description = "모임 ID", example = "1")
-        @PathVariable meetingId: Long,
+        @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
+        @MeetingId("meetingId") meetingId: Long,
         @UserId userId: Long,
         @RequestBody @Valid request: SurveyCreateRequest
     ): DpmApiResponse<SurveyCreateResponse> {

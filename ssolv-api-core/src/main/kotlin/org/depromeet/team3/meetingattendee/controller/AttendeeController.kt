@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.depromeet.team3.common.ContextConstants
+import org.depromeet.team3.common.annotation.MeetingId
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.common.response.DpmApiResponse
 import org.depromeet.team3.meetingattendee.application.UpdateAttendeeService
@@ -26,8 +27,8 @@ class AttendeeController(
     fun updateAttendee(
         @UserId userId: Long,
 
-        @Parameter(description = "모임 ID", required = true)
-        @PathVariable meetingId: Long,
+        @Parameter(description = "모임 ID 또는 초대 토큰", required = true)
+        @MeetingId("meetingId") meetingId: Long,
 
         @Parameter(description = "참여자 정보 수정 요청", required = true)
         @RequestBody @Valid request: UpdateAttendeeRequest

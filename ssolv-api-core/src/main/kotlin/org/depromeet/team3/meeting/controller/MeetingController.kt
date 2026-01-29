@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.depromeet.team3.common.ContextConstants
+import org.depromeet.team3.common.annotation.MeetingId
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.common.response.DpmApiResponse
 import org.depromeet.team3.meeting.application.CreateMeetingService
@@ -53,10 +54,10 @@ class MeetingController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "모임 상세 정보 조회 성공")
     )
-    @GetMapping("/{meetingId}")
+    @GetMapping("/{identifier}")
     fun getMeetingDetail(
-        @Parameter(description = "모임 ID", example = "1")
-        @PathVariable meetingId: Long,
+        @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
+        @MeetingId("identifier") meetingId: Long,
         @UserId userId: Long
     ) : DpmApiResponse<MeetingDetailResponse> {
         val response = getMeetingDetailService.invoke(meetingId, userId)
@@ -71,10 +72,10 @@ class MeetingController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "종료된 모임 상세 정보 조회 성공")
     )
-    @GetMapping("/{meetingId}/history")
+    @GetMapping("/{identifier}/history")
     fun getMeetingDetailHistory(
-        @Parameter(description = "모임 ID", example = "1")
-        @PathVariable meetingId: Long,
+        @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
+        @MeetingId("identifier") meetingId: Long,
         @UserId userId: Long
     ): DpmApiResponse<MeetingDetailResponse> {
         val response = getMeetingDetailService.invoke(meetingId, userId, allowClosed = true)
@@ -90,10 +91,10 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "초대 토큰 조회 성공"),
         ApiResponse(responseCode = "400", description = "잘못된 요청 (모임이 존재하지 않거나 종료된 경우)")
     )
-    @GetMapping("/{meetingId}/invite-token")
+    @GetMapping("/{identifier}/invite-token")
     fun getInviteToken(
-        @Parameter(description = "모임 ID", example = "5")
-        @PathVariable meetingId: Long
+        @Parameter(description = "모임 ID 또는 초대 토큰", example = "5")
+        @MeetingId("identifier") meetingId: Long
     ): DpmApiResponse<GetInviteTokenResponse> {
         val inviteUrl = inviteTokenService.generateInviteToken(meetingId)
         val token = inviteUrl.substringAfter("token=")
