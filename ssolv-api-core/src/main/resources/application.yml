@@ -54,6 +54,18 @@ kakao:
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
 
+# 애플 OAuth 설정
+apple:
+  team-id: ${APPLE_TEAM_ID}
+  key-id: ${APPLE_KEY_ID}
+  client-id: ${APPLE_CLIENT_ID}
+  redirect-uris:
+    - http://localhost:3000/auth/callback
+    - http://localhost:8080/auth/callback
+    - https://api.ssolv.site/auth/callback
+    - https://www.ssolv.site/auth/callback
+  private-key: ${APPLE_PRIVATE_KEY}
+
 springdoc:
   swagger-ui:
     urls:
