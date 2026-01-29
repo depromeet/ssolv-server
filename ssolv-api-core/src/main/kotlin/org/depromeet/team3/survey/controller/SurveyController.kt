@@ -35,7 +35,7 @@ class SurveyController(
     @PostMapping
     fun createSurvey(
         @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
-        @MeetingId meetingId: Long,
+        @MeetingId("meetingId") meetingId: Long,
         @UserId userId: Long,
         @RequestBody @Valid request: SurveyCreateRequest
     ): DpmApiResponse<SurveyCreateResponse> {

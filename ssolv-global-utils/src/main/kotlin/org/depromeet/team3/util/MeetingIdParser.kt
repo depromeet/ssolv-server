@@ -12,6 +12,9 @@ object MeetingIdParser {
      */
     fun parse(identifier: String): Long {
         val token = if (identifier.startsWith("http")) {
+            if (!identifier.contains("token=")) {
+                throw IllegalArgumentException("Invalid invitation URL: missing token parameter")
+            }
             identifier.substringAfter("token=")
         } else {
             identifier

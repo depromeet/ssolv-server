@@ -38,6 +38,15 @@ class MeetingIdParserTest {
     }
 
     @Test
+    fun `전체 초대 URL에 token 파라미터가 없으면 IllegalArgumentException을 발생시킨다`() {
+        val urlWithoutToken = "https://api.ssolv.site/api/v1/meetings/validate-invite"
+
+        assertThrows<IllegalArgumentException> {
+            MeetingIdParser.parse(urlWithoutToken)
+        }
+    }
+
+    @Test
     fun `잘못된 형식의 토큰이 들어오면 IllegalArgumentException을 발생시킨다`() {
         val invalidToken = "!!invalid!!"
 

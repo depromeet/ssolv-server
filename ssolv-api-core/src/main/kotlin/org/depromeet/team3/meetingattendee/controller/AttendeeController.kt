@@ -28,7 +28,7 @@ class AttendeeController(
         @UserId userId: Long,
 
         @Parameter(description = "모임 ID 또는 초대 토큰", required = true)
-        @MeetingId meetingId: Long,
+        @MeetingId("meetingId") meetingId: Long,
 
         @Parameter(description = "참여자 정보 수정 요청", required = true)
         @RequestBody @Valid request: UpdateAttendeeRequest
