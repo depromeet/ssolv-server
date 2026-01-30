@@ -84,9 +84,26 @@ class AuthController(
     fun appleLogin(
         @Parameter(description = "애플 OAuth 인가코드", required = true)
         @RequestParam("code") code: String,
-        @Parameter(description = "리다이렉트 URI", required = false)
+        
+        @Parameter(
+            description = "리다이렉트 URI",
+            required = false,
+            schema = Schema(
+                type = "string",
+                allowableValues = [
+                    "http://localhost:3000/auth/callback",
+                    "http://localhost:8080/auth/callback",
+                    "https://www.ssolv.site/auth/callback",
+                    "https://api.ssolv.site/auth/callback"
+                ]
+            )
+        )
         @RequestParam(value = "redirect_uri", required = false) redirectUri: String?,
-        @Parameter(description = "최초 로그인 시 제공되는 사용자 정보 (JSON 문자열)", required = false)
+
+        @Parameter(
+            description = "최초 로그인 시 제공되는 사용자 정보 (JSON 문자열). 이름(firstName, lastName) 추출을 위해 필요합니다.",
+            required = false
+        )
         @RequestParam(value = "user", required = false) user: String?
     ): DpmApiResponse<LoginResponse> {
         val command = AppleLoginCommand(authorizationCode = code, redirectUri = redirectUri, user = user)
