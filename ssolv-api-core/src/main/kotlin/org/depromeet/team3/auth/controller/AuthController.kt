@@ -91,8 +91,6 @@ class AuthController(
             schema = Schema(
                 type = "string",
                 allowableValues = [
-                    "http://localhost:3000/auth/callback",
-                    "http://localhost:8080/auth/callback",
                     "https://www.ssolv.site/auth/callback",
                     "https://api.ssolv.site/auth/callback"
                 ]
