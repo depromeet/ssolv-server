@@ -21,9 +21,12 @@ class GeminiRestClientConfiguration {
     private val logger = KotlinLogging.logger {}
 
     @Bean
-    fun geminiRestClient(geminiProperties: GeminiProperties): RestClient {
+    fun geminiRestClient(
+        geminiProperties: GeminiProperties,
+        geminiHttpRequestFactory: ClientHttpRequestFactory
+    ): RestClient {
         return RestClient.builder()
-            .requestFactory(geminiHttpRequestFactory())
+            .requestFactory(geminiHttpRequestFactory)
             .baseUrl(geminiProperties.baseUrl)
             .defaultHeaders { headers ->
                 headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
@@ -59,9 +62,11 @@ class GeminiRestClientConfiguration {
     }
 
     @Bean
-    fun geminiHttpRequestFactory(): ClientHttpRequestFactory {
+    fun geminiHttpRequestFactory(
+        geminiConnectionManager: PoolingHttpClientConnectionManager
+    ): ClientHttpRequestFactory {
         val httpClient = HttpClients.custom()
-            .setConnectionManager(geminiConnectionManager())
+            .setConnectionManager(geminiConnectionManager)
             .build()
 
         return HttpComponentsClientHttpRequestFactory(httpClient).apply {
