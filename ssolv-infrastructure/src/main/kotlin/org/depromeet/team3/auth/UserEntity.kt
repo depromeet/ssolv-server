@@ -39,10 +39,10 @@ class UserEntity(
     @Column(nullable = false)
     var nickname: String = "",
 
-    @OneToMany(mappedBy = "hostUser", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OneToMany(mappedBy = "hostUser", fetch = FetchType.LAZY)
     val meetings: MutableList<MeetingEntity> = mutableListOf(),
 
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     val meetingAttendances: MutableList<MeetingAttendeeEntity> = mutableListOf(),
 
     @Column(name = "deleted_at")
