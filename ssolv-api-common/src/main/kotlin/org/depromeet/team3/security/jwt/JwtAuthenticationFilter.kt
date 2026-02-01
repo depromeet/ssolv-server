@@ -7,7 +7,9 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.resolver.UserIdArgumentResolver
 import org.depromeet.team3.common.response.DpmApiResponse
+import org.slf4j.MDC
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
@@ -87,6 +89,9 @@ class JwtAuthenticationFilter(
                 val authorities = listOf<GrantedAuthority>(SimpleGrantedAuthority("ROLE_USER"))
                 val authentication = JwtAuthenticationToken(authResult.userId, authorities)
                 SecurityContextHolder.getContext().authentication = authentication
+                
+                // MDC에 사용자 ID 저장 (로그 추적용)
+                MDC.put(UserIdArgumentResolver.USER_ID, authResult.userId.toString())
             }
             is AuthResult.Failed -> {
                 SecurityContextHolder.clearContext()

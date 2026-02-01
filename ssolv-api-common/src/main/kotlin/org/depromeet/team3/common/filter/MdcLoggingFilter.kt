@@ -71,9 +71,13 @@ class MdcLoggingFilter : OncePerRequestFilter() {
             filterChain.doFilter(request, response)
         } finally {
             val duration = System.currentTimeMillis() - startTime
-            logger.info(
-                "HTTP Request Completed - status=${response.status} method=${request.method} uri=${request.requestURI} duration=${duration}ms"
-            )
+            val logMessage = "HTTP Request Completed - status=${response.status} method=${request.method} uri=${request.requestURI} duration=${duration}ms"
+            
+            if (request.method == "GET" && response.status == HttpServletResponse.SC_OK) {
+                logger.debug(logMessage)
+            } else {
+                logger.info(logMessage)
+            }
             MDC.clear()
         }
     }

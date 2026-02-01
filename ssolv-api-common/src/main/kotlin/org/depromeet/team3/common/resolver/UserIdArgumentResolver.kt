@@ -65,8 +65,8 @@ class UserIdArgumentResolver : HandlerMethodArgumentResolver {
         // MDC에 사용자 ID 저장
         MDC.put(USER_ID, userId.toString())
         
-        // 사용자 식별 로그
-        logger.info("User identified: userId={}", userId)
+        // 사용자 식별 로그 (MDC에 이미 포함되어 있으므로 DEBUG 레벨로 변경)
+        logger.debug("User identified: userId={}", userId)
 
         return userId
     }
