@@ -4,8 +4,11 @@ import jakarta.persistence.*
 import org.depromeet.team3.common.BaseTimeEntity
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meetingattendee.MeetingAttendeeEntity
+import org.hibernate.annotations.SQLRestriction
+import java.time.LocalDateTime
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(
     name = "tb_users",
     uniqueConstraints = [
@@ -40,5 +43,8 @@ class UserEntity(
     val meetings: MutableList<MeetingEntity> = mutableListOf(),
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
-    val meetingAttendances: MutableList<MeetingAttendeeEntity> = mutableListOf()
+    val meetingAttendances: MutableList<MeetingAttendeeEntity> = mutableListOf(),
+
+    @Column(name = "deleted_at")
+    var deletedAt: LocalDateTime? = null
 ) : BaseTimeEntity()

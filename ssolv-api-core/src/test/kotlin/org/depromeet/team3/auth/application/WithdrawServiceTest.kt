@@ -70,7 +70,11 @@ class WithdrawServiceTest {
 
         // then
         verify(kakaoOAuthClient).unlink(socialId)
-        verify(userCommandRepository).delete(user)
+        verify(userCommandRepository).save(argThat { 
+            this.email.startsWith("withdrawn_") && 
+            this.socialId.startsWith("withdrawn_") &&
+            this.deletedAt != null
+        })
     }
 
     @Test
@@ -88,7 +92,12 @@ class WithdrawServiceTest {
         withdrawService.withdraw(userId)
 
         // then
-        verify(userCommandRepository).delete(user)
+        // then
+        verify(userCommandRepository).save(argThat { 
+            this.email.startsWith("withdrawn_") && 
+            this.socialId.startsWith("withdrawn_") &&
+            this.deletedAt != null
+        })
         verifyNoInteractions(kakaoOAuthClient)
     }
 

@@ -45,7 +45,8 @@ object TestDataFactory {
         profileImage: String? = "http://example.com/profile.jpg",
         refreshToken: String? = null,
         createdAt: LocalDateTime = LocalDateTime.now(),
-        updatedAt: LocalDateTime? = null
+        updatedAt: LocalDateTime? = null,
+        deletedAt: LocalDateTime? = null
     ): User {
         return User(
             id = id,
@@ -56,7 +57,8 @@ object TestDataFactory {
             profileImage = profileImage,
             refreshToken = refreshToken,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            deletedAt = deletedAt
         )
     }
 }

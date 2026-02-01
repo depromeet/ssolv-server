@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.LocalDateTime
 
 /**
  * 회원 탈퇴 Service
@@ -42,9 +43,13 @@ class WithdrawService(
         // 1. 호스팅 중인 모임 검증 (트랜잭션 참여)
         validateHostedMeetings(userId)
 
-        // 2. 로컬 데이터 삭제 (트랜잭션 참여)
-        // UserEntity의 cascade 설정에 의해 관련 데이터(미팅, 참석자 등)가 원자적으로 삭제됨
-        userCommandRepository.delete(user)
+        // 2. 로컬 데이터 삭제 (소프트 딜리트)
+        val withdrawnUser = user.copy(
+            email = "withdrawn_${System.currentTimeMillis()}_${user.email}",
+            socialId = "withdrawn_${System.currentTimeMillis()}_${user.socialId}",
+            deletedAt = LocalDateTime.now()
+        )
+        userCommandRepository.save(withdrawnUser)
 
         // 3. 소셜 플랫폼 연동 해제 (트랜잭션 커밋 성공 후 비동기/지연 실행)
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

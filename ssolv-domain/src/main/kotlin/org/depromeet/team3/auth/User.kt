@@ -15,4 +15,5 @@ data class User(
     val meetings: MutableList<Meeting> = mutableListOf(),
     override val createdAt: LocalDateTime,
     override val updatedAt: LocalDateTime? = null,
+    val deletedAt: LocalDateTime? = null,
 ) : BaseTimeDomain(createdAt, updatedAt)

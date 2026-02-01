@@ -17,7 +17,8 @@ class UserMapper : DomainMapper<User, UserEntity> {
             profileImage = entity.profileImage,
             refreshToken = entity.refreshToken,
             createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            updatedAt = entity.updatedAt,
+            deletedAt = entity.deletedAt
         )
     }
 
@@ -29,7 +30,8 @@ class UserMapper : DomainMapper<User, UserEntity> {
             email = domain.email,
             profileImage = domain.profileImage,
             refreshToken = domain.refreshToken,
-            nickname = domain.nickname
+            nickname = domain.nickname,
+            deletedAt = domain.deletedAt
         )
         // Note: createdAt and updatedAt are now managed by JPA auditing
         // Do not manually set these fields to prevent audit integrity issues
