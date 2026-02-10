@@ -97,7 +97,7 @@ class GetMeetingDetailServiceTest {
             meetingId = meetingId,
             userId = 456L,
             attendeeNickname = "아따맘마",
-            muzziColor = MuzziColor.CHOCOLATE
+            muzziColor = MuzziColor.BANANA
         )
 
         val attendee2 = MeetingAttendeeTestDataFactory.createMeetingAttendee(
@@ -105,7 +105,7 @@ class GetMeetingDetailServiceTest {
             meetingId = meetingId,
             userId = 789L,
             attendeeNickname = "아따맘마마마",
-            muzziColor = MuzziColor.ORANGE
+            muzziColor = MuzziColor.BROCCOLI
         )
 
         val survey1 = SurveyTestDataFactory.createSurvey(
@@ -144,7 +144,7 @@ class GetMeetingDetailServiceTest {
         val participant1 = result.participantList.find { it.userId == 456L }
         assertNotNull(participant1)
         assertEquals("아따맘마", participant1.nickname)
-        assertEquals("chocolate", participant1.profileColor)
+        assertEquals("banana", participant1.profileColor)
     }
 
     @Test
@@ -283,7 +283,7 @@ class GetMeetingDetailServiceTest {
             meetingId = meetingId,
             userId = 789L,
             attendeeNickname = "설문 안 한 참가자",
-            muzziColor = MuzziColor.ORANGE
+            muzziColor = MuzziColor.BANANA
         )
 
         val survey1 = SurveyTestDataFactory.createSurvey(

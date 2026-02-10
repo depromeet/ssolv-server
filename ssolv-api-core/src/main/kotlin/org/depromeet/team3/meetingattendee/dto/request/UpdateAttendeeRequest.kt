@@ -9,6 +9,6 @@ data class UpdateAttendeeRequest(
     @field:NotBlank(message = "참여자 닉네임은 필수입니다.")
     val attendeeNickname: String,
 
-    @Schema(description = "모임에서 사용할 무찌 색상", example = "ORANGE")
+    @Schema(description = "모임에서 사용할 프로필 색상", example = "BANANA")
     val color: String?
 )

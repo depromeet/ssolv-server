@@ -3,15 +3,15 @@ package org.depromeet.team3.meetingattendee
 enum class MuzziColor {
     NONE,
     DEFAULT,
-    STRAWBERRY,
-    MATCHA,
-    ORANGE,
-    GRAPE,
-    CHOCOLATE,
-    MILK,
-    MINT,
-    SWEET_POTATO,
-    PISTACHIO
+    BANANA,
+    BROCCOLI,
+    CARROT,
+    LEMON,
+    MUSHROOM,
+    PAPRIKA,
+    PEAR,
+    TOMATO,
+    TURNIP
     ;
 
     companion object {
