@@ -34,5 +34,8 @@ data class MeetingInfoResponse(
     
     @Schema(description = "모임 수정 시간", example = "2024-12-25T15:30:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    val updatedAt: LocalDateTime?
+    val updatedAt: LocalDateTime?,
+
+    @Schema(description = "모임 토큰", example = "abc123def456")
+    val token: String? = null
 )

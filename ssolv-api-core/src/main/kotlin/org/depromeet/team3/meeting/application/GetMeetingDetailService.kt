@@ -28,7 +28,8 @@ class GetMeetingDetailService(
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
     private val surveyRepository: SurveyRepository,
     private val surveyResultRepository: SurveyResultRepository,
-    private val surveyCategoryRepository: SurveyCategoryRepository
+    private val surveyCategoryRepository: SurveyCategoryRepository,
+    private val inviteTokenService: InviteTokenService,
 ) {
 
     @Transactional
@@ -70,7 +71,8 @@ class GetMeetingDetailService(
             stationName = stationName,
             endAt = endAt,
             createdAt = createdAt,
-            updatedAt = meeting.updatedAt
+            updatedAt = meeting.updatedAt,
+            token = inviteTokenService.generateToken(meeting)
         )
 
         // 참가자 목록 조회
