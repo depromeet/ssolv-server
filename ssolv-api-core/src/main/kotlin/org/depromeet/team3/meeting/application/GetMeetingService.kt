@@ -14,7 +14,8 @@ class GetMeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
     private val stationRepository: StationRepository,
-    private val getSurveyListService: GetSurveyListService
+    private val getSurveyListService: GetSurveyListService,
+    private val inviteTokenService: InviteTokenService,
 ) {
 
     @Transactional(readOnly = true)
@@ -48,7 +49,8 @@ class GetMeetingService(
                 stationName = stationName,
                 endAt = meeting.endAt!!,
                 createdAt = meeting.createdAt!!,
-                updatedAt = meeting.updatedAt
+                updatedAt = meeting.updatedAt,
+                token = inviteTokenService.generateToken(meeting)
             )
 
             val participantList = try {

@@ -50,6 +50,9 @@ class GetMeetingDetailServiceTest {
 
     @Mock
     private lateinit var surveyCategoryRepository: SurveyCategoryRepository
+    
+    @Mock
+    private lateinit var inviteTokenService: InviteTokenService
 
     private lateinit var getMeetingDetailService: GetMeetingDetailService
 
@@ -61,7 +64,8 @@ class GetMeetingDetailServiceTest {
             meetingAttendeeRepository,
             surveyRepository,
             surveyResultRepository,
-            surveyCategoryRepository
+            surveyCategoryRepository,
+            inviteTokenService
         )
     }
 
@@ -126,6 +130,7 @@ class GetMeetingDetailServiceTest {
         whenever(meetingAttendeeRepository.findByMeetingId(meetingId)).thenReturn(listOf(attendee1, attendee2))
         whenever(surveyRepository.findByMeetingId(meetingId)).thenReturn(listOf(survey1, survey2))
         whenever(surveyResultRepository.findBySurveyIdIn(listOf(1L, 2L))).thenReturn(emptyList())
+        whenever(inviteTokenService.generateToken(meeting)).thenReturn("test-token")
 
         // when
         val result = getMeetingDetailService.invoke(meetingId, userId)
@@ -140,6 +145,7 @@ class GetMeetingDetailServiceTest {
         assertEquals(meetingEndAt, result.meetingInfo.endAt)
         assertEquals(meetingCreatedAt, result.meetingInfo.createdAt)
         assertEquals(meetingUpdatedAt, result.meetingInfo.updatedAt)
+        assertEquals("test-token", result.meetingInfo.token)
         
         val participant1 = result.participantList.find { it.userId == 456L }
         assertNotNull(participant1)

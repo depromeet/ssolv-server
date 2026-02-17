@@ -4,6 +4,7 @@ import org.depromeet.team3.common.ContextConstants.API_VERSION_V1
 import org.depromeet.team3.common.ContextConstants.BASE_DOMAIN
 import org.depromeet.team3.common.ContextConstants.HTTPS_PROTOCOL
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.ValidateInviteTokenResponse
 import org.depromeet.team3.meeting.exception.InvalidInviteTokenException
@@ -32,14 +33,20 @@ class InviteTokenService(
         val meeting = meetingRepository.findById(meetingId)
             ?: throw IllegalArgumentException("Not Found meeting ID: $meetingId")
 
+        val token = generateToken(meeting)
+            ?: throw IllegalStateException("Ended meeting ID: $meetingId")
+        
+        return "$HTTPS_PROTOCOL/$BASE_DOMAIN/$API_VERSION_V1/meetings/validate-invite?token=$token"
+    }
+
+    fun generateToken(meeting: Meeting): String? {
         if (meeting.isClosed) {
-            throw IllegalStateException("Ended meeting ID: $meetingId")
+            return null
         }
 
         val endAtTimestamp = meeting.endAt?.toInstant(ZoneOffset.UTC)?.toEpochMilli() ?: Long.MAX_VALUE
         
-        val encodedData = DataEncoder.encodeWithSeparator(SEPARATOR, meetingId.toString(), endAtTimestamp.toString())
-        return "$HTTPS_PROTOCOL/$BASE_DOMAIN/$API_VERSION_V1/meetings/validate-invite?token=$encodedData"
+        return DataEncoder.encodeWithSeparator(SEPARATOR, meeting.id.toString(), endAtTimestamp.toString())
     }
 
     @Transactional(readOnly = true)
