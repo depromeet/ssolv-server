@@ -1,14 +1,16 @@
-package org.depromeet.team3.place.application.execution
+package org.depromeet.team3.place.application.search
+
+import kotlinx.coroutines.CancellationException
 
 import org.depromeet.team3.place.PlaceQuery
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
-class PlacePhotoService(
+class GetPlacePhotoService(
     private val placeQuery: PlaceQuery
 ) {
-    private val logger = LoggerFactory.getLogger(PlacePhotoService::class.java)
+    private val logger = LoggerFactory.getLogger(GetPlacePhotoService::class.java)
 
     /**
      * 장소 사진 데이터를 조회합니다.
@@ -23,6 +25,13 @@ class PlacePhotoService(
         }
 
         // 2. 인프라 계층을 통해 데이터 조회
-        return placeQuery.fetchPhoto(photoName)
+        return try {
+            placeQuery.fetchPhoto(photoName)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn("Google 사진 조회 실패: photoName={}, error={}", photoName, e.message)
+            null
+        }
     }
 }

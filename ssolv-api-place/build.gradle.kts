@@ -9,8 +9,8 @@ dependencies {
 
     implementation("org.springframework:spring-jdbc:6.2.3")
 
-    // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
 
     testImplementation("org.mockito:mockito-core:5.1.1")
     testImplementation("org.mockito:mockito-junit-jupiter:5.1.1")

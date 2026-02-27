@@ -1,4 +1,4 @@
-package org.depromeet.team3.place.application.model
+package org.depromeet.team3.place.application.search.model
 
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.surveycategory.SurveyCategory

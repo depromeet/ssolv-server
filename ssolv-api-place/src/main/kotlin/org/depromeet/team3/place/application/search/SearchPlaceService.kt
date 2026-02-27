@@ -1,9 +1,8 @@
-package org.depromeet.team3.place.application.facade
+package org.depromeet.team3.place.application.search
 
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.place.application.execution.ExecutePlaceSearchService
-import org.depromeet.team3.place.application.plan.CreatePlaceSearchPlanService
+import org.depromeet.team3.place.application.search.planner.CreatePlaceSearchPlanService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.springframework.stereotype.Service
@@ -13,7 +12,7 @@ import org.springframework.stereotype.Service
  * PlaceSearchPlanService와 PlaceSearchExecutionService를 순차 호출한다.
  */
 @Service
-class GetPlacesService(
+class SearchPlaceService(
     private val createPlaceSearchPlanService: CreatePlaceSearchPlanService,
     private val executePlaceSearchService: ExecutePlaceSearchService
 ) {

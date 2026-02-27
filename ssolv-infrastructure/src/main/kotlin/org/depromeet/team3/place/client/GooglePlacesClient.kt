@@ -1,25 +1,25 @@
 package org.depromeet.team3.place.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.place.exception.PlaceSearchException
+import org.depromeet.team3.place.model.PlaceDetailsResponse
 import org.depromeet.team3.place.model.PlacesTextSearchRequest
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
-import kotlin.random.Random
+
+import org.depromeet.team3.common.util.RetryUtil
 
 @Component
-@ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class GooglePlacesClient(
     private val googlePlacesRestClient: RestClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
@@ -29,92 +29,6 @@ class GooglePlacesClient(
     
     // API 호출 타임아웃 설정 (5초)
     private val apiTimeoutMillis = 5_000L
-    
-    // 재시도 설정
-    private val maxRetries = 3  // 최대 3번 시도 (초기 1번 + 재시도 2번)
-    private val initialDelayMillis = 100L // 초기 지연 시간 (100ms)
-    private val maxDelayMillis = 2000L // 최대 지연 시간 (2초)
-    private val jitterMaxMillis = 100L // 지터 최대값 (0~100ms)
-
-    /**
-     * 지수 백오프 재시도 로직
-     * 일시적 오류(429, 500-504, 네트워크 오류)에 대해서만 재시도
-     */
-    private suspend fun <T> retryWithExponentialBackoff(
-        operation: String,
-        operationDetail: String = "",
-        block: suspend () -> T
-    ): T {
-        var lastException: Exception? = null
-        var delayMillis = initialDelayMillis
-
-        for (attempt in 0 until maxRetries) {
-            try {
-                return block()
-            } catch (e: HttpClientErrorException) {
-                val statusCode = e.statusCode.value()
-                if (statusCode in listOf(401, 404)) {
-                    throw e
-                }
-                if (statusCode == 429 || statusCode in 500..504) {
-                    lastException = e
-                    if (attempt < maxRetries - 1) {
-                        val jitter = Random.nextLong(0, jitterMaxMillis)
-                        val totalDelay = delayMillis + jitter
-                        logger.warn(e) { 
-                            "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 상태코드: $statusCode, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                        }
-                        delay(totalDelay)
-                        delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                    }
-                } else {
-                    throw e
-                }
-            } catch (e: RestClientException) {
-                lastException = e
-                if (attempt < maxRetries - 1) {
-                    val jitter = Random.nextLong(0, jitterMaxMillis)
-                    val totalDelay = delayMillis + jitter
-                    logger.warn(e) { 
-                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 네트워크 오류: ${e.message}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                    }
-                    delay(totalDelay)
-                    delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                }
-            } catch (e: Exception) {
-                lastException = e
-                if (attempt < maxRetries - 1) {
-                    val jitter = Random.nextLong(0, jitterMaxMillis)
-                    val totalDelay = delayMillis + jitter
-                    logger.warn(e) { 
-                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 예외: ${e.javaClass.simpleName}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
-                    }
-                    delay(totalDelay)
-                    delayMillis = minOf(delayMillis * 2, maxDelayMillis)
-                }
-            }
-        }
-
-        logger.error(lastException) { "$operation 최종 실패 (${maxRetries - 1}회 재시도 후), $operationDetail" }
-        when (val exception = lastException) {
-            is HttpClientErrorException -> {
-                throw PlaceSearchException(
-                    ErrorCode.PLACE_API_ERROR,
-                    detail = mapOf("statusCode" to exception.statusCode.value(), "detail" to operationDetail)
-                )
-            }
-            is RestClientException -> {
-                throw PlaceSearchException(
-                    ErrorCode.PLACE_API_ERROR,
-                    detail = mapOf("error" to exception.message, "detail" to operationDetail)
-                )
-            }
-            else -> throw exception ?: PlaceSearchException(
-                ErrorCode.PLACE_API_ERROR,
-                detail = mapOf("detail" to "$operation 실패")
-            )
-        }
-    }
 
     /**
      * 텍스트 검색
@@ -126,11 +40,12 @@ class GooglePlacesClient(
         longitude: Double? = null,
         radius: Double = 3000.0
     ): PlacesTextSearchResponse = withContext(Dispatchers.IO) {
-        retryWithExponentialBackoff(
-            operation = "텍스트 검색",
-            operationDetail = "query=$query"
-        ) {
-            try {
+        try {
+            RetryUtil.retryWithExponentialBackoff(
+                operation = "텍스트 검색",
+                logger = logger,
+                operationDetail = "query=$query"
+            ) {
                 withTimeout(apiTimeoutMillis) {
                     val locationBias = if (latitude != null && longitude != null) {
                         PlacesTextSearchRequest.LocationBias(
@@ -164,27 +79,25 @@ class GooglePlacesClient(
                         detail = mapOf("query" to query)
                     )
                 }
-            } catch (e: TimeoutCancellationException) {
-                logger.error(e) { "Google Places API 텍스트 검색 타임아웃: query=$query" }
-                throw PlaceSearchException(
-                    ErrorCode.PLACE_API_ERROR,
-                    detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)")
-                )
-            } catch (e: Exception) {
-                throw e
             }
+        } catch (e: CancellationException) {
+            logger.debug { "텍스트 검색 취소됨: query=$query" }
+            throw e
+        } catch (e: Exception) {
+            handleException("텍스트 검색", "query=$query", e)
         }
     }
 
     /**
-     * 사진 데이터 조회 (New API)
+     * 사진 데이터 조회
      */
     suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(Dispatchers.IO) {
-        retryWithExponentialBackoff(
-            operation = "사진 데이터 조회",
-            operationDetail = "photoName=$photoName"
-        ) {
-            try {
+        try {
+            RetryUtil.retryWithExponentialBackoff(
+                operation = "사진 데이터 조회",
+                logger = logger,
+                operationDetail = "photoName=$photoName"
+            ) {
                 withTimeout(apiTimeoutMillis) {
                     googlePlacesRestClient.get()
                         .uri { uriBuilder ->
@@ -197,10 +110,60 @@ class GooglePlacesClient(
                         .retrieve()
                         .body(ByteArray::class.java)
                 }
-            } catch (e: Exception) {
-                logger.error(e) { "Google Places API 사진 조회 실패: photoName=$photoName" }
-                null
             }
+        } catch (e: CancellationException) {
+            logger.debug { "사진 데이터 조회 취소됨: photoName=$photoName" }
+            throw e
+        } catch (e: Exception) {
+            handleException("사진 데이터 조회", "photoName=$photoName", e)
+        }
+    }
+
+    /**
+     * 장소 상세 정보 조회
+     */
+    suspend fun getPlaceDetails(placeId: String): PlaceDetailsResponse? = withContext(Dispatchers.IO) {
+        try {
+            RetryUtil.retryWithExponentialBackoff(
+                operation = "장소 상세 조회",
+                logger = logger,
+                operationDetail = "placeId=$placeId"
+            ) {
+                withTimeout(apiTimeoutMillis) {
+                    googlePlacesRestClient.get()
+                        .uri("/v1/places/$placeId")
+                        .header("X-Goog-Api-Key", googlePlacesApiProperties.apiKey)
+                        .header("X-Goog-FieldMask", buildDetailsFieldMask())
+                        .retrieve()
+                        .body(PlaceDetailsResponse::class.java)
+                }
+            }
+        } catch (e: CancellationException) {
+            logger.debug { "장소 상세 조회 취소됨: placeId=$placeId" }
+            throw e
+        } catch (e: Exception) {
+            handleException("장소 상세 조회", "placeId=$placeId", e)
+        }
+    }
+
+    private fun handleException(operation: String, detail: String, e: Exception): Nothing {
+        when (e) {
+            is HttpClientErrorException -> {
+                throw PlaceSearchException(
+                    ErrorCode.PLACE_API_ERROR,
+                    detail = mapOf("statusCode" to e.statusCode.value(), "detail" to detail)
+                )
+            }
+            is RestClientException -> {
+                throw PlaceSearchException(
+                    ErrorCode.PLACE_API_ERROR,
+                    detail = mapOf("error" to e.message, "detail" to detail)
+                )
+            }
+            else -> throw e as? PlaceSearchException ?: PlaceSearchException(
+                ErrorCode.PLACE_API_ERROR,
+                detail = mapOf("detail" to "$operation 실패", "error" to e.message)
+            )
         }
     }
 
@@ -216,7 +179,20 @@ class GooglePlacesClient(
             "places.userRatingCount",
             "places.photos",
             "places.location",
-            "places.types"
+            "places.types",
+            "places.currentOpeningHours"
+        ).joinToString(",")
+    }
+
+    private fun buildDetailsFieldMask(): String {
+        return listOf(
+            "id",
+            "displayName",
+            "formattedAddress",
+            "rating",
+            "userRatingCount",
+            "location",
+            "types"
         ).joinToString(",")
     }
 }

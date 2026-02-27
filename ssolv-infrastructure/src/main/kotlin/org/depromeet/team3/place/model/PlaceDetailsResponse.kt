@@ -3,7 +3,7 @@ package org.depromeet.team3.place.model
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Google Places API (New) Place Details 응답
+ * Google Places API Place Details 응답
  */
 data class PlaceDetailsResponse(
     val id: String,
@@ -24,7 +24,8 @@ data class PlaceDetailsResponse(
     val priceRange: PriceRange? = null,
     @JsonProperty("addressDescriptor")
     val addressDescriptor: AddressDescriptor? = null,
-    val location: Location? = null
+    val location: Location? = null,
+    val types: List<String>? = null
 ) {
     data class DisplayName(
         val text: String,

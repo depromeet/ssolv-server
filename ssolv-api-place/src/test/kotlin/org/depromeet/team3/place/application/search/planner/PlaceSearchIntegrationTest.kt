@@ -1,7 +1,9 @@
-package org.depromeet.team3.place.application.plan
+package org.depromeet.team3.place.application.search.planner
 
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.place.application.model.PlaceSurveySummary
+import org.depromeet.team3.meeting.MeetingQuery
+import org.depromeet.team3.place.application.search.model.PlaceSurveySummary
+import org.depromeet.team3.place.application.search.planner.SelectSurveyKeywordsService
 import org.depromeet.team3.surveycategory.SurveyCategory
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.junit.jupiter.api.Test
@@ -138,7 +140,7 @@ class PlaceSearchIntegrationTest {
     ): PlaceSurveySummary {
         return PlaceSurveySummary(
             stationName = stationName,
-            stationCoordinates = org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.498, 127.028),
+            stationCoordinates = MeetingQuery.StationCoordinates(37.498, 127.028),
             totalRespondents = totalRespondents,
             leafVotes = leafVotes,
             branchVotes = branchVotes,

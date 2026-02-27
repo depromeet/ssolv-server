@@ -1,11 +1,11 @@
-package org.depromeet.team3.place.application.plan
+package org.depromeet.team3.place.application.search.planner
 
-import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordCandidate
-import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordType
-import org.depromeet.team3.place.application.model.PlaceSurveySummary
+import org.depromeet.team3.place.application.search.support.CreateSurveyKeywordService.KeywordCandidate
+import org.depromeet.team3.place.application.search.support.CreateSurveyKeywordService.KeywordType
+import org.depromeet.team3.place.application.search.model.PlaceSurveySummary
+import org.depromeet.team3.place.application.search.support.CreateSurveyKeywordService
 import org.springframework.stereotype.Service
 import java.util.LinkedHashMap
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**

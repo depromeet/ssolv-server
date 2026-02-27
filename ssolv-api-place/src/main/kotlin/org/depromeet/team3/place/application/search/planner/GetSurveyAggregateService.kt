@@ -1,8 +1,8 @@
-package org.depromeet.team3.place.application.plan
+package org.depromeet.team3.place.application.search.planner
 
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
-import org.depromeet.team3.place.application.model.PlaceSurveySummary
+import org.depromeet.team3.place.application.search.model.PlaceSurveySummary
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.station.StationRepository
 import org.depromeet.team3.survey.SurveyRepository

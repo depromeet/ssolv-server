@@ -1,4 +1,4 @@
-package org.depromeet.team3.place.application.execution
+package org.depromeet.team3.place.application.search.components
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -8,7 +8,6 @@ import org.depromeet.team3.meeting.exception.MeetingException
 import org.depromeet.team3.meetingplacesearch.MeetingPlaceSearchEntity
 import org.depromeet.team3.meetingplacesearch.MeetingPlaceSearchRepository
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -20,7 +19,7 @@ import java.time.LocalDateTime
  * - 재요청 시 JSON 역직렬화 후 좋아요만 업데이트
  */
 @Service
-class MeetingPlaceSearchService(
+class ManagePlaceSearchService(
     private val repository: MeetingPlaceSearchRepository,
     private val meetingRepository: MeetingRepository,
     private val objectMapper: ObjectMapper

@@ -1,7 +1,7 @@
-package org.depromeet.team3.place.application.model
+package org.depromeet.team3.place.application.search.model
 
 import org.depromeet.team3.meeting.MeetingQuery
-import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
+import org.depromeet.team3.place.application.search.support.CreateSurveyKeywordService
 
 /**
  *  검색 실행 전 '검색 전략' 표현하는 모델

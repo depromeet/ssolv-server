@@ -1,6 +1,7 @@
-package org.depromeet.team3.place.application.plan
+package org.depromeet.team3.place.application.search.planner
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.place.application.model.PlaceSearchPlan
+import org.depromeet.team3.place.application.search.model.PlaceSearchPlan
+import org.depromeet.team3.place.application.search.support.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.springframework.stereotype.Service

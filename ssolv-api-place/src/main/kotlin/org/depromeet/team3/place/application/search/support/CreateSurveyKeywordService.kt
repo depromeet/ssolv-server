@@ -1,6 +1,8 @@
-package org.depromeet.team3.place.application.plan
+package org.depromeet.team3.place.application.search.support
 
 import org.depromeet.team3.meeting.MeetingQuery
+import org.depromeet.team3.place.application.search.planner.GetSurveyAggregateService
+import org.depromeet.team3.place.application.search.planner.SelectSurveyKeywordsService
 import org.springframework.stereotype.Service
 
 /**

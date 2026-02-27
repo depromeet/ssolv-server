@@ -26,7 +26,7 @@ class PlaceDataCleanupScheduler(
 
         try {
             val deletedCount = placeJpaRepository.deleteByUpdatedAtBefore(thirtyDaysAgo)
-            logger.info("30일 경과 장소 데이터 삭제 완료: {}건", deletedCount)
+            logger.debug("30일 경과 장소 데이터 삭제 완료: {}건", deletedCount)
         } catch (e: Exception) {
             logger.error("장소 데이터 정리 중 오류 발생", e)
         }

@@ -2,10 +2,10 @@ package org.depromeet.team3.place.application
 
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.place.application.facade.GetPlacesService
-import org.depromeet.team3.place.application.plan.CreatePlaceSearchPlanService
-import org.depromeet.team3.place.application.execution.ExecutePlaceSearchService
-import org.depromeet.team3.place.application.model.PlaceSearchPlan
+import org.depromeet.team3.place.application.search.SearchPlaceService
+import org.depromeet.team3.place.application.search.planner.CreatePlaceSearchPlanService
+import org.depromeet.team3.place.application.search.ExecutePlaceSearchService
+import org.depromeet.team3.place.application.search.model.PlaceSearchPlan
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.junit.jupiter.api.BeforeEach
@@ -16,7 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 
 @ExtendWith(MockitoExtension::class)
-class GetPlacesServiceTest {
+class SearchPlaceServiceTest {
 
     @Mock
     private lateinit var createPlaceSearchPlanService: CreatePlaceSearchPlanService
@@ -24,11 +24,11 @@ class GetPlacesServiceTest {
     @Mock
     private lateinit var executePlaceSearchService: ExecutePlaceSearchService
     
-    private lateinit var getPlacesService: GetPlacesService
+    private lateinit var searchPlaceService: SearchPlaceService
 
     @BeforeEach
     fun setUp() {
-        getPlacesService = GetPlacesService(
+        searchPlaceService = SearchPlaceService(
             createPlaceSearchPlanService = createPlaceSearchPlanService,
             executePlaceSearchService = executePlaceSearchService
         )
@@ -51,7 +51,7 @@ class GetPlacesServiceTest {
             .thenReturn(expectedResponse)
 
         // when
-        val response = getPlacesService.textSearch(request)
+        val response = searchPlaceService.textSearch(request)
 
         // then
         assertThat(response).isEqualTo(expectedResponse)

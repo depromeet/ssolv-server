@@ -72,4 +72,4 @@ springdoc:
       - name: Core API
         url: /v3/api-docs
       - name: Place API
-        url: /places/v3/api-docs
+        url: http://localhost:8081/v3/api-docs

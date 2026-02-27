@@ -8,4 +8,5 @@ import java.time.LocalDateTime
 interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
     fun findByGooglePlaceIdIn(googlePlaceIds: List<String>): List<PlaceEntity>
     fun deleteByUpdatedAtBefore(dateTime: LocalDateTime): Int
+    fun findByGooglePlaceId(googlePlaceId: String): PlaceEntity?
 }
