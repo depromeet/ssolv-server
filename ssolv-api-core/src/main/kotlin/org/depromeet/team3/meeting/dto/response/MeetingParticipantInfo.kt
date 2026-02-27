@@ -8,10 +8,10 @@ data class MeetingParticipantInfo(
     val userId: Long,
     
     @Schema(description = "참여자 닉네임", example = "아따맘마")
-    val nickname: String,
+    val attendeeNickname: String,
     
     @Schema(description = "프로필 색상", example = "choco")
-    val profileColor: String,
+    val color: String,
     
     @Schema(description = "선택한 설문 카테고리 목록")
     val selectedCategories: List<ParticipantSelectedCategory>

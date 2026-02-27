@@ -149,8 +149,8 @@ class GetMeetingDetailServiceTest {
         
         val participant1 = result.participantList.find { it.userId == 456L }
         assertNotNull(participant1)
-        assertEquals("아따맘마", participant1.nickname)
-        assertEquals("banana", participant1.profileColor)
+        assertEquals("아따맘마", participant1.attendeeNickname)
+        assertEquals("banana", participant1.color)
     }
 
     @Test
@@ -313,7 +313,7 @@ class GetMeetingDetailServiceTest {
 
         val participant = result.participantList.first()
         assertEquals(456L, participant.userId)
-        assertEquals("설문한 참가자", participant.nickname)
+        assertEquals("설문한 참가자", participant.attendeeNickname)
         assertTrue(participant.selectedCategories.isEmpty())
     }
 

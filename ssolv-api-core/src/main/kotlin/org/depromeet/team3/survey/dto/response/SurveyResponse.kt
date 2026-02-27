@@ -14,7 +14,7 @@ data class SurveyItemResponse(
     val participantId: Long,
     
     @Schema(description = "참가자 닉네임", example = "홍길동")
-    val nickname: String?,
+    val attendeeNickname: String?,
     
     @Schema(description = "선택된 카테고리 ID 목록", example = "[1, 3, 5]")
     val selectedCategoryList: List<Long>
