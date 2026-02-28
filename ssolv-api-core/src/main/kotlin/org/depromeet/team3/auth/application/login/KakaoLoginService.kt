@@ -17,10 +17,11 @@ import org.springframework.stereotype.Service
 class KakaoLoginService(
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val createKakaoUserService: CreateKakaoUserService,
-    private val kakaoProperties: KakaoProperties
+    private val kakaoProperties: KakaoProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    suspend fun login(command: KakaoLoginCommand): LoginResponse = withContext(CoroutineDispatchers.VT) {
+    suspend fun login(command: KakaoLoginCommand): LoginResponse = withContext(coroutineDispatchers.VT) {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 

@@ -31,7 +31,8 @@ import java.util.concurrent.ConcurrentHashMap
 class AppleOAuthClient(
     private val objectMapper: ObjectMapper,
     private val appleProperties: AppleProperties,
-    private val restTemplate: RestTemplate
+    private val restTemplate: RestTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthClient::class.java)
     
@@ -56,7 +57,7 @@ class AppleOAuthClient(
     /**
      * 인가 코드를 이용해 애플 서버로부터 OAuth 토큰 반환 받음
      */
-    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken = withContext(CoroutineDispatchers.VT) {
+    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken = withContext(coroutineDispatchers.VT) {
         val trimmedRedirectUri = redirectUri.trim()
 
         if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {

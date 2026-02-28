@@ -13,7 +13,9 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.assertj.core.api.Assertions.assertThat
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.auth.application.login.CreateKakaoUserService
 import org.depromeet.team3.auth.application.login.KakaoLoginService
 
@@ -26,6 +28,9 @@ class KakaoLoginServiceTest {
     @Mock
     private lateinit var createKakaoUserService: CreateKakaoUserService
 
+    @Mock
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+
     private lateinit var kakaoLoginService: KakaoLoginService
 
     private lateinit var kakaoProfile: KakaoResponse.KakaoProfile
@@ -33,13 +38,16 @@ class KakaoLoginServiceTest {
     
     @BeforeEach
     fun setUp() {
+        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        
         val kakaoProperties = KakaoProperties().apply {
             redirectUri = "http://localhost:8080/login/oauth2/code/kakao"
         }
         kakaoLoginService = KakaoLoginService(
             kakaoOAuthClient, 
             createKakaoUserService,
-            kakaoProperties
+            kakaoProperties,
+            coroutineDispatchers
         )
 
         kakaoProfile = TestDataFactory.createKakaoProfile()

@@ -29,7 +29,8 @@ class WithdrawService(
     private val userCommandRepository: UserCommandRepository,
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val meetingRepository: MeetingRepository,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeRepository: MeetingAttendeeRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(WithdrawService::class.java)
 
@@ -59,7 +60,7 @@ class WithdrawService(
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
-                    CoroutineScope(CoroutineDispatchers.VT).launch {
+                    CoroutineScope(coroutineDispatchers.VT).launch {
                         try {
                             unlinkSocial(user)
                         } catch (e: Exception) {
@@ -69,7 +70,7 @@ class WithdrawService(
                 }
             })
         } else {
-            withContext(CoroutineDispatchers.VT) {
+            withContext(coroutineDispatchers.VT) {
                 unlinkSocial(user)
             }
         }

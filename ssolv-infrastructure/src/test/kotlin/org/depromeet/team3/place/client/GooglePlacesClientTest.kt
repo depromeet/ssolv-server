@@ -9,16 +9,22 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.web.client.RestClient
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 
 class GooglePlacesClientTest {
 
     private lateinit var restClient: RestClient
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var googlePlacesClient: GooglePlacesClient
 
     @BeforeEach
     fun setUp() {
         restClient = mock()
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
             baseUrl = "https://places.googleapis.com"
@@ -26,7 +32,8 @@ class GooglePlacesClientTest {
         
         googlePlacesClient = GooglePlacesClient(
             googlePlacesRestClient = restClient,
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
+            coroutineDispatchers = coroutineDispatchers
         )
     }
 

@@ -1,18 +1,27 @@
 package org.depromeet.team3.common.util
 
+import jakarta.annotation.PreDestroy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import org.springframework.stereotype.Component
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-object CoroutineDispatchers {
+@Component
+open class CoroutineDispatchers {
     /**
      * Virtual Thread 기반 Dispatcher
-     *
      * - Blocking I/O 구간 격리 목적
-     * - 기존 동기 코드 유지
-     * - 스레드 점유 비용 최소화
      */
-    val VT: CoroutineDispatcher by lazy {
-        Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()
+    private val executor: ExecutorService = Executors.newVirtualThreadPerTaskExecutor()
+    
+    val VT: CoroutineDispatcher = executor.asCoroutineDispatcher()
+
+    /**
+     * 애플리케이션 종료 시 리소스 반납
+     */
+    @PreDestroy
+    fun shutdown() {
+        executor.shutdown()
     }
 }

@@ -10,14 +10,34 @@ import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.mockito.kotlin.mock
 import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.mockito.kotlin.whenever
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.junit.jupiter.api.BeforeEach
 
 class KakaoOAuthClientTest {
+    
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+    private lateinit var kakaoProperties: KakaoProperties
+    private lateinit var kakaoOAuthClient: KakaoOAuthClient
+
+    @BeforeEach
+    fun setUp() {
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        
+        kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
+        kakaoOAuthClient = KakaoOAuthClient(
+            objectMapper = ObjectMapper(),
+            kakaoProperties = kakaoProperties,
+            restTemplate = mock(),
+            coroutineDispatchers = coroutineDispatchers
+        )
+    }
 
     @Test
     fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() {
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val invalidRedirectUri = "http://invalid-uri.com"
         val accessCode = "test-access-code"
 
@@ -32,8 +52,7 @@ class KakaoOAuthClientTest {
     @Test
     fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() {
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
+        // Already initialized in setUp
 
         // when & then
         val exception = assertThrows<AuthException> {
@@ -46,8 +65,6 @@ class KakaoOAuthClientTest {
     @Test
     fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() {
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val invalidRedirectUriWithSpaces = "  http://invalid-uri.com  "
         val accessCode = "test-access-code"
 
@@ -62,8 +79,6 @@ class KakaoOAuthClientTest {
     @Test
     fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() {
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val oAuthToken = KakaoResponse.OAuthToken(
             access_token = "valid-access-token"
         )

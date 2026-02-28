@@ -21,11 +21,12 @@ class AppleOAuthService(
     private val appleOAuthClient: AppleOAuthClient,
     private val createAppleUserService: CreateAppleUserService,
     private val appleProperties: AppleProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthService::class.java)
 
-    suspend fun login(command: AppleLoginCommand): LoginResponse = withContext(CoroutineDispatchers.VT) {
+    suspend fun login(command: AppleLoginCommand): LoginResponse = withContext(coroutineDispatchers.VT) {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 

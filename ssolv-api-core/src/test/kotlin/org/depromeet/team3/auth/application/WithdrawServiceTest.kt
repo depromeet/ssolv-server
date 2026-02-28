@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.meeting.MeetingRepository
@@ -46,6 +47,9 @@ class WithdrawServiceTest {
     @Mock
     private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
+    @Mock
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+
     private lateinit var withdrawService: WithdrawService
 
     private val testDispatcher = StandardTestDispatcher()
@@ -53,12 +57,15 @@ class WithdrawServiceTest {
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        whenever(coroutineDispatchers.VT).thenReturn(testDispatcher)
+        
         withdrawService = WithdrawService(
             userQueryRepository,
             userCommandRepository,
             kakaoOAuthClient,
             meetingRepository,
-            meetingAttendeeRepository
+            meetingAttendeeRepository,
+            coroutineDispatchers
         )
     }
 

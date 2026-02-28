@@ -23,6 +23,7 @@ import kotlin.random.Random
 class GooglePlacesClient(
     private val googlePlacesRestClient: RestClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     private val logger = KotlinLogging.logger { GooglePlacesClient::class.java.name }
@@ -125,7 +126,7 @@ class GooglePlacesClient(
         latitude: Double? = null,
         longitude: Double? = null,
         radius: Double = 3000.0
-    ): PlacesTextSearchResponse = withContext(CoroutineDispatchers.VT) {
+    ): PlacesTextSearchResponse = withContext(coroutineDispatchers.VT) {
         retryWithExponentialBackoff(
             operation = "텍스트 검색",
             operationDetail = "query=$query"
@@ -179,7 +180,7 @@ class GooglePlacesClient(
     /**
      * 사진 데이터 조회 (New API)
      */
-    suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(CoroutineDispatchers.VT) {
+    suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(coroutineDispatchers.VT) {
         retryWithExponentialBackoff(
             operation = "사진 데이터 조회",
             operationDetail = "photoName=$photoName"

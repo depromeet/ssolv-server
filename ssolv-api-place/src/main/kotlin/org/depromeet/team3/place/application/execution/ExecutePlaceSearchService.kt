@@ -39,7 +39,8 @@ class ExecutePlaceSearchService(
     private val meetingPlaceRepository: MeetingPlaceRepository,
     private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
-    private val googlePlacesApiProperties: GooglePlacesApiProperties
+    private val googlePlacesApiProperties: GooglePlacesApiProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -484,7 +485,7 @@ class ExecutePlaceSearchService(
         }
 
         return try {
-            withContext(CoroutineDispatchers.VT) {
+            withContext(coroutineDispatchers.VT) {
                 placeQuery.textSearch(
                     query = sanitizedQuery,
                     maxResults = keywordFetchSize,

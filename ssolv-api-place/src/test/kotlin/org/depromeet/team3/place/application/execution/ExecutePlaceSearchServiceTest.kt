@@ -19,6 +19,9 @@ import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
+import org.mockito.kotlin.whenever
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import java.util.ArrayDeque
 
 class ExecutePlaceSearchServiceTest {
@@ -28,6 +31,7 @@ class ExecutePlaceSearchServiceTest {
     private lateinit var placeLikeRepository: PlaceLikeRepository
     private lateinit var searchService: MeetingPlaceSearchService
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
 
     private lateinit var service: ExecutePlaceSearchService
 
@@ -41,12 +45,16 @@ class ExecutePlaceSearchServiceTest {
             on { proxyBaseUrl } doReturn "https://proxy.url"
         }
 
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+
         service = ExecutePlaceSearchService(
             placeQuery = placeQuery,
             meetingPlaceRepository = meetingPlaceRepository,
             placeLikeRepository = placeLikeRepository,
             searchService = searchService,
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
+            coroutineDispatchers = coroutineDispatchers
         )
 
         searchService.stub {

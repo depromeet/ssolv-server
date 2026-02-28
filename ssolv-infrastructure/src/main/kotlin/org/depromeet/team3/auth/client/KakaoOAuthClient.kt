@@ -21,7 +21,8 @@ import org.depromeet.team3.common.util.CoroutineDispatchers
 class KakaoOAuthClient(
     private val objectMapper: ObjectMapper,
     private val kakaoProperties: KakaoProperties,
-    private val restTemplate: RestTemplate
+    private val restTemplate: RestTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(KakaoOAuthClient::class.java)
 
@@ -43,7 +44,7 @@ class KakaoOAuthClient(
     /**
      * 인가 코드를 이용해 카카오 서버로부터 OAuth 토큰 반환 받음.
      */
-    suspend fun requestToken(accessCode: String, redirectUri: String): KakaoResponse.OAuthToken = withContext(CoroutineDispatchers.VT) {
+    suspend fun requestToken(accessCode: String, redirectUri: String): KakaoResponse.OAuthToken = withContext(coroutineDispatchers.VT) {
         val trimmedRedirectUri = redirectUri.trim()
 
         if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
@@ -91,7 +92,7 @@ class KakaoOAuthClient(
     /**
      * access token 을 사용해 카카오 사용자 정보 요청
      */
-    suspend fun requestProfile(oAuthToken: KakaoResponse.OAuthToken?): KakaoResponse.KakaoProfile = withContext(CoroutineDispatchers.VT) {
+    suspend fun requestProfile(oAuthToken: KakaoResponse.OAuthToken?): KakaoResponse.KakaoProfile = withContext(coroutineDispatchers.VT) {
         val accessToken = oAuthToken?.access_token ?: throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
 
         val headers = HttpHeaders().apply {
@@ -123,7 +124,7 @@ class KakaoOAuthClient(
     /**
      * 카카오 연결 끊기 (탈퇴 시 사용)
      */
-    suspend fun unlink(socialId: String) = withContext(CoroutineDispatchers.VT) {
+    suspend fun unlink(socialId: String) = withContext(coroutineDispatchers.VT) {
         val headers = HttpHeaders().apply {
             add("Content-Type", "application/x-www-form-urlencoded")
             add("Authorization", "KakaoAK ${kakaoProperties.adminKey}")
