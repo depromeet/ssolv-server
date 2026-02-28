@@ -9,13 +9,15 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.depromeet.team3.util.DataEncoder
+import org.depromeet.team3.auth.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class JoinMeetingService(
     private val meetingRepository: MeetingRepository,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeRepository: MeetingAttendeeRepository,
+    private val userRepository: UserRepository
 ) {
 
     @Transactional
@@ -26,11 +28,19 @@ class JoinMeetingService(
         val meetingId = parseTokenId(token)
         validateMeeting(meetingId, userId)
 
+        val user = userRepository.findById(userId)
+            .orElseThrow { 
+                MeetingException(
+                    errorCode = ErrorCode.USER_NOT_FOUND,
+                    detail = mapOf("userId" to userId)
+                )
+            }
+
         val meetingAttendee = MeetingAttendee(
             id = null,
             meetingId = meetingId,
             userId = userId,
-            attendeeNickname = null,
+            attendeeNickname = user.nickname,
             muzziColor = MuzziColor.DEFAULT,
             createdAt = null,
             updatedAt = null

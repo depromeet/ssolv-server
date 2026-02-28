@@ -8,6 +8,8 @@ import org.depromeet.team3.meetingattendee.MeetingAttendee
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
+import org.depromeet.team3.auth.UserRepository
+import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.util.DataEncoder
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
@@ -29,12 +31,15 @@ class JoinMeetingServiceTest {
     @Mock
     private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
+    @Mock
+    private lateinit var userRepository: UserRepository
+
     private lateinit var joinMeetingService: JoinMeetingService
 
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        joinMeetingService = JoinMeetingService(meetingRepository, meetingAttendeeRepository)
+        joinMeetingService = JoinMeetingService(meetingRepository, meetingAttendeeRepository, userRepository)
     }
 
     @Test
@@ -54,6 +59,8 @@ class JoinMeetingServiceTest {
             endAt = LocalDateTime.now().plusHours(2)
         )
 
+        val user = UserEntity(id = userId, nickname = "테스트유저")
+        whenever(userRepository.findById(userId)).thenReturn(java.util.Optional.of(user))
         whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
         whenever(meetingAttendeeRepository.findByMeetingIdAndUserId(meetingId, userId)).thenReturn(null)
         whenever(meetingAttendeeRepository.countByMeetingId(meetingId)).thenReturn(2)
@@ -70,6 +77,7 @@ class JoinMeetingServiceTest {
         assertEquals(MuzziColor.DEFAULT, savedAttendee.muzziColor)
         assertEquals(userId, savedAttendee.userId)
         assertEquals(meetingId, savedAttendee.meetingId)
+        assertEquals("테스트유저", savedAttendee.attendeeNickname)
     }
 
     @Test
@@ -89,6 +97,8 @@ class JoinMeetingServiceTest {
             endAt = LocalDateTime.now().plusDays(1)
         )
 
+        val user = UserEntity(id = userId, nickname = "성공유저")
+        whenever(userRepository.findById(userId)).thenReturn(java.util.Optional.of(user))
         whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
         whenever(meetingAttendeeRepository.findByMeetingIdAndUserId(meetingId, userId)).thenReturn(null)
         whenever(meetingAttendeeRepository.countByMeetingId(meetingId)).thenReturn(5)
@@ -104,6 +114,7 @@ class JoinMeetingServiceTest {
         val savedAttendee = attendeeCaptor.firstValue
         assertNotNull(savedAttendee)
         assertEquals(MuzziColor.DEFAULT, savedAttendee.muzziColor)
+        assertEquals("성공유저", savedAttendee.attendeeNickname)
     }
 
     @Test
