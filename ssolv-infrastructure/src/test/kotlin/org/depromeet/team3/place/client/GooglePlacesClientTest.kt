@@ -16,6 +16,7 @@ import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
 class GooglePlacesClientTest {
 
@@ -28,7 +29,6 @@ class GooglePlacesClientTest {
     fun setUp() {
         restClient = mock()
         coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
         
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
@@ -44,6 +44,7 @@ class GooglePlacesClientTest {
 
     @Test
     fun `텍스트 검색 성공`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "강남역 맛집"
         val mockResponse = PlacesTextSearchResponse(
             places = listOf(

@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
 class KakaoOAuthClientTest {
     
@@ -29,7 +30,6 @@ class KakaoOAuthClientTest {
     @BeforeEach
     fun setUp() {
         coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
         
         kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
         kakaoOAuthClient = KakaoOAuthClient(
@@ -42,6 +42,7 @@ class KakaoOAuthClientTest {
 
     @Test
     fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
         val invalidRedirectUri = "http://invalid-uri.com"
         val accessCode = "test-access-code"
@@ -56,6 +57,7 @@ class KakaoOAuthClientTest {
 
     @Test
     fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
         // Already initialized in setUp
 
@@ -69,6 +71,7 @@ class KakaoOAuthClientTest {
 
     @Test
     fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
         val invalidRedirectUriWithSpaces = "  http://invalid-uri.com  "
         val accessCode = "test-access-code"
@@ -83,6 +86,7 @@ class KakaoOAuthClientTest {
 
     @Test
     fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
         val oAuthToken = KakaoResponse.OAuthToken(
             access_token = "valid-access-token"

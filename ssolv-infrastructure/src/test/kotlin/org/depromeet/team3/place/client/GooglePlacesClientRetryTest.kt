@@ -18,6 +18,7 @@ import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
 class GooglePlacesClientRetryTest {
 
@@ -30,7 +31,6 @@ class GooglePlacesClientRetryTest {
     fun setUp() {
         restClient = mock()
         coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
         
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
@@ -46,6 +46,7 @@ class GooglePlacesClientRetryTest {
 
     @Test
     fun `재시도 성공 - 500 에러 후 재시도하여 성공`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "맛집"
         val mockResponse = PlacesTextSearchResponse(emptyList())
         
@@ -71,6 +72,7 @@ class GooglePlacesClientRetryTest {
 
     @Test
     fun `재시도 실패 - 최대 재시도 횟수 초과`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "맛집"
         val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
         val requestBodySpec = mock<RestClient.RequestBodySpec>()
