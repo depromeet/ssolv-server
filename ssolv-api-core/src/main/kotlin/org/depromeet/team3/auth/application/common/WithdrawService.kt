@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 회원 탈퇴 Service
@@ -36,7 +40,7 @@ class WithdrawService(
      * 3. 소셜 플랫폼 연동 해제 (Transaction 커밋 후 실행)
      */
     @Transactional
-    fun withdraw(userId: Long) {
+    suspend fun withdraw(userId: Long) {
         val user = userQueryRepository.findById(userId)
             ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
 
@@ -55,15 +59,21 @@ class WithdrawService(
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
-                    unlinkSocial(user)
+                    // 트랜잭션 종료 후이므로 별도 코루틴 스코프에서 Virtual Thread로 호출
+                    CoroutineScope(CoroutineDispatchers.VT).launch {
+                        unlinkSocial(user)
+                    }
                 }
             })
         } else {
-            unlinkSocial(user)
+            // 트랜잭션 아닐 경우에도 Virtual Thread로 호출
+            withContext(CoroutineDispatchers.VT) {
+                unlinkSocial(user)
+            }
         }
     }
 
-    private fun unlinkSocial(user: User) {
+    private suspend fun unlinkSocial(user: User) {
         try {
             when (user.provider) {
                 AuthProvider.KAKAO -> kakaoOAuthClient.unlink(user.socialId)

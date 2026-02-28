@@ -15,6 +15,8 @@ import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import java.math.BigInteger
 import java.security.Key
 import java.security.KeyFactory
@@ -54,7 +56,7 @@ class AppleOAuthClient(
     /**
      * 인가 코드를 이용해 애플 서버로부터 OAuth 토큰 반환 받음
      */
-    fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken {
+    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken = withContext(CoroutineDispatchers.VT) {
         val trimmedRedirectUri = redirectUri.trim()
 
         if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
@@ -79,7 +81,7 @@ class AppleOAuthClient(
 
         log.debug("애플 토큰 요청 - redirect_uri: {}, client_id: {}", trimmedRedirectUri, appleProperties.clientId)
 
-        return try {
+        try {
             val response = restTemplate.exchange(
                 appleProperties.tokenUri,
                 HttpMethod.POST,
@@ -105,7 +107,7 @@ class AppleOAuthClient(
     /**
      * ID 토큰 서명 및 클레임 검증 후 사용자 정보 추출
      */
-    fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload {
+    suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload {
         return try {
             val claims = Jwts.parser()
                 .keyLocator { header ->
