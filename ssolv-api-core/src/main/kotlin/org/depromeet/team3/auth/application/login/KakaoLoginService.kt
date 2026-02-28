@@ -6,6 +6,8 @@ import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Service
 
 /**
@@ -15,10 +17,11 @@ import org.springframework.stereotype.Service
 class KakaoLoginService(
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val createKakaoUserService: CreateKakaoUserService,
-    private val kakaoProperties: KakaoProperties
+    private val kakaoProperties: KakaoProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    fun login(command: KakaoLoginCommand): LoginResponse {
+    suspend fun login(command: KakaoLoginCommand): LoginResponse = withContext(coroutineDispatchers.VT) {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 
@@ -32,8 +35,8 @@ class KakaoLoginService(
         val nickname = kakaoProfile.kakao_account.profile.nickname
         val profileImage = kakaoProfile.kakao_account.profile.profile_image_url
 
-        // 3. DB 작업 위임
-        return createKakaoUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
+        // 3. DB 작업 위임 (자체적으로 IO 디스패처/VT를 사용할 수 있지만 여기서는 순차 실행)
+        createKakaoUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
     }
     
     private fun getDefaultRedirectUri(): String {

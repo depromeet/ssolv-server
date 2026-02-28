@@ -9,16 +9,30 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.web.client.RestClient
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.junit.jupiter.MockitoExtension
+import org.junit.jupiter.api.extension.ExtendWith
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class GooglePlacesClientTest {
 
     private lateinit var restClient: RestClient
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var googlePlacesClient: GooglePlacesClient
 
     @BeforeEach
     fun setUp() {
         restClient = mock()
+        coroutineDispatchers = mock()
+        
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
             baseUrl = "https://places.googleapis.com"
@@ -26,12 +40,14 @@ class GooglePlacesClientTest {
         
         googlePlacesClient = GooglePlacesClient(
             googlePlacesRestClient = restClient,
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
+            coroutineDispatchers = coroutineDispatchers
         )
     }
 
     @Test
-    fun `텍스트 검색 성공`(): Unit = runBlocking {
+    fun `텍스트 검색 성공`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "강남역 맛집"
         val mockResponse = PlacesTextSearchResponse(
             places = listOf(

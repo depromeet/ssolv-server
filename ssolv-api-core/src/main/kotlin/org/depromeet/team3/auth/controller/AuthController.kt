@@ -43,7 +43,7 @@ class AuthController(
         ApiResponse(responseCode = "500", description = "서버 내부 오류")
     )
     @GetMapping("/kakao-login")
-    fun kakaoLogin(
+    suspend fun kakaoLogin(
         @Parameter(
             description = "카카오 OAuth 인가코드",
             required = true,
@@ -81,7 +81,7 @@ class AuthController(
         ApiResponse(responseCode = "500", description = "서버 내부 오류")
     )
     @PostMapping("/apple-login")
-    fun appleLogin(
+    suspend fun appleLogin(
         @Parameter(description = "애플 OAuth 인가코드", required = true)
         @RequestParam("code") code: String,
         
@@ -153,7 +153,7 @@ class AuthController(
         ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     )
     @DeleteMapping("/withdraw")
-    fun withdraw(@UserId userId: Long): DpmApiResponse<Unit> {
+    suspend fun withdraw(@UserId userId: Long): DpmApiResponse<Unit> {
         withdrawService.withdraw(userId)
         return DpmApiResponse.ok()
     }

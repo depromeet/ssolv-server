@@ -1,13 +1,13 @@
 package org.depromeet.team3.place.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.place.model.PlacesTextSearchRequest
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
@@ -23,6 +23,7 @@ import kotlin.random.Random
 class GooglePlacesClient(
     private val googlePlacesRestClient: RestClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     private val logger = KotlinLogging.logger { GooglePlacesClient::class.java.name }
@@ -125,7 +126,7 @@ class GooglePlacesClient(
         latitude: Double? = null,
         longitude: Double? = null,
         radius: Double = 3000.0
-    ): PlacesTextSearchResponse = withContext(Dispatchers.IO) {
+    ): PlacesTextSearchResponse = withContext(coroutineDispatchers.VT) {
         retryWithExponentialBackoff(
             operation = "텍스트 검색",
             operationDetail = "query=$query"
@@ -179,7 +180,7 @@ class GooglePlacesClient(
     /**
      * 사진 데이터 조회 (New API)
      */
-    suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(Dispatchers.IO) {
+    suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(coroutineDispatchers.VT) {
         retryWithExponentialBackoff(
             operation = "사진 데이터 조회",
             operationDetail = "photoName=$photoName"

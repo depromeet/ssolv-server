@@ -10,6 +10,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.slf4j.MDCContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.meetingplace.MeetingPlace
@@ -38,7 +39,8 @@ class ExecutePlaceSearchService(
     private val meetingPlaceRepository: MeetingPlaceRepository,
     private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
-    private val googlePlacesApiProperties: GooglePlacesApiProperties
+    private val googlePlacesApiProperties: GooglePlacesApiProperties,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -483,7 +485,7 @@ class ExecutePlaceSearchService(
         }
 
         return try {
-            withContext(Dispatchers.IO) {
+            withContext(coroutineDispatchers.VT) {
                 placeQuery.textSearch(
                     query = sanitizedQuery,
                     maxResults = keywordFetchSize,

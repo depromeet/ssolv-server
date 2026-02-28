@@ -44,14 +44,14 @@ subprojects {
 
     // tasks 설정
     tasks.withType<JavaCompile> {
-        targetCompatibility = "17"
-        sourceCompatibility = "17"
+        targetCompatibility = "21"
+        sourceCompatibility = "21"
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions {
             freeCompilerArgs = listOf("-Xjsr305=strict")
-            jvmTarget = "17"
+            jvmTarget = "21"
         }
     }
 
@@ -158,7 +158,7 @@ sonar {
         property("sonar.tests", "src/test/kotlin")
         
         // Java 버전
-        property("sonar.java.source", "17")
+        property("sonar.java.source", "21")
     }
 }
 

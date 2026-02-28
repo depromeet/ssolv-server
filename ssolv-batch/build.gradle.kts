@@ -18,3 +18,20 @@ tasks {
         enabled = false
     }
 }
+
+jib {
+    from {
+        image = "eclipse-temurin:21-jre"
+    }
+    to {
+        image = "registry.ssolv.site/batch-server"
+        tags = setOf("latest", "${project.version}")
+    }
+    container {
+        jvmFlags = listOf(
+            "-Duser.timezone=Asia/Seoul",
+            "-XX:MaxRAMPercentage=75.0"
+        )
+        creationTime = "USE_CURRENT_TIMESTAMP"
+    }
+}

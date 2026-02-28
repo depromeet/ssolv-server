@@ -22,6 +22,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import kotlinx.coroutines.test.runTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
@@ -63,33 +64,40 @@ class AuthControllerTest {
 
     @Test
     fun `카카오 로그인 성공 - 200 응답`() {
-        // given
-        val code = "test-auth-code"
-        val command = KakaoLoginCommand(authorizationCode = code)
-        val loginResponse = LoginResponse(
-            accessToken = "access-token-123",
-            refreshToken = "refresh-token-456",
-            userProfile = UserProfileResponse(
-                email = "test@example.com",
-                nickname = "테스트사용자",
-                profileImage = "https://example.com/profile.jpg"
+        runTest {
+            // given
+            val code = "test-auth-code"
+            val loginResponse = LoginResponse(
+                accessToken = "access-token-123",
+                refreshToken = "refresh-token-456",
+                userProfile = UserProfileResponse(
+                    email = "test@example.com",
+                    nickname = "테스트사용자",
+                    profileImage = "https://example.com/profile.jpg"
+                )
             )
-        )
-        
-        whenever(kakaoLoginService.login(any<KakaoLoginCommand>())).thenReturn(loginResponse)
+            
+            kakaoLoginService.stub {
+                onBlocking { login(any()) }.doReturn(loginResponse)
+            }
 
-        // when & then
-        mockMvc.perform(
-            get("/api/v1/auth/kakao-login")
-                .param("code", code)
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.accessToken").value("access-token-123"))
-            .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-456"))
-            .andExpect(jsonPath("$.data.userProfile.email").value("test@example.com"))
-            .andExpect(jsonPath("$.data.userProfile.nickname").value("테스트사용자"))
-            .andExpect(jsonPath("$.data.userProfile.profileImage").value("https://example.com/profile.jpg"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                get("/api/v1/auth/kakao-login")
+                    .param("code", code)
+                    .contentType(MediaType.APPLICATION_JSON)
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.data.accessToken").value("access-token-123"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-456"))
+                .andExpect(jsonPath("$.data.userProfile.email").value("test@example.com"))
+                .andExpect(jsonPath("$.data.userProfile.nickname").value("테스트사용자"))
+                .andExpect(jsonPath("$.data.userProfile.profileImage").value("https://example.com/profile.jpg"))
+        }
     }
 
     @Test
@@ -233,34 +241,50 @@ class AuthControllerTest {
 
     @Test
     fun `회원 탈퇴 성공 - 200 응답`() {
-        // given
-        val userId = 1L
-        testUserIdArgumentResolver.setTestUserId(userId)
-        // Unit을 반환하는 메서드는 doNothing() 또는 그냥 놔둬도 됨 (mock이므로)
-
-        // when & then
-        mockMvc.perform(
-            delete("/api/v1/auth/withdraw")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isOk)
+        runTest {
+            // given
+            val userId = 1L
+            testUserIdArgumentResolver.setTestUserId(userId)
             
-        verify(withdrawService).withdraw(userId)
+            withdrawService.stub {
+                onBlocking { withdraw(userId) }.doAnswer { }
+            }
+
+            // when & then
+            val mvcResult = mockMvc.perform(
+                delete("/api/v1/auth/withdraw")
+                    .contentType(MediaType.APPLICATION_JSON)
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk)
+        }
     }
 
     @Test
     fun `회원 탈퇴 실패 - 404 응답 (사용자 없음)`() {
-        // given
-        val userId = 1L
-        testUserIdArgumentResolver.setTestUserId(userId)
-        whenever(withdrawService.withdraw(any())).thenThrow(AuthException(ErrorCode.USER_NOT_FOUND))
+        runTest {
+            // given
+            val userId = 1L
+            testUserIdArgumentResolver.setTestUserId(userId)
+            
+            withdrawService.stub {
+                onBlocking { withdraw(any()) }.doAnswer { throw AuthException(ErrorCode.USER_NOT_FOUND) }
+            }
 
-        // when & then
-        mockMvc.perform(
-            delete("/api/v1/auth/withdraw")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.error.code").value("C4051"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                delete("/api/v1/auth/withdraw")
+                    .contentType(MediaType.APPLICATION_JSON)
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isNotFound)
+                .andExpect(jsonPath("$.error.code").value("C4051"))
+        }
     }
 }

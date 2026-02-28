@@ -14,12 +14,15 @@ import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 
 @Component
 class KakaoOAuthClient(
     private val objectMapper: ObjectMapper,
     private val kakaoProperties: KakaoProperties,
-    private val restTemplate: RestTemplate
+    private val restTemplate: RestTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(KakaoOAuthClient::class.java)
 
@@ -41,7 +44,7 @@ class KakaoOAuthClient(
     /**
      * 인가 코드를 이용해 카카오 서버로부터 OAuth 토큰 반환 받음.
      */
-    fun requestToken(accessCode: String, redirectUri: String): KakaoResponse.OAuthToken {
+    suspend fun requestToken(accessCode: String, redirectUri: String): KakaoResponse.OAuthToken = withContext(coroutineDispatchers.VT) {
         val trimmedRedirectUri = redirectUri.trim()
 
         if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
@@ -63,7 +66,7 @@ class KakaoOAuthClient(
 
         log.debug("카카오 토큰 요청 - redirect_uri: {}, client_id: {}", trimmedRedirectUri, kakaoProperties.clientId)
 
-        return try {
+        try {
             val response = restTemplate.exchange(
                 kakaoProperties.tokenUri,
                 HttpMethod.POST,
@@ -89,7 +92,7 @@ class KakaoOAuthClient(
     /**
      * access token 을 사용해 카카오 사용자 정보 요청
      */
-    fun requestProfile(oAuthToken: KakaoResponse.OAuthToken?): KakaoResponse.KakaoProfile {
+    suspend fun requestProfile(oAuthToken: KakaoResponse.OAuthToken?): KakaoResponse.KakaoProfile = withContext(coroutineDispatchers.VT) {
         val accessToken = oAuthToken?.access_token ?: throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
 
         val headers = HttpHeaders().apply {
@@ -97,7 +100,7 @@ class KakaoOAuthClient(
             add("Authorization", "Bearer $accessToken")
         }
 
-        return try {
+        try {
             val response = restTemplate.exchange(
                 kakaoProperties.userInfoUri,
                 HttpMethod.GET,
@@ -121,7 +124,7 @@ class KakaoOAuthClient(
     /**
      * 카카오 연결 끊기 (탈퇴 시 사용)
      */
-    fun unlink(socialId: String) {
+    suspend fun unlink(socialId: String) = withContext(coroutineDispatchers.VT) {
         val headers = HttpHeaders().apply {
             add("Content-Type", "application/x-www-form-urlencoded")
             add("Authorization", "KakaoAK ${kakaoProperties.adminKey}")

@@ -9,15 +9,44 @@ import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.mockito.kotlin.mock
-import org.springframework.web.client.RestTemplate
+import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.mockito.kotlin.whenever
+import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.junit.jupiter.MockitoExtension
+import org.junit.jupiter.api.extension.ExtendWith
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.BeforeEach
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class KakaoOAuthClientTest {
+    
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+    private lateinit var kakaoProperties: KakaoProperties
+    private lateinit var kakaoOAuthClient: KakaoOAuthClient
+
+    @BeforeEach
+    fun setUp() {
+        coroutineDispatchers = mock()
+        
+        kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
+        kakaoOAuthClient = KakaoOAuthClient(
+            objectMapper = ObjectMapper(),
+            kakaoProperties = kakaoProperties,
+            restTemplate = mock(),
+            coroutineDispatchers = coroutineDispatchers
+        )
+    }
 
     @Test
-    fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() {
+    fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val invalidRedirectUri = "http://invalid-uri.com"
         val accessCode = "test-access-code"
 
@@ -30,10 +59,10 @@ class KakaoOAuthClientTest {
     }
 
     @Test
-    fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() {
+    fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
+        // Already initialized in setUp
 
         // when & then
         val exception = assertThrows<AuthException> {
@@ -44,10 +73,9 @@ class KakaoOAuthClientTest {
     }
 
     @Test
-    fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() {
+    fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val invalidRedirectUriWithSpaces = "  http://invalid-uri.com  "
         val accessCode = "test-access-code"
 
@@ -60,22 +88,18 @@ class KakaoOAuthClientTest {
     }
 
     @Test
-    fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() {
+    fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         // given
-        val kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
-        val kakaoOAuthClient = KakaoOAuthClient(ObjectMapper(), kakaoProperties, mock())
         val oAuthToken = KakaoResponse.OAuthToken(
             access_token = "valid-access-token"
         )
 
         // when & then
-        // 실제 HTTP 호출이 이루어지므로 네트워크 오류가 발생할 것이지만,
-        // AuthException(access_token null 체크)은 발생하지 않아야 함
         val exception = assertThrows<Exception> {
             kakaoOAuthClient.requestProfile(oAuthToken)
         }
         
-        // access_token이 있으므로 null 체크는 통과하고 다른 예외가 발생해야 함
         assertThat(exception.message).doesNotContain("access_token")
     }
 }

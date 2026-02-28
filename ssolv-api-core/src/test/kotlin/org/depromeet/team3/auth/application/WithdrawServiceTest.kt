@@ -12,16 +12,28 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.meeting.MeetingRepository
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.meeting.util.MeetingTestDataFactory
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.util.MeetingAttendeeTestDataFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.jupiter.api.AfterEach
 
 @ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class WithdrawServiceTest {
 
     @Mock
@@ -39,66 +51,83 @@ class WithdrawServiceTest {
     @Mock
     private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
+    @Mock
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+
     private lateinit var withdrawService: WithdrawService
+
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @BeforeEach
     fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(testDispatcher)
+        
         withdrawService = WithdrawService(
             userQueryRepository,
             userCommandRepository,
             kakaoOAuthClient,
             meetingRepository,
-            meetingAttendeeRepository
+            meetingAttendeeRepository,
+            coroutineDispatchers
         )
+    }
+
+    @AfterEach
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
     fun `회원 탈퇴 성공 - 카카오 연동 해제 및 데이터 삭제`() {
-        // given
-        val userId = 1L
-        val socialId = "kakao-123"
-        val user = TestDataFactory.createUser(
-            id = userId,
-            provider = AuthProvider.KAKAO,
-            socialId = socialId
-        )
-        whenever(userQueryRepository.findById(userId)).thenReturn(user)
-        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
+        runTest {
+            // given
+            val userId = 1L
+            val socialId = "kakao-123"
+            val user = TestDataFactory.createUser(
+                id = userId,
+                provider = AuthProvider.KAKAO,
+                socialId = socialId
+            )
+            whenever(userQueryRepository.findById(userId)).thenReturn(user)
+            whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
 
-        // when
-        withdrawService.withdraw(userId)
+            // when
+            withdrawService.withdraw(userId)
 
-        // then
-        verify(kakaoOAuthClient).unlink(socialId)
-        verify(userCommandRepository).save(argThat { 
-            this.email.startsWith("withdrawn_") && 
-            this.socialId.startsWith("withdrawn_") &&
-            this.deletedAt != null
-        })
+            // then
+            verify(kakaoOAuthClient).unlink(socialId)
+            verify(userCommandRepository).save(argThat { 
+                this.email.startsWith("withdrawn_") && 
+                this.socialId.startsWith("withdrawn_") &&
+                this.deletedAt != null
+            })
+        }
     }
 
     @Test
     fun `회원 탈퇴 성공 - 애플 데이터 삭제`() {
-        // given
-        val userId = 1L
-        val user = TestDataFactory.createUser(
-            id = userId,
-            provider = AuthProvider.APPLE
-        )
-        whenever(userQueryRepository.findById(userId)).thenReturn(user)
-        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
+        runTest {
+            // given
+            val userId = 1L
+            val user = TestDataFactory.createUser(
+                id = userId,
+                provider = AuthProvider.APPLE
+            )
+            whenever(userQueryRepository.findById(userId)).thenReturn(user)
+            whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(emptyList())
 
-        // when
-        withdrawService.withdraw(userId)
+            // when
+            withdrawService.withdraw(userId)
 
-        // then
-        // then
-        verify(userCommandRepository).save(argThat { 
-            this.email.startsWith("withdrawn_") && 
-            this.socialId.startsWith("withdrawn_") &&
-            this.deletedAt != null
-        })
-        verifyNoInteractions(kakaoOAuthClient)
+            // then
+            verify(userCommandRepository).save(argThat { 
+                this.email.startsWith("withdrawn_") && 
+                this.socialId.startsWith("withdrawn_") &&
+                this.deletedAt != null
+            })
+            verifyNoInteractions(kakaoOAuthClient)
+        }
     }
 
     @Test
@@ -109,7 +138,7 @@ class WithdrawServiceTest {
 
         // when & then
         val exception = assertThrows<AuthException> {
-            withdrawService.withdraw(userId)
+            runBlocking { withdrawService.withdraw(userId) }
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
     }
@@ -141,7 +170,7 @@ class WithdrawServiceTest {
 
         // when & then
         val exception = assertThrows<AuthException> {
-            withdrawService.withdraw(userId)
+            runBlocking { withdrawService.withdraw(userId) }
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
     }

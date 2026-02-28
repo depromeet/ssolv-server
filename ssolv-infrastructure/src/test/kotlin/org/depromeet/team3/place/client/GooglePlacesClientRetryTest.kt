@@ -11,16 +11,30 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.junit.jupiter.MockitoExtension
+import org.junit.jupiter.api.extension.ExtendWith
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class GooglePlacesClientRetryTest {
 
     private lateinit var restClient: RestClient
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var googlePlacesClient: GooglePlacesClient
 
     @BeforeEach
     fun setUp() {
         restClient = mock()
+        coroutineDispatchers = mock()
+        
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
             baseUrl = "https://places.googleapis.com"
@@ -28,12 +42,14 @@ class GooglePlacesClientRetryTest {
         
         googlePlacesClient = GooglePlacesClient(
             googlePlacesRestClient = restClient,
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
+            coroutineDispatchers = coroutineDispatchers
         )
     }
 
     @Test
-    fun `재시도 성공 - 500 에러 후 재시도하여 성공`(): Unit = runBlocking {
+    fun `재시도 성공 - 500 에러 후 재시도하여 성공`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "맛집"
         val mockResponse = PlacesTextSearchResponse(emptyList())
         
@@ -58,7 +74,8 @@ class GooglePlacesClientRetryTest {
     }
 
     @Test
-    fun `재시도 실패 - 최대 재시도 횟수 초과`(): Unit = runBlocking {
+    fun `재시도 실패 - 최대 재시도 횟수 초과`() = runTest {
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
         val query = "맛집"
         val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
         val requestBodySpec = mock<RestClient.RequestBodySpec>()
@@ -73,9 +90,7 @@ class GooglePlacesClientRetryTest {
             .thenThrow(createHttpClientErrorException(500))
 
         org.junit.jupiter.api.assertThrows<PlaceSearchException> {
-            runBlocking {
-                googlePlacesClient.textSearch(query)
-            }
+            googlePlacesClient.textSearch(query)
         }
         
         verify(responseSpec, times(3)).body(PlacesTextSearchResponse::class.java)
