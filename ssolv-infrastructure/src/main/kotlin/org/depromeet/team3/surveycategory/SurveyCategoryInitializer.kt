@@ -20,7 +20,7 @@ class SurveyCategoryInitializer(
         val western = saveBranch("양식", 3)
         val japanese = saveBranch("일식", 4)
         val asian = saveBranch("동남아 음식", 5)
-        val everythingOk = saveBranch("다 괜찮아요", 6)
+        saveBranch("다 괜찮아요", 6)
 
         // 2. LEAF 카테고리 생성
         // 한식 (id: 1)

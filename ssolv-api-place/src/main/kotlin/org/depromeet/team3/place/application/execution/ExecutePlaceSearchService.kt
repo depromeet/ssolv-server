@@ -118,8 +118,8 @@ class ExecutePlaceSearchService(
 
                 PlacesSearchResponse.PlaceItem(
                     placeId = placeDbId,
-                    name = entity.name ?: "",
-                    address = entity.address?.replace("대한민국 ", "") ?: "",
+                    name = entity.name,
+                    address = entity.address.replace("대한민국 ", ""),
                     rating = entity.rating,
                     userRatingsTotal = entity.userRatingsTotal,
                     openNow = entity.openNow,
