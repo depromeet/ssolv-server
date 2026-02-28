@@ -36,8 +36,8 @@ class WithdrawService(
     /**
      * 회원 탈퇴 처리
      * 1. 호스팅 중인 모임 검증 (다른 참석자가 있는 모임이 있으면 탈퇴 불가)
-     * 2. 로컬 데이터 삭제 (Transaction)
-     * 3. 소셜 플랫폼 연동 해제 (Transaction 커밋 후 실행)
+     * 2. 로컬 데이터 삭제
+     * 3. 소셜 플랫폼 연동 해제
      */
     @Transactional
     suspend fun withdraw(userId: Long) {
@@ -60,7 +60,11 @@ class WithdrawService(
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
                     CoroutineScope(CoroutineDispatchers.VT).launch {
-                        unlinkSocial(user)
+                        try {
+                            unlinkSocial(user)
+                        } catch (e: Exception) {
+                            log.error("소셜 연동 해제 중 에러 발생 (userId: ${user.id})", e)
+                        }
                     }
                 }
             })
