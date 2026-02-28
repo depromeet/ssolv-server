@@ -6,6 +6,10 @@ spring:
   application:
     name: ssolv-api-core
   
+  threads:
+    virtual:
+      enabled: true
+  
   cloud:
     config:
       enabled: false
