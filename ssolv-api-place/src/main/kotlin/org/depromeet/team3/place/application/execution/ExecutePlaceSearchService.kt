@@ -10,6 +10,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.slf4j.MDCContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.meetingplace.MeetingPlace
@@ -483,7 +484,7 @@ class ExecutePlaceSearchService(
         }
 
         return try {
-            withContext(Dispatchers.IO) {
+            withContext(CoroutineDispatchers.VT) {
                 placeQuery.textSearch(
                     query = sanitizedQuery,
                     maxResults = keywordFetchSize,
