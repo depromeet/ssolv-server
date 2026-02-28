@@ -99,12 +99,12 @@ object SurveyTestDataFactory {
 
     fun createSurveyItemResponse(
         participantId: Long = 1L,
-        nickname: String = "홍길동",
+        attendeeNickname: String = "홍길동",
         selectedCategoryList: List<Long> = listOf(1L, 3L, 5L)
     ): SurveyItemResponse {
         return SurveyItemResponse(
             participantId = participantId,
-            nickname = nickname,
+            attendeeNickname = attendeeNickname,
             selectedCategoryList = selectedCategoryList
         )
     }
@@ -114,7 +114,7 @@ object SurveyTestDataFactory {
             createSurveyItemResponse(),
             createSurveyItemResponse(
                 participantId = 2L,
-                nickname = "김철수",
+                attendeeNickname = "김철수",
                 selectedCategoryList = listOf(2L, 4L)
             )
         ),

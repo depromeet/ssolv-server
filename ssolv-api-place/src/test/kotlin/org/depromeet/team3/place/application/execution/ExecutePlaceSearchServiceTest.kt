@@ -1,8 +1,6 @@
 package org.depromeet.team3.place.application.execution
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.meetingplace.MeetingPlace
@@ -68,113 +66,117 @@ class ExecutePlaceSearchServiceTest {
     }
 
     @Test
-    fun `저장된 결과가 있으면 좋아요 정보만 업데이트해서 반환한다`() = runTest {
-        val plan = PlaceSearchPlan.Automatic(
-            keywords = emptyList(),
-            stationCoordinates = null,
-            fallbackKeyword = "fallback"
-        )
-
-        val storedItem1 = org.depromeet.team3.place.dto.response.PlacesSearchResponse.PlaceItem(
-            placeId = 1L,
-            name = "사진 없음",
-            address = "주소",
-            rating = 4.5,
-            userRatingsTotal = 10,
-            openNow = true,
-            photos = emptyList(),
-            link = "link",
-            weekdayText = emptyList(),
-            topReview = null,
-            priceRange = null,
-            addressDescriptor = null,
-            likeCount = 0,
-            isLiked = false
-        )
-        val storedItem2 = org.depromeet.team3.place.dto.response.PlacesSearchResponse.PlaceItem(
-            placeId = 2L,
-            name = "사진 있음",
-            address = "주소",
-            rating = 4.0,
-            userRatingsTotal = 8,
-            openNow = true,
-            photos = listOf("image"),
-            link = "link",
-            weekdayText = emptyList(),
-            topReview = null,
-            priceRange = null,
-            addressDescriptor = null,
-            likeCount = 0,
-            isLiked = false
-        )
-
-        searchService.stub {
-            onBlocking { find(1L) }.doReturn(
-                org.depromeet.team3.place.dto.response.PlacesSearchResponse(
-                    items = listOf(storedItem1, storedItem2)
-                )
+    fun `저장된 결과가 있으면 좋아요 정보만 업데이트해서 반환한다`() {
+        runTest {
+            val plan = PlaceSearchPlan.Automatic(
+                keywords = emptyList(),
+                stationCoordinates = null,
+                fallbackKeyword = "fallback"
             )
+
+            val storedItem1 = org.depromeet.team3.place.dto.response.PlacesSearchResponse.PlaceItem(
+                placeId = 1L,
+                name = "사진 없음",
+                address = "주소",
+                rating = 4.5,
+                userRatingsTotal = 10,
+                openNow = true,
+                photos = emptyList(),
+                link = "link",
+                weekdayText = emptyList(),
+                topReview = null,
+                priceRange = null,
+                addressDescriptor = null,
+                likeCount = 0,
+                isLiked = false
+            )
+            val storedItem2 = org.depromeet.team3.place.dto.response.PlacesSearchResponse.PlaceItem(
+                placeId = 2L,
+                name = "사진 있음",
+                address = "주소",
+                rating = 4.0,
+                userRatingsTotal = 8,
+                openNow = true,
+                photos = listOf("image"),
+                link = "link",
+                weekdayText = emptyList(),
+                topReview = null,
+                priceRange = null,
+                addressDescriptor = null,
+                likeCount = 0,
+                isLiked = false
+            )
+
+            searchService.stub {
+                onBlocking { find(1L) }.doReturn(
+                    org.depromeet.team3.place.dto.response.PlacesSearchResponse(
+                        items = listOf(storedItem1, storedItem2)
+                    )
+                )
+            }
+
+            val request = PlacesSearchRequest(meetingId = 1L, userId = null)
+
+            val response = service.search(request, plan)
+
+            assertThat(response.items).hasSize(2)
+            assertThat(response.items.map { it.name }).containsExactly("사진 없음", "사진 있음")
         }
-
-        val request = PlacesSearchRequest(meetingId = 1L, userId = null)
-
-        val response = service.search(request, plan)
-
-        assertThat(response.items).hasSize(2)
-        assertThat(response.items.map { it.name }).containsExactly("사진 없음", "사진 있음")
     }
 
     @Test
-    fun `저장된 결과 없을 시 검색 결과를 DB에 저장하고 반환한다`() = runTest {
-        val keywordCandidate = CreateSurveyKeywordService.KeywordCandidate(
-            keyword = "키워드 맛집",
-            weight = 1.0,
-            type = CreateSurveyKeywordService.KeywordType.GENERAL,
-            matchKeywords = setOf("키워드", "keyword", "맛집")
-        )
-        val plan = PlaceSearchPlan.Automatic(
-            keywords = listOf(keywordCandidate),
-            stationCoordinates = null,
-            fallbackKeyword = "fallback 맛집"
-        )
-
-        val textSearchPlaces = (0 until 15).map { index ->
-            PlacesTextSearchResponse.Place(
-                id = "P$index",
-                displayName = PlacesTextSearchResponse.Place.DisplayName("키워드 맛집 $index"),
-                formattedAddress = "주소 $index",
-                rating = 5.0 - index * 0.1,
-                userRatingCount = 10 - index,
-                location = PlacesTextSearchResponse.Place.Location(37.5 + index, 127.0 + index),
-                photos = listOf(PlacesTextSearchResponse.Place.Photo("photo-$index", 400, 400))
+    fun `저장된 결과 없을 시 검색 결과를 DB에 저장하고 반환한다`() {
+        runTest {
+            val keywordCandidate = CreateSurveyKeywordService.KeywordCandidate(
+                keyword = "키워드 맛집",
+                weight = 1.0,
+                type = CreateSurveyKeywordService.KeywordType.GENERAL,
+                matchKeywords = setOf("키워드", "keyword", "맛집")
             )
-        }
+            val plan = PlaceSearchPlan.Automatic(
+                keywords = listOf(keywordCandidate),
+                stationCoordinates = null,
+                fallbackKeyword = "fallback 맛집"
+            )
 
-        placeQuery.stubTextSearch("키워드 맛집", PlacesTextSearchResponse(textSearchPlaces))
-        placeQuery.stubTextSearch("fallback 맛집", PlacesTextSearchResponse(emptyList()))
-        
-        // savePlacesFromTextSearch를 모의(mock) 처리하기 위해 FakePlaceQuery의 해당 메서드를 오버라이드
-        placeQuery.stubSavePlaces { places ->
-            places.mapIndexed { idx, place ->
-                PlaceEntity(
-                    id = idx.toLong() + 1,
-                    googlePlaceId = place.id,
-                    name = place.displayName.text,
-                    address = place.formattedAddress,
-                    rating = place.rating ?: 0.0,
-                    userRatingsTotal = place.userRatingCount ?: 0,
-                    photos = place.photos?.joinToString(",") { it.name }
+            val textSearchPlaces = (0 until 15).map { index ->
+                PlacesTextSearchResponse.Place(
+                    id = "P$index",
+                    displayName = PlacesTextSearchResponse.Place.DisplayName("키워드 맛집 $index"),
+                    formattedAddress = "주소 $index",
+                    rating = 5.0 - index * 0.1,
+                    userRatingCount = 10 - index,
+                    location = PlacesTextSearchResponse.Place.Location(37.5 + index, 127.0 + index),
+                    photos = listOf(PlacesTextSearchResponse.Place.Photo("photo-$index", 400, 400))
                 )
             }
+
+            placeQuery.stubTextSearch("키워드 맛집", PlacesTextSearchResponse(textSearchPlaces))
+            placeQuery.stubTextSearch("fallback 맛집", PlacesTextSearchResponse(emptyList()))
+            
+            // savePlacesFromTextSearch를 모의(mock) 처리하기 위해 FakePlaceQuery의 해당 메서드를 오버라이드
+            placeQuery.stubSavePlaces { places ->
+                places.mapIndexed { idx, place ->
+                    PlaceEntity(
+                        id = idx.toLong() + 1,
+                        googlePlaceId = place.id,
+                        name = place.displayName.text,
+                        address = place.formattedAddress,
+                        rating = place.rating ?: 0.0,
+                        userRatingsTotal = place.userRatingCount ?: 0,
+                        photos = place.photos?.joinToString(",") { it.name }
+                    )
+                }
+            }
+
+            val request = PlacesSearchRequest(meetingId = 2L, userId = null)
+
+            val response = service.search(request, plan)
+
+            assertThat(response.items).hasSize(10)
+            assertThat(response.items.first().name).contains("키워드 맛집")
+            assertThat(response.items.all { it.photos?.isNotEmpty() == true }).isTrue()
         }
-
-        val request = PlacesSearchRequest(meetingId = 2L, userId = null)
-
-        val response = service.search(request, plan)
-
-        assertThat(response.items).hasSize(10)
-        assertThat(response.items.first().name).contains("키워드 맛집")
-        assertThat(response.items.all { it.photos?.isNotEmpty() == true }).isTrue()
     }
 }
 
