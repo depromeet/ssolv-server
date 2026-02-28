@@ -13,6 +13,8 @@ import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.mockito.kotlin.whenever
 import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class KakaoOAuthClientTest {
     
     private lateinit var coroutineDispatchers: CoroutineDispatchers

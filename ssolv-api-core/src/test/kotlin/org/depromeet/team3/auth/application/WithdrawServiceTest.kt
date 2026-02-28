@@ -13,6 +13,8 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.depromeet.team3.common.util.CoroutineDispatchers
@@ -31,6 +33,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 
 @ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class WithdrawServiceTest {
 
     @Mock

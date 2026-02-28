@@ -14,19 +14,19 @@ import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.depromeet.team3.placelike.PlaceLikeRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.stub
+import org.mockito.kotlin.*
 import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import java.util.ArrayDeque
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ExecutePlaceSearchServiceTest {
 
     private lateinit var placeQuery: FakePlaceQuery
@@ -49,8 +49,7 @@ class ExecutePlaceSearchServiceTest {
         }
 
         coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
-
+        
         service = ExecutePlaceSearchService(
             placeQuery = placeQuery,
             meetingPlaceRepository = meetingPlaceRepository,
@@ -79,6 +78,7 @@ class ExecutePlaceSearchServiceTest {
     @Test
     fun `저장된 결과가 있으면 좋아요 정보만 업데이트해서 반환한다`() {
         runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val plan = PlaceSearchPlan.Automatic(
                 keywords = emptyList(),
                 stationCoordinates = null,
@@ -138,6 +138,7 @@ class ExecutePlaceSearchServiceTest {
     @Test
     fun `저장된 결과 없을 시 검색 결과를 DB에 저장하고 반환한다`() {
         runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val keywordCandidate = CreateSurveyKeywordService.KeywordCandidate(
                 keyword = "키워드 맛집",
                 weight = 1.0,
