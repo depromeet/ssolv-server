@@ -59,14 +59,12 @@ class WithdrawService(
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
-                    // 트랜잭션 종료 후이므로 별도 코루틴 스코프에서 Virtual Thread로 호출
                     CoroutineScope(CoroutineDispatchers.VT).launch {
                         unlinkSocial(user)
                     }
                 }
             })
         } else {
-            // 트랜잭션 아닐 경우에도 Virtual Thread로 호출
             withContext(CoroutineDispatchers.VT) {
                 unlinkSocial(user)
             }
