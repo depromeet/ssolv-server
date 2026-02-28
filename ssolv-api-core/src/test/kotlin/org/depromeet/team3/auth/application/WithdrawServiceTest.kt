@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.depromeet.team3.common.util.CoroutineDispatchers
@@ -24,7 +25,7 @@ import org.depromeet.team3.meeting.util.MeetingTestDataFactory
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.util.MeetingAttendeeTestDataFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -52,12 +53,12 @@ class WithdrawServiceTest {
 
     private lateinit var withdrawService: WithdrawService
 
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        whenever(coroutineDispatchers.VT).thenReturn(testDispatcher)
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(testDispatcher)
         
         withdrawService = WithdrawService(
             userQueryRepository,
@@ -92,11 +93,6 @@ class WithdrawServiceTest {
             withdrawService.withdraw(userId)
 
             // then
-            // afterCommit 비동기 실행이므로 verifyBlocking 대신 verify 사용 시 
-            // 이미 큐에 들어가거나 실행 중인 것을 감지해야 함. 
-            // 하지만 여기서는 withdraw가 suspend이므로 withContext(VT) 케이스만 테스트 가능.
-            // wait for a moment if it's asynchronous afterCommit
-            Thread.sleep(100) 
             verify(kakaoOAuthClient).unlink(socialId)
             verify(userCommandRepository).save(argThat { 
                 this.email.startsWith("withdrawn_") && 

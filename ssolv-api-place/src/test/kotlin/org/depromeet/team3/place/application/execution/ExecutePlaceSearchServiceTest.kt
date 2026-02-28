@@ -19,11 +19,14 @@ import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
-import org.mockito.kotlin.whenever
+import org.mockito.Mockito.lenient
+import org.mockito.junit.jupiter.MockitoExtension
+import org.junit.jupiter.api.extension.ExtendWith
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import java.util.ArrayDeque
 
+@ExtendWith(MockitoExtension::class)
 class ExecutePlaceSearchServiceTest {
 
     private lateinit var placeQuery: FakePlaceQuery
@@ -46,7 +49,7 @@ class ExecutePlaceSearchServiceTest {
         }
 
         coroutineDispatchers = mock()
-        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
 
         service = ExecutePlaceSearchService(
             placeQuery = placeQuery,

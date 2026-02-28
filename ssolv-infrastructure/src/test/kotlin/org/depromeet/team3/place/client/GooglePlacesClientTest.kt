@@ -11,7 +11,12 @@ import org.mockito.kotlin.*
 import org.springframework.web.client.RestClient
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.mockito.Mockito.lenient
+import org.mockito.junit.jupiter.MockitoExtension
+import org.junit.jupiter.api.extension.ExtendWith
 
+@ExtendWith(MockitoExtension::class)
 class GooglePlacesClientTest {
 
     private lateinit var restClient: RestClient
@@ -23,7 +28,7 @@ class GooglePlacesClientTest {
     fun setUp() {
         restClient = mock()
         coroutineDispatchers = mock()
-        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
         
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
@@ -38,7 +43,7 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    fun `텍스트 검색 성공`(): Unit = runBlocking {
+    fun `텍스트 검색 성공`() = runTest {
         val query = "강남역 맛집"
         val mockResponse = PlacesTextSearchResponse(
             places = listOf(
