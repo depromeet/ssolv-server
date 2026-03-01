@@ -1,7 +1,9 @@
 package org.depromeet.team3.survey.application
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.survey.Survey
@@ -21,8 +23,10 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.mockito.junit.jupiter.MockitoExtension
+import org.springframework.transaction.support.TransactionTemplate
 import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
@@ -44,16 +48,27 @@ class CreateSurveyServiceTest {
     @Mock
     private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
 
+    private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var createSurveyService: CreateSurveyService
 
     @BeforeEach
     fun setUp() {
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
         createSurveyService = CreateSurveyService(
             surveyRepository,
             surveyResultRepository,
             surveyCategoryRepository,
             meetingJpaRepository,
-            meetingAttendeeJpaRepository
+            meetingAttendeeJpaRepository,
+            transactionTemplate,
+            coroutineDispatchers
         )
     }
 

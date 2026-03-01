@@ -1,7 +1,9 @@
 package org.depromeet.team3.meeting.application
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.exception.MeetingException
 import org.depromeet.team3.meeting.util.MeetingTestDataFactory
@@ -18,8 +20,10 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 
 class JoinMeetingServiceTest {
@@ -30,12 +34,26 @@ class JoinMeetingServiceTest {
     @Mock
     private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
+    private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var joinMeetingService: JoinMeetingService
 
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        joinMeetingService = JoinMeetingService(meetingRepository, meetingAttendeeRepository)
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
+        joinMeetingService = JoinMeetingService(
+            meetingRepository,
+            meetingAttendeeRepository,
+            transactionTemplate,
+            coroutineDispatchers
+        )
     }
 
     @Test

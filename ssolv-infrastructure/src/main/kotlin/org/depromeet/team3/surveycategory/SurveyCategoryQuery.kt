@@ -12,40 +12,39 @@ class SurveyCategoryQuery (
     private val surveyCategoryMapper: SurveyCategoryMapper,
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
     private val queryFactory: JPAQueryFactory,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) : SurveyCategoryRepository {
 
-    override suspend fun save(surveyCategory: SurveyCategory): SurveyCategory = withContext(coroutineDispatchers.VT) {
+    override suspend fun save(surveyCategory: SurveyCategory): SurveyCategory {
         val entity = surveyCategoryMapper.toEntity(surveyCategory)
-        surveyCategoryMapper.toDomain(surveyCategoryJpaRepository.save(entity))
+        return surveyCategoryMapper.toDomain(surveyCategoryJpaRepository.save(entity))
     }
 
-    override suspend fun findById(id: Long): SurveyCategory? = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.findById(id)
+    override suspend fun findById(id: Long): SurveyCategory? {
+        return surveyCategoryJpaRepository.findById(id)
             .map { surveyCategoryMapper.toDomain(it) }
             .orElse(null)
     }
     
-    override suspend fun findAllById(ids: List<Long>): List<SurveyCategory> = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.findAllById(ids)
+    override suspend fun findAllById(ids: List<Long>): List<SurveyCategory> {
+        return surveyCategoryJpaRepository.findAllById(ids)
             .map { surveyCategoryMapper.toDomain(it) }
     }
 
-    override suspend fun findActive(): List<SurveyCategory> = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.findByIsDeletedFalse()
+    override suspend fun findActive(): List<SurveyCategory> {
+        return surveyCategoryJpaRepository.findByIsDeletedFalse()
             .map { surveyCategoryMapper.toDomain(it) }
     }
 
-    override suspend fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(parentId)
+    override suspend fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean {
+        return surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(parentId)
     }
     
-    override suspend fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory? = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)
+    override suspend fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory? {
+        return surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)
             ?.let { surveyCategoryMapper.toDomain(it) }
     }
     
-    override suspend fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long?): Boolean = withContext(coroutineDispatchers.VT) {
+    override suspend fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long?): Boolean {
         val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
         
         val firstMatch = queryFactory.selectFrom(qSurveyCategory)
@@ -69,10 +68,10 @@ class SurveyCategoryQuery (
             )
             .fetchFirst()
         
-        firstMatch != null
+        return firstMatch != null
     }
     
-    override suspend fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long?): Boolean = withContext(coroutineDispatchers.VT) {
+    override suspend fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long?): Boolean {
         val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
         
         val firstMatch = queryFactory.selectFrom(qSurveyCategory)
@@ -96,15 +95,15 @@ class SurveyCategoryQuery (
             )
             .fetchFirst()
         
-        firstMatch != null
+        return firstMatch != null
     }
     
-    override suspend fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.countByParentIdAndIsDeletedFalse(parentId)
+    override suspend fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long {
+        return surveyCategoryJpaRepository.countByParentIdAndIsDeletedFalse(parentId)
     }
 
-    override suspend fun findByName(name: String): SurveyCategory? = withContext(coroutineDispatchers.VT) {
-        surveyCategoryJpaRepository.findByNameAndIsDeletedFalse(name)
+    override suspend fun findByName(name: String): SurveyCategory? {
+        return surveyCategoryJpaRepository.findByNameAndIsDeletedFalse(name)
             ?.let { surveyCategoryMapper.toDomain(it) }
     }
 }

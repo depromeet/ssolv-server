@@ -1,8 +1,10 @@
 package org.depromeet.team3.surveycategory.application
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveycategory.SurveyCategoryRepository
 import org.depromeet.team3.surveycategory.exception.SurveyCategoryException
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.kotlin.*
 import org.mockito.junit.jupiter.MockitoExtension
+import org.springframework.transaction.support.TransactionTemplate
 
 @ExtendWith(MockitoExtension::class)
 @DisplayName("설문 카테고리 삭제 서비스 테스트")
@@ -23,11 +26,24 @@ class DeleteSurveyCategoryServiceTest {
     @Mock
     private lateinit var surveyCategoryRepository: SurveyCategoryRepository
 
+    private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var deleteSurveyCategoryService: DeleteSurveyCategoryService
 
     @BeforeEach
     fun setUp() {
-        deleteSurveyCategoryService = DeleteSurveyCategoryService(surveyCategoryRepository)
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
+        deleteSurveyCategoryService = DeleteSurveyCategoryService(
+            surveyCategoryRepository,
+            transactionTemplate,
+            coroutineDispatchers
+        )
     }
 
     @Test

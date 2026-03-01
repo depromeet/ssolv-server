@@ -2,7 +2,6 @@ package org.depromeet.team3.placelike
 
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.PlaceLikeMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -20,18 +19,13 @@ class PlaceLikeQueryTest {
     @Mock
     private lateinit var placeLikeMapper: PlaceLikeMapper
 
-    @Mock
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
-
     private lateinit var placeLikeQuery: PlaceLikeQuery
 
     @BeforeEach
     fun setUp() {
-        whenever(coroutineDispatchers.VT).thenReturn(kotlinx.coroutines.Dispatchers.Unconfined)
         placeLikeQuery = PlaceLikeQuery(
             placeLikeJpaRepository = placeLikeJpaRepository,
             placeLikeMapper = placeLikeMapper,
-            coroutineDispatchers = coroutineDispatchers
         )
     }
 
