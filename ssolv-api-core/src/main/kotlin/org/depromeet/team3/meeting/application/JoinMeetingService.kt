@@ -9,34 +9,41 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.depromeet.team3.util.DataEncoder
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 
 @Service
 class JoinMeetingService(
     private val meetingRepository: MeetingRepository,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeRepository: MeetingAttendeeRepository,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    @Transactional
     suspend operator fun invoke(
         userId: Long,
         token: String,
-    ): Unit {
-        val meetingId = parseTokenId(token)
-        validateMeeting(meetingId, userId)
+    ): Unit = withContext(coroutineDispatchers.VT) {
+        transactionTemplate.execute {
+            val meetingId = parseTokenId(token)
+            runBlocking { validateMeeting(meetingId, userId) }
 
-        val meetingAttendee = MeetingAttendee(
-            id = null,
-            meetingId = meetingId,
-            userId = userId,
-            attendeeNickname = null,
-            muzziColor = MuzziColor.DEFAULT,
-            createdAt = null,
-            updatedAt = null
-        )
+            val meetingAttendee = MeetingAttendee(
+                id = null,
+                meetingId = meetingId,
+                userId = userId,
+                attendeeNickname = null,
+                muzziColor = MuzziColor.DEFAULT,
+                createdAt = null,
+                updatedAt = null
+            )
 
-        meetingAttendeeRepository.save(meetingAttendee)
+            runBlocking { meetingAttendeeRepository.save(meetingAttendee) }
+        }
+        Unit
     }
 
     private suspend fun validateMeeting(meetingId: Long, userId: Long) {
