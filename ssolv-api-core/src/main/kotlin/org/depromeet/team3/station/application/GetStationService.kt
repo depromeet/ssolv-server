@@ -11,7 +11,7 @@ class GetStationService(
 ) {
 
     @Transactional(readOnly = true)
-    fun getAllStations(): List<StationResponse> {
+    suspend fun getAllStations(): List<StationResponse> {
         return stationRepository.findAll().map { StationResponse(it.id!!, it.name) }
     }
 }

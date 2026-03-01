@@ -24,7 +24,7 @@ class GetSurveyListService(
     private val logger = LoggerFactory.getLogger(GetSurveyListService::class.java)
 
     @Transactional(readOnly = true)
-    fun invoke(meetingId: Long, userId: Long): SurveyListResponse {
+    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)) {
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
@@ -100,7 +100,7 @@ class GetSurveyListService(
     }
 
     @Transactional(readOnly = true)
-    fun getRespondents(meetingId: Long): List<GetRespondents> {
+    suspend fun getRespondents(meetingId: Long): List<GetRespondents> {
         // 모든 참가자를 한 번에 조회 (N+1 문제 해결)
         val attendeeList = meetingAttendeeRepository.findByMeetingId(meetingId)
         val attendeeMap = attendeeList.associateBy { it.userId }

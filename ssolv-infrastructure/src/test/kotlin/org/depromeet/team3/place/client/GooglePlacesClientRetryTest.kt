@@ -48,52 +48,59 @@ class GooglePlacesClientRetryTest {
     }
 
     @Test
-    fun `재시도 성공 - 500 에러 후 재시도하여 성공`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        val query = "맛집"
-        val mockResponse = PlacesTextSearchResponse(emptyList())
-        
-        val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
-        val requestBodySpec = mock<RestClient.RequestBodySpec>()
-        val responseSpec = mock<RestClient.ResponseSpec>()
-        
-        whenever(restClient.post()).thenReturn(requestBodyUriSpec)
-        whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
-        whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
-        // body() returns RequestBodySpec
-        doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
-        whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
-        whenever(responseSpec.body(PlacesTextSearchResponse::class.java))
-            .thenThrow(createHttpClientErrorException(500))
-            .thenReturn(mockResponse)
+    fun `재시도 성공 - 500 에러 후 재시도하여 성공`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            val query = "맛집"
+            val mockResponse = PlacesTextSearchResponse(emptyList())
+            
+            val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
+            val requestBodySpec = mock<RestClient.RequestBodySpec>()
+            val responseSpec = mock<RestClient.ResponseSpec>()
+            
+            whenever(restClient.post()).thenReturn(requestBodyUriSpec)
+            whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
+            whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
+            // body() returns RequestBodySpec
+            doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
+            whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
+            whenever(responseSpec.body(PlacesTextSearchResponse::class.java))
+                .thenThrow(createHttpClientErrorException(500))
+                .thenReturn(mockResponse)
 
-        val result = googlePlacesClient.textSearch(query)
+            val result = googlePlacesClient.textSearch(query)
 
-        assertThat(result).isNotNull
-        verify(responseSpec, times(2)).body(PlacesTextSearchResponse::class.java)
+            assertThat(result).isNotNull
+            verify(responseSpec, times(2)).body(PlacesTextSearchResponse::class.java)
+        }
     }
 
     @Test
-    fun `재시도 실패 - 최대 재시도 횟수 초과`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        val query = "맛집"
-        val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
-        val requestBodySpec = mock<RestClient.RequestBodySpec>()
-        val responseSpec = mock<RestClient.ResponseSpec>()
-        
-        whenever(restClient.post()).thenReturn(requestBodyUriSpec)
-        whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
-        whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
-        doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
-        whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
-        whenever(responseSpec.body(PlacesTextSearchResponse::class.java))
-            .thenThrow(createHttpClientErrorException(500))
+    fun `재시도 실패 - 최대 재시도 횟수 초과`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            val query = "맛집"
+            val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
+            val requestBodySpec = mock<RestClient.RequestBodySpec>()
+            val responseSpec = mock<RestClient.ResponseSpec>()
+            
+            whenever(restClient.post()).thenReturn(requestBodyUriSpec)
+            whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
+            whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
+            doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
+            whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
+            whenever(responseSpec.body(PlacesTextSearchResponse::class.java))
+                .thenThrow(createHttpClientErrorException(500))
 
-        org.junit.jupiter.api.assertThrows<PlaceSearchException> {
-            googlePlacesClient.textSearch(query)
+            try {
+                googlePlacesClient.textSearch(query)
+                org.junit.jupiter.api.fail("Should have thrown PlaceSearchException")
+            } catch (e: PlaceSearchException) {
+                // Expected
+            }
+            
+            verify(responseSpec, times(3)).body(PlacesTextSearchResponse::class.java)
         }
-        
-        verify(responseSpec, times(3)).body(PlacesTextSearchResponse::class.java)
     }
 
     private fun createHttpClientErrorException(statusCode: Int): HttpClientErrorException {

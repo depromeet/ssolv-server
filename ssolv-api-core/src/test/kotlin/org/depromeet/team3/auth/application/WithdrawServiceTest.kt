@@ -132,46 +132,50 @@ class WithdrawServiceTest {
 
     @Test
     fun `회원 탈퇴 실패 - 사용자를 찾을 수 없음`() {
-        // given
-        val userId = 1L
-        whenever(userQueryRepository.findById(userId)).thenReturn(null)
+        runTest {
+            // given
+            val userId = 1L
+            whenever(userQueryRepository.findById(userId)).thenReturn(null)
 
-        // when & then
-        val exception = assertThrows<AuthException> {
-            runBlocking { withdrawService.withdraw(userId) }
+            // when & then
+            val exception = assertThrows<AuthException> {
+                runBlocking { withdrawService.withdraw(userId) }
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
         }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
     }
 
     @Test
     fun `회원 탈퇴 실패 - 다른 참석자가 있는 모임 호스팅 중`() {
-        // given
-        val userId = 1L
-        val user = TestDataFactory.createUser(id = userId)
-        val meetingId = 100L
-        val meeting = MeetingTestDataFactory.createMeeting(
-            id = meetingId,
-            hostUserId = userId
-        )
-        val otherAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
-            id = 200L,
-            meetingId = meetingId,
-            userId = 2L // 다른 사용자
-        )
-        val hostAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
-            id = 201L,
-            meetingId = meetingId,
-            userId = userId
-        )
+        runTest {
+            // given
+            val userId = 1L
+            val user = TestDataFactory.createUser(id = userId)
+            val meetingId = 100L
+            val meeting = MeetingTestDataFactory.createMeeting(
+                id = meetingId,
+                hostUserId = userId
+            )
+            val otherAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
+                id = 200L,
+                meetingId = meetingId,
+                userId = 2L // 다른 사용자
+            )
+            val hostAttendee = MeetingAttendeeTestDataFactory.createMeetingAttendee(
+                id = 201L,
+                meetingId = meetingId,
+                userId = userId
+            )
 
-        whenever(userQueryRepository.findById(userId)).thenReturn(user)
-        whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(listOf(meeting))
-        whenever(meetingAttendeeRepository.findByMeetingId(meetingId)).thenReturn(listOf(hostAttendee, otherAttendee))
+            whenever(userQueryRepository.findById(userId)).thenReturn(user)
+            whenever(meetingRepository.findMeetingsByUserId(userId)).thenReturn(listOf(meeting))
+            whenever(meetingAttendeeRepository.findByMeetingId(meetingId)).thenReturn(listOf(hostAttendee, otherAttendee))
 
-        // when & then
-        val exception = assertThrows<AuthException> {
-            runBlocking { withdrawService.withdraw(userId) }
+            // when & then
+            val exception = assertThrows<AuthException> {
+                runBlocking { withdrawService.withdraw(userId) }
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
         }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
     }
 }

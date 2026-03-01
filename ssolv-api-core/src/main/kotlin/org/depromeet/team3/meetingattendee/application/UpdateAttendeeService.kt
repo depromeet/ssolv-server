@@ -13,7 +13,7 @@ class UpdateAttendeeService(
 ) {
 
     @Transactional
-    operator fun invoke(
+    suspend operator fun invoke(
         userId: Long,
         meetingId: Long,
         attendeeNickname: String,
@@ -49,7 +49,7 @@ class UpdateAttendeeService(
         meetingAttendeeRepository.save(attendee)
     }
 
-    private fun validateNicknameDuplication(
+    private suspend fun validateNicknameDuplication(
         meetingId: Long,
         attendeeNickname: String,
         currentNickname: String?,

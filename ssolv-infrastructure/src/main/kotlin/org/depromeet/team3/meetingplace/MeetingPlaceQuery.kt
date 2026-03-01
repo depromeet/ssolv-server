@@ -1,6 +1,8 @@
 package org.depromeet.team3.meetingplace
 
 
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.mapper.MeetingPlaceMapper
 import org.depromeet.team3.meeting.MeetingJpaRepository
@@ -15,12 +17,12 @@ class MeetingPlaceQuery(
     private val meetingPlaceJpaRepository: MeetingPlaceJpaRepository,
     private val meetingPlaceMapper: MeetingPlaceMapper,
     private val meetingJpaRepository: MeetingJpaRepository,
-    private val placeJpaRepository: PlaceJpaRepository
+    private val placeJpaRepository: PlaceJpaRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) : MeetingPlaceRepository {
 
     @Transactional
-    override suspend fun save(meetingPlace: MeetingPlace): MeetingPlace {
-
+    override suspend fun save(meetingPlace: MeetingPlace): MeetingPlace = withContext(coroutineDispatchers.VT) {
         val meeting = meetingJpaRepository.findById(meetingPlace.meetingId)
             .orElseThrow { 
                 MeetingException(
@@ -38,11 +40,11 @@ class MeetingPlaceQuery(
         
         val entity = meetingPlaceMapper.toEntity(meetingPlace, meeting, place)
         val saved = meetingPlaceJpaRepository.save(entity)
-        return meetingPlaceMapper.toDomain(saved)
+        meetingPlaceMapper.toDomain(saved)
     }
 
     @Transactional
-    override suspend fun saveAll(meetingPlaces: List<MeetingPlace>): List<MeetingPlace> {
+    override suspend fun saveAll(meetingPlaces: List<MeetingPlace>): List<MeetingPlace> = withContext(coroutineDispatchers.VT) {
         // Meeting과 Place를 미리 조회 (N+1 방지)
         val meetingIds = meetingPlaces.map { it.meetingId }.distinct()
         val placeIds = meetingPlaces.map { it.placeId }.distinct()
@@ -68,33 +70,33 @@ class MeetingPlaceQuery(
         
         // 저장
         val saved = meetingPlaceJpaRepository.saveAll(entities)
-        return saved.map { meetingPlaceMapper.toDomain(it) }
+        saved.map { meetingPlaceMapper.toDomain(it) }
     }
 
     @Transactional(readOnly = true)
-    override suspend fun findByMeetingId(meetingId: Long): List<MeetingPlace> {
-        return meetingPlaceJpaRepository.findByMeetingId(meetingId)
+    override suspend fun findByMeetingId(meetingId: Long): List<MeetingPlace> = withContext(coroutineDispatchers.VT) {
+        meetingPlaceJpaRepository.findByMeetingId(meetingId)
             .map { meetingPlaceMapper.toDomain(it) }
     }
 
     @Transactional(readOnly = true)
-    override suspend fun findByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): MeetingPlace? {
-        return meetingPlaceJpaRepository.findByMeetingIdAndPlaceId(meetingId, placeId)
+    override suspend fun findByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): MeetingPlace? = withContext(coroutineDispatchers.VT) {
+        meetingPlaceJpaRepository.findByMeetingIdAndPlaceId(meetingId, placeId)
             ?.let { meetingPlaceMapper.toDomain(it) }
     }
 
     @Transactional(readOnly = true)
-    override suspend fun findIdByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Long? {
-        return meetingPlaceJpaRepository.findIdByMeetingIdAndPlaceId(meetingId, placeId)
+    override suspend fun findIdByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Long? = withContext(coroutineDispatchers.VT) {
+        meetingPlaceJpaRepository.findIdByMeetingIdAndPlaceId(meetingId, placeId)
     }
 
     @Transactional
-    override suspend fun deleteByMeetingId(meetingId: Long) {
+    override suspend fun deleteByMeetingId(meetingId: Long): Unit = withContext(coroutineDispatchers.VT) {
         meetingPlaceJpaRepository.deleteByMeetingId(meetingId)
     }
 
     @Transactional(readOnly = true)
-    override suspend fun existsByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Boolean {
-        return meetingPlaceJpaRepository.existsByMeetingIdAndPlaceId(meetingId, placeId)
+    override suspend fun existsByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Boolean = withContext(coroutineDispatchers.VT) {
+        meetingPlaceJpaRepository.existsByMeetingIdAndPlaceId(meetingId, placeId)
     }
 }

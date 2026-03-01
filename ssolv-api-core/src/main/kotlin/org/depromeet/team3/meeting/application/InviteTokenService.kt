@@ -27,7 +27,7 @@ class InviteTokenService(
     }
 
     @Transactional(readOnly = true)
-    fun generateInviteToken(
+    suspend fun generateInviteToken(
         meetingId: Long
     ): String {
         val meeting = meetingRepository.findById(meetingId)
@@ -50,7 +50,7 @@ class InviteTokenService(
     }
 
     @Transactional(readOnly = true)
-    fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse {
+    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse {
         val (meetingId, expiryTimestamp) = parseTokenData(token)
 
         // 토큰 만료 조회

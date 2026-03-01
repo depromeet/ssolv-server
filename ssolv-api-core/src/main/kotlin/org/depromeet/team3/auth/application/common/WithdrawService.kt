@@ -93,7 +93,7 @@ class WithdrawService(
      * 호스팅 중인 모임 검증
      * 다른 참석자가 있는 모임을 호스팅 중이면 탈퇴 불가
      */
-    private fun validateHostedMeetings(userId: Long) {
+    private suspend fun validateHostedMeetings(userId: Long) {
         val hostedMeetings = meetingRepository.findMeetingsByUserId(userId)
         
         for (meeting in hostedMeetings) {

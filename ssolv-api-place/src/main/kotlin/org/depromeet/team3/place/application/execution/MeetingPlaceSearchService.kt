@@ -30,7 +30,7 @@ class MeetingPlaceSearchService(
      * 검색 결과 저장
      */
     @Transactional
-    fun save(meetingId: Long, result: PlacesSearchResponse) {
+    suspend fun save(meetingId: Long, result: PlacesSearchResponse) {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw MeetingException(
                 ErrorCode.MEETING_NOT_FOUND,
@@ -65,7 +65,7 @@ class MeetingPlaceSearchService(
     /**
      * 검색 결과 조회
      */
-    fun find(meetingId: Long): PlacesSearchResponse? {
+    suspend fun find(meetingId: Long): PlacesSearchResponse? {
         val entity = repository.findByMeetingId(meetingId) ?: return null
         
         // 만료 확인

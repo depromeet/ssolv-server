@@ -44,62 +44,76 @@ class KakaoOAuthClientTest {
     }
 
     @Test
-    fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        // given
-        val invalidRedirectUri = "http://invalid-uri.com"
-        val accessCode = "test-access-code"
+    fun `허용되지 않은 redirect_uri로 토큰 요청시 예외가 발생한다`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            // given
+            val invalidRedirectUri = "http://invalid-uri.com"
+            val accessCode = "test-access-code"
 
-        // when & then
-        val exception = assertThrows<AuthException> {
-            kakaoOAuthClient.requestToken(accessCode, invalidRedirectUri)
+            // when & then
+            try {
+                kakaoOAuthClient.requestToken(accessCode, invalidRedirectUri)
+                org.junit.jupiter.api.fail("Should have thrown AuthException")
+            } catch (e: AuthException) {
+                assertThat(e.errorCode.code).isEqualTo("O008")
+            }
         }
-        
-        assertThat(exception.errorCode.code).isEqualTo("O008")
     }
 
     @Test
-    fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        // given
-        // Already initialized in setUp
+    fun `null oAuthToken으로 프로필 요청시 예외가 발생한다`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            // given
+            // Already initialized in setUp
 
-        // when & then
-        val exception = assertThrows<AuthException> {
-            kakaoOAuthClient.requestProfile(null)
+            // when & then
+            try {
+                kakaoOAuthClient.requestProfile(null)
+                org.junit.jupiter.api.fail("Should have thrown AuthException")
+            } catch (e: AuthException) {
+                assertThat(e.errorCode.code).isEqualTo("O002")
+            }
         }
-        
-        assertThat(exception.errorCode.code).isEqualTo("O002")
     }
 
     @Test
-    fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        // given
-        val invalidRedirectUriWithSpaces = "  http://invalid-uri.com  "
-        val accessCode = "test-access-code"
+    fun `잘못된 redirect_uri는 trim 후에도 허용되지 않는다`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            // given
+            val invalidRedirectUriWithSpaces = "  http://invalid-uri.com  "
+            val accessCode = "test-access-code"
 
-        // when & then
-        val exception = assertThrows<AuthException> {
-            kakaoOAuthClient.requestToken(accessCode, invalidRedirectUriWithSpaces)
+            // when & then
+            val exception = assertThrows<AuthException> {
+                runBlocking {
+                    kakaoOAuthClient.requestToken(accessCode, invalidRedirectUriWithSpaces)
+                }
+            }
+            
+            assertThat(exception.errorCode.code).isEqualTo("O008")
         }
-        
-        assertThat(exception.errorCode.code).isEqualTo("O008")
     }
 
     @Test
-    fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        // given
-        val oAuthToken = KakaoResponse.OAuthToken(
-            access_token = "valid-access-token"
-        )
+    fun `올바른 토큰 구조로 프로필 요청시 null 체크를 통과한다`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            // given
+            val oAuthToken = KakaoResponse.OAuthToken(
+                access_token = "valid-access-token"
+            )
 
-        // when & then
-        val exception = assertThrows<Exception> {
-            kakaoOAuthClient.requestProfile(oAuthToken)
+            // when & then
+            val exception = assertThrows<Exception> {
+                runBlocking {
+                    kakaoOAuthClient.requestProfile(oAuthToken)
+                }
+            }
+            
+            assertThat(exception.message).doesNotContain("access_token")
         }
-        
-        assertThat(exception.message).doesNotContain("access_token")
     }
 }

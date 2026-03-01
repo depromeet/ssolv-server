@@ -22,7 +22,7 @@ class UpdateTokenService(
 ) {
 
     @Transactional
-    fun refresh(command: RefreshTokenCommand): TokenResponse {
+    suspend fun refresh(command: RefreshTokenCommand): TokenResponse {
         val refreshToken = command.refreshToken
         
         if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {

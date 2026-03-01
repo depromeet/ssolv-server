@@ -33,7 +33,7 @@ class GetMeetingDetailService(
 ) {
 
     @Transactional
-    operator fun invoke(
+    suspend operator fun invoke(
         meetingId: Long,
         userId: Long,
         allowClosed: Boolean = false
@@ -121,7 +121,7 @@ class GetMeetingDetailService(
         )
     }
 
-    private fun buildParticipantSelectedCategories(surveyId: Long, surveyResultsMap: Map<Long, List<SurveyResult>>): List<ParticipantSelectedCategory> {
+    private suspend fun buildParticipantSelectedCategories(surveyId: Long, surveyResultsMap: Map<Long, List<SurveyResult>>): List<ParticipantSelectedCategory> {
         // 설문 결과 조회 (Map에서 조회)
         val surveyResults = surveyResultsMap[surveyId] ?: emptyList()
         if (surveyResults.isEmpty()) {
@@ -161,7 +161,7 @@ class GetMeetingDetailService(
     /**
      * 모임을 조회하고, endAt이 지났다면 자동으로 isClosed를 true로 설정하여 DB에 반영
      */
-    private fun findAndAutoCloseIfExpired(meetingId: Long): Meeting {
+    private suspend fun findAndAutoCloseIfExpired(meetingId: Long): Meeting {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw MeetingException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
 

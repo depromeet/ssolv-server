@@ -40,7 +40,8 @@ class ExecutePlaceSearchServiceTest {
 
     @BeforeEach
     fun setup() {
-        placeQuery = FakePlaceQuery()
+        coroutineDispatchers = mock()
+        placeQuery = FakePlaceQuery(coroutineDispatchers)
         meetingPlaceRepository = mock()
         placeLikeRepository = mock()
         searchService = mock()
@@ -48,8 +49,6 @@ class ExecutePlaceSearchServiceTest {
             on { proxyBaseUrl } doReturn "https://proxy.url"
         }
 
-        coroutineDispatchers = mock()
-        
         service = ExecutePlaceSearchService(
             placeQuery = placeQuery,
             meetingPlaceRepository = meetingPlaceRepository,
@@ -192,9 +191,12 @@ class ExecutePlaceSearchServiceTest {
     }
 }
 
-private open class FakePlaceQuery : PlaceQuery(
+private open class FakePlaceQuery(
+    coroutineDispatchers: CoroutineDispatchers
+) : PlaceQuery(
     googlePlacesClient = mock(),
-    placeJpaRepository = mock()
+    placeJpaRepository = mock(),
+    coroutineDispatchers = coroutineDispatchers
 ) {
     private val textSearchResponses = mutableMapOf<String, ArrayDeque<PlacesTextSearchResponse>>()
     private var findByIdsProvider: (List<String>) -> List<PlaceEntity> = { emptyList() }
@@ -227,7 +229,7 @@ private open class FakePlaceQuery : PlaceQuery(
         return deque.removeFirst()
     }
 
-    override fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> =
+    override suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> =
         findByIdsProvider(googlePlaceIds)
 
     override suspend fun savePlacesFromTextSearch(places: List<PlacesTextSearchResponse.Place>): List<PlaceEntity> =

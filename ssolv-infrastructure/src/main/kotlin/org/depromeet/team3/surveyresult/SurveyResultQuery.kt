@@ -1,32 +1,35 @@
 package org.depromeet.team3.surveyresult
 
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.SurveyResultMapper
 import org.springframework.stereotype.Repository
 
 @Repository
 class SurveyResultQuery(
     private val surveyResultMapper: SurveyResultMapper,
-    private val surveyResultJpaRepository: SurveyResultJpaRepository
+    private val surveyResultJpaRepository: SurveyResultJpaRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) : SurveyResultRepository {
     
-    override fun save(surveyResult: SurveyResult): SurveyResult {
+    override suspend fun save(surveyResult: SurveyResult): SurveyResult = withContext(coroutineDispatchers.VT) {
         val entity = surveyResultMapper.toEntity(surveyResult)
-        return surveyResultMapper.toDomain(surveyResultJpaRepository.save(entity))
+        surveyResultMapper.toDomain(surveyResultJpaRepository.save(entity))
     }
     
-    override fun saveAll(surveyResults: List<SurveyResult>): List<SurveyResult> {
+    override suspend fun saveAll(surveyResults: List<SurveyResult>): List<SurveyResult> = withContext(coroutineDispatchers.VT) {
         val entities = surveyResults.map { surveyResultMapper.toEntity(it) }
         val savedEntities = surveyResultJpaRepository.saveAll(entities)
-        return savedEntities.map { surveyResultMapper.toDomain(it) }
+        savedEntities.map { surveyResultMapper.toDomain(it) }
     }
     
-    override fun findBySurveyId(surveyId: Long): List<SurveyResult> {
-        return surveyResultJpaRepository.findBySurveyId(surveyId)
+    override suspend fun findBySurveyId(surveyId: Long): List<SurveyResult> = withContext(coroutineDispatchers.VT) {
+        surveyResultJpaRepository.findBySurveyId(surveyId)
             .map { surveyResultMapper.toDomain(it) }
     }
     
-    override fun findBySurveyIdIn(surveyIds: List<Long>): List<SurveyResult> {
-        return surveyResultJpaRepository.findBySurveyIdIn(surveyIds)
+    override suspend fun findBySurveyIdIn(surveyIds: List<Long>): List<SurveyResult> = withContext(coroutineDispatchers.VT) {
+        surveyResultJpaRepository.findBySurveyIdIn(surveyIds)
             .map { surveyResultMapper.toDomain(it) }
     }
 }

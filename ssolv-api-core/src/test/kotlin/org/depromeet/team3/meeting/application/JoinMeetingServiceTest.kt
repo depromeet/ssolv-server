@@ -1,5 +1,6 @@
 package org.depromeet.team3.meeting.application
 
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.exception.MeetingException
@@ -38,7 +39,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `모임 참여 시 muzziColor가 DEFAULT로 설정된다`() {
+    fun `모임 참여 시 muzziColor가 DEFAULT로 설정된다`() = runBlocking {
         // Given
         val userId = 1L
         val meetingId = 100L
@@ -73,7 +74,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `모임 참여 성공 시 닉네임과 muzziColor가 함께 저장된다`() {
+    fun `모임 참여 성공 시 닉네임과 muzziColor가 함께 저장된다`() = runBlocking {
         // Given
         val userId = 10L
         val meetingId = 200L
@@ -107,7 +108,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `존재하지 않는 모임에 참여하려고 하면 예외가 발생한다`() {
+    fun `존재하지 않는 모임에 참여하려고 하면 예외가 발생한다`() = runBlocking {
         // Given
         val userId = 1L
         val meetingId = 999L
@@ -124,7 +125,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `종료된 모임에 참여하려고 하면 예외가 발생한다`() {
+    fun `종료된 모임에 참여하려고 하면 예외가 발생한다`() = runBlocking {
         // Given
         val userId = 1L
         val meetingId = 100L
@@ -151,7 +152,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `이미 참여한 모임에 다시 참여하려고 하면 예외가 발생한다`() {
+    fun `이미 참여한 모임에 다시 참여하려고 하면 예외가 발생한다`() = runBlocking {
         // Given
         val userId = 1L
         val meetingId = 100L
@@ -189,7 +190,7 @@ class JoinMeetingServiceTest {
     }
 
     @Test
-    fun `정원이 다 찬 모임에 참여하려고 하면 예외가 발생한다`() {
+    fun `정원이 다 찬 모임에 참여하려고 하면 예외가 발생한다`() = runBlocking {
         // Given
         val userId = 1L
         val meetingId = 100L

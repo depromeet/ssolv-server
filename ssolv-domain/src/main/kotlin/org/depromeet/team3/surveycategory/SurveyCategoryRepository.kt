@@ -2,23 +2,23 @@ package org.depromeet.team3.surveycategory
 
 interface SurveyCategoryRepository {
 
-    fun save(surveyCategory: SurveyCategory): SurveyCategory
+    suspend fun save(surveyCategory: SurveyCategory): SurveyCategory
 
-    fun findById(id: Long): SurveyCategory?
+    suspend fun findById(id: Long): SurveyCategory?
     
-    fun findAllById(ids: List<Long>): List<SurveyCategory>
+    suspend fun findAllById(ids: List<Long>): List<SurveyCategory>
 
-    fun findActive(): List<SurveyCategory>
+    suspend fun findActive(): List<SurveyCategory>
 
-    fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean
+    suspend fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean
     
-    fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory?
+    suspend fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory?
     
-    fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long? = null): Boolean
+    suspend fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long? = null): Boolean
     
-    fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long? = null): Boolean
+    suspend fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long? = null): Boolean
     
-    fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long
+    suspend fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long
     
-    fun findByName(name: String): SurveyCategory?
+    suspend fun findByName(name: String): SurveyCategory?
 }

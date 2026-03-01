@@ -33,7 +33,7 @@ class SurveyController(
         ApiResponse(responseCode = "409", description = "중복 설문 제출")
     )
     @PostMapping
-    fun createSurvey(
+    suspend fun createSurvey(
         @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
         @MeetingId("meetingId") meetingId: Long,
         @UserId userId: Long,

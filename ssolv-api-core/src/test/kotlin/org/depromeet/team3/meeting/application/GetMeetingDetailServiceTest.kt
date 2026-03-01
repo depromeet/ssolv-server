@@ -1,5 +1,6 @@
 package org.depromeet.team3.meeting.application
 
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.*
@@ -71,7 +72,7 @@ class GetMeetingDetailServiceTest {
 
     @Test
     @DisplayName("모임 상세 정보를 성공적으로 조회한다")
-    fun `모임 상세 정보를 성공적으로 조회한다`() {
+    fun `모임 상세 정보를 성공적으로 조회한다`() = runBlocking {
         // given
         val meetingId = 1L
         val userId = 234L
@@ -155,7 +156,7 @@ class GetMeetingDetailServiceTest {
 
     @Test
     @DisplayName("참가자의 설문 정보를 포함하여 조회한다")
-    fun `참가자의 설문 정보를 포함하여 조회한다`() {
+    fun `참가자의 설문 정보를 포함하여 조회한다`() = runBlocking {
         // given
         val meetingId = 1L
         val userId = 234L
@@ -239,7 +240,7 @@ class GetMeetingDetailServiceTest {
 
     @Test
     @DisplayName("존재하지 않는 모임 조회 시 예외가 발생한다")
-    fun `존재하지 않는 모임 조회 시 예외가 발생한다`() {
+    fun `존재하지 않는 모임 조회 시 예외가 발생한다`() = runBlocking {
         // given
         val meetingId = 999L
         val userId = 234L
@@ -256,7 +257,7 @@ class GetMeetingDetailServiceTest {
 
     @Test
     @DisplayName("설문이 있는 참가자만 participantList에 포함된다")
-    fun `설문이 있는 참가자만 participantList에 포함된다`() {
+    fun `설문이 있는 참가자만 participantList에 포함된다`() = runBlocking {
         // given
         val meetingId = 1L
         val userId = 234L
@@ -318,7 +319,7 @@ class GetMeetingDetailServiceTest {
     }
 
     @Test
-    fun `종료된 모임도 allowClosed true라면 정상 조회된다`() {
+    fun `종료된 모임도 allowClosed true라면 정상 조회된다`() = runBlocking {
         // given
         val meetingId = 2L
         val userId = 999L

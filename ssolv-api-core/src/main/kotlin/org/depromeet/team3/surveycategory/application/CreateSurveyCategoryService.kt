@@ -15,7 +15,7 @@ class CreateSurveyCategoryService(
 ) {
 
     @Transactional
-    operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse {
+    suspend operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse {
         // sortOrder 중복 검증
         if (surveyCategoryRepository.existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(
                 sortOrder = request.sortOrder,

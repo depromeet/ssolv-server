@@ -17,7 +17,7 @@ class LogoutService(
     private val userCommandRepository: UserCommandRepository
 ) {
     @Transactional
-    fun logout(userId: Long) {
+    suspend fun logout(userId: Long) {
         val user = userQueryRepository.findById(userId)
             ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
             

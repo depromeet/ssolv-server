@@ -12,7 +12,7 @@ class DeleteSurveyCategoryService(
 ) {
 
     @Transactional
-    operator fun invoke(id: Long): Unit {
+    suspend operator fun invoke(id: Long): Unit {
         // 1. 삭제할 카테고리 조회
         val categoryToDelete = surveyCategoryRepository.findById(id)
             ?: throw SurveyCategoryException(ErrorCode.CATEGORY_NOT_FOUND, mapOf("id" to id))

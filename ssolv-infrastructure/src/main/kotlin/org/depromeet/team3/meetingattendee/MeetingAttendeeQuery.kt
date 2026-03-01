@@ -1,58 +1,60 @@
 package org.depromeet.team3.meetingattendee
 
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.MeetingAttendeeMapper
 import org.springframework.stereotype.Repository
 
 @Repository
 class MeetingAttendeeQuery(
     private val meetingAttendeeMapper: MeetingAttendeeMapper,
-    private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
+    private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) : MeetingAttendeeRepository {
 
-    override fun save(meetingAttendee: MeetingAttendee): MeetingAttendee {
+    override suspend fun save(meetingAttendee: MeetingAttendee): MeetingAttendee = withContext(coroutineDispatchers.VT) {
         val entity = meetingAttendeeMapper.toEntity(meetingAttendee)
-
-        return meetingAttendeeMapper.toDomain(meetingAttendeeJpaRepository.save(entity))
+        meetingAttendeeMapper.toDomain(meetingAttendeeJpaRepository.save(entity))
     }
 
-    override fun findByMeetingId(meetingId: Long): List<MeetingAttendee> {
-        return meetingAttendeeJpaRepository.findByMeetingId(meetingId)
+    override suspend fun findByMeetingId(meetingId: Long): List<MeetingAttendee> = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.findByMeetingId(meetingId)
             .map { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun findByUserId(userId: Long): List<MeetingAttendee> {
-        return meetingAttendeeJpaRepository.findByUserId(userId)
+    override suspend fun findByUserId(userId: Long): List<MeetingAttendee> = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.findByUserId(userId)
             .map { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun findByMeetingIdAndUserId(
+    override suspend fun findByMeetingIdAndUserId(
         meetingId: Long,
         userId: Long
-    ): MeetingAttendee? {
-        return meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
+    ): MeetingAttendee? = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
             ?.let { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun existsByMeetingIdAndUserId(
+    override suspend fun existsByMeetingIdAndUserId(
         meetingId: Long,
         userId: Long
-    ): Boolean {
-        return meetingAttendeeJpaRepository.existsByMeetingIdAndUserId(meetingId, userId)
+    ): Boolean = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.existsByMeetingIdAndUserId(meetingId, userId)
     }
 
-    override fun existsByMeetingIdAndNormalizedNickname(
+    override suspend fun existsByMeetingIdAndNormalizedNickname(
         meetingId: Long,
         nickname: String,
         excludeUserId: Long
-    ): Boolean {
-        return meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(meetingId, nickname, excludeUserId)
+    ): Boolean = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(meetingId, nickname, excludeUserId)
     }
 
-    override fun countByMeetingId(meetingId: Long): Int {
-        return meetingAttendeeJpaRepository.countByMeetingId(meetingId)
+    override suspend fun countByMeetingId(meetingId: Long): Int = withContext(coroutineDispatchers.VT) {
+        meetingAttendeeJpaRepository.countByMeetingId(meetingId)
     }
 
-    override fun deleteById(id: Long) {
+    override suspend fun deleteById(id: Long): Unit = withContext(coroutineDispatchers.VT) {
         meetingAttendeeJpaRepository.deleteById(id)
     }
 }

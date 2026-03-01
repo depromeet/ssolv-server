@@ -19,7 +19,7 @@ class GetMeetingService(
 ) {
 
     @Transactional(readOnly = true)
-    operator fun invoke(userId: Long): List<MeetingsResponse> {
+    suspend operator fun invoke(userId: Long): List<MeetingsResponse> {
         // 1. 호스트로 등록된 모임 조회
         val hostMeetings = meetingRepository.findMeetingsByUserId(userId)
         

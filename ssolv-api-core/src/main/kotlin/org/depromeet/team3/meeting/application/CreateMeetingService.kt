@@ -24,7 +24,7 @@ class CreateMeetingService(
 ) {
 
     @Transactional
-    operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse {
+    suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse {
         val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
         if (request.endAt != null && request.endAt.isBefore(now)) {
             throw MeetingException(

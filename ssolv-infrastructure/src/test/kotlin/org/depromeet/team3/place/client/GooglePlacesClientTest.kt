@@ -46,37 +46,39 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    fun `텍스트 검색 성공`() = runTest {
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
-        val query = "강남역 맛집"
-        val mockResponse = PlacesTextSearchResponse(
-            places = listOf(
-                PlacesTextSearchResponse.Place(
-                    id = "place_1",
-                    displayName = PlacesTextSearchResponse.Place.DisplayName("맛집 1"),
-                    formattedAddress = "서울시 강남구",
-                    rating = 4.5,
-                    userRatingCount = 100,
-                    location = PlacesTextSearchResponse.Place.Location(37.5, 127.0)
+    fun `텍스트 검색 성공`() {
+        runTest {
+            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            val query = "강남역 맛집"
+            val mockResponse = PlacesTextSearchResponse(
+                places = listOf(
+                    PlacesTextSearchResponse.Place(
+                        id = "place_1",
+                        displayName = PlacesTextSearchResponse.Place.DisplayName("맛집 1"),
+                        formattedAddress = "서울시 강남구",
+                        rating = 4.5,
+                        userRatingCount = 100,
+                        location = PlacesTextSearchResponse.Place.Location(37.5, 127.0)
+                    )
                 )
             )
-        )
 
-        val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
-        val requestBodySpec = mock<RestClient.RequestBodySpec>()
-        val responseSpec = mock<RestClient.ResponseSpec>()
+            val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
+            val requestBodySpec = mock<RestClient.RequestBodySpec>()
+            val responseSpec = mock<RestClient.ResponseSpec>()
 
-        whenever(restClient.post()).thenReturn(requestBodyUriSpec)
-        whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
-        whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
-        doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
-        whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
-        whenever(responseSpec.body(PlacesTextSearchResponse::class.java)).thenReturn(mockResponse)
+            whenever(restClient.post()).thenReturn(requestBodyUriSpec)
+            whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
+            whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
+            doReturn(requestBodySpec).whenever(requestBodySpec).body(any<PlacesTextSearchRequest>())
+            whenever(requestBodySpec.retrieve()).thenReturn(responseSpec)
+            whenever(responseSpec.body(PlacesTextSearchResponse::class.java)).thenReturn(mockResponse)
 
-        val result = googlePlacesClient.textSearch(query)
+            val result = googlePlacesClient.textSearch(query)
 
-        assertThat(result).isNotNull
-        assertThat(result.places).hasSize(1)
-        assertThat(result.places!![0].displayName.text).isEqualTo("맛집 1")
+            assertThat(result).isNotNull
+            assertThat(result.places).hasSize(1)
+            assertThat(result.places!![0].displayName.text).isEqualTo("맛집 1")
+        }
     }
 }

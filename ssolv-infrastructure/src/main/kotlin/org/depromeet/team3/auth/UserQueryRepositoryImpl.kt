@@ -1,5 +1,7 @@
 package org.depromeet.team3.auth
 
+import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.UserMapper
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -12,26 +14,27 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class UserQueryRepositoryImpl(
     private val userJpaRepository: UserRepository,
-    private val userMapper: UserMapper
+    private val userMapper: UserMapper,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) : UserQueryRepository {
 
-    override fun findById(id: Long): User? {
-        return userJpaRepository.findById(id)
+    override suspend fun findById(id: Long): User? = withContext(coroutineDispatchers.VT) {
+        userJpaRepository.findById(id)
             .map { userMapper.toDomain(it) }
             .orElse(null)
     }
 
-    override fun findByEmail(email: String): User? {
-        return userJpaRepository.findByEmail(email)
+    override suspend fun findByEmail(email: String): User? = withContext(coroutineDispatchers.VT) {
+        userJpaRepository.findByEmail(email)
             ?.let { userMapper.toDomain(it) }
     }
 
-    override fun existsByEmail(email: String): Boolean {
-        return userJpaRepository.findByEmail(email) != null
+    override suspend fun existsByEmail(email: String): Boolean = withContext(coroutineDispatchers.VT) {
+        userJpaRepository.findByEmail(email) != null
     }
 
-    override fun findByProviderAndSocialId(provider: AuthProvider, socialId: String): User? {
-        return userJpaRepository.findByProviderAndSocialId(provider, socialId)
+    override suspend fun findByProviderAndSocialId(provider: AuthProvider, socialId: String): User? = withContext(coroutineDispatchers.VT) {
+        userJpaRepository.findByProviderAndSocialId(provider, socialId)
             ?.let { userMapper.toDomain(it) }
     }
 }

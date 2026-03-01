@@ -1,10 +1,9 @@
 package org.depromeet.team3.place
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.client.GooglePlacesClient
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -14,9 +13,9 @@ import java.time.LocalDateTime
 @ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class PlaceQuery(
     private val googlePlacesClient: GooglePlacesClient,
-    private val placeJpaRepository: PlaceJpaRepository
+    private val placeJpaRepository: PlaceJpaRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
-    private val logger = LoggerFactory.getLogger(PlaceQuery::class.java)
 
     /**
      * 텍스트 검색
@@ -34,8 +33,8 @@ class PlaceQuery(
     @Transactional
     suspend fun savePlacesFromTextSearch(
         places: List<PlacesTextSearchResponse.Place>
-    ): List<PlaceEntity> {
-        if (places.isEmpty()) return emptyList()
+    ): List<PlaceEntity> = withContext(coroutineDispatchers.VT) {
+        if (places.isEmpty()) return@withContext emptyList()
 
         val googlePlaceIds = places.map { it.id }
         val existingPlaces = placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
@@ -74,12 +73,12 @@ class PlaceQuery(
             )
         }
 
-        return placeJpaRepository.saveAll(entities).toList()
+        placeJpaRepository.saveAll(entities).toList()
     }
 
     // Google Place ID 목록으로 Place 엔티티 조회
-    fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> {
-        return placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
+    suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> = withContext(coroutineDispatchers.VT) {
+        placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
     }
 
     // 사진 데이터 조회

@@ -28,7 +28,7 @@ class StationController(
         ApiResponse(responseCode = "200", description = "모든 역 조회 성공")
     )
     @GetMapping
-    fun getAllStations(
+    suspend fun getAllStations(
         @UserId userId: Long
     ) : DpmApiResponse<List<StationResponse>> {
         val response = getStationService.getAllStations();

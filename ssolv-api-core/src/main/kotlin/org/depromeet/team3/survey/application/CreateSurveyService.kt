@@ -26,7 +26,7 @@ class CreateSurveyService(
 ) {
 
     @Transactional
-    fun invoke(meetingId: Long, userId: Long, request: SurveyCreateRequest): SurveyCreateResponse {
+    suspend fun invoke(meetingId: Long, userId: Long, request: SurveyCreateRequest): SurveyCreateResponse {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)){
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))

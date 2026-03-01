@@ -1,5 +1,6 @@
 package org.depromeet.team3.meeting.application
 
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.util.MeetingTestDataFactory
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
@@ -30,7 +31,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `초대 토큰 생성 성공 테스트`() {
+    fun `초대 토큰 생성 성공 테스트`() = runBlocking {
         // Given
         val meetingId = 1L
         val meeting = MeetingTestDataFactory.createMeeting(
@@ -55,7 +56,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `존재하지 않는 모임으로 초대 토큰 생성 시 예외 발생`() {
+    fun `존재하지 않는 모임으로 초대 토큰 생성 시 예외 발생`() = runBlocking {
         // Given
         val meetingId = 999L
         val baseUrl = "https://app.ssolv.site"
@@ -69,7 +70,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `종료된 모임으로 초대 토큰 생성 시 예외 발생`() {
+    fun `종료된 모임으로 초대 토큰 생성 시 예외 발생`() = runBlocking {
         // Given
         val meetingId = 1L
         val meeting = MeetingTestDataFactory.createMeeting(
@@ -91,7 +92,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `유효한 토큰 검증 성공 테스트`() {
+    fun `유효한 토큰 검증 성공 테스트`() = runBlocking {
         // Given
         val meetingId = 1L
         val meeting = MeetingTestDataFactory.createMeeting(
@@ -120,7 +121,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `잘못된 토큰 검증 실패 테스트`() {
+    fun `잘못된 토큰 검증 실패 테스트`() = runBlocking {
         // Given
         val invalidToken = "invalid_token"
 
@@ -131,7 +132,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    fun `존재하지 않는 모임 ID로 토큰 검증 실패 테스트`() {
+    fun `존재하지 않는 모임 ID로 토큰 검증 실패 테스트`() = runBlocking {
         // Given
         val meetingId = 999L
 

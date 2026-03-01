@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.application.login.CreateAppleUserService
 
@@ -38,7 +39,7 @@ class CreateAppleUserServiceTest {
     }
 
     @Test
-    fun `신규 사용자 저장 및 토큰 발급 성공`() {
+    fun `신규 사용자 저장 및 토큰 발급 성공`() = runBlocking {
         // given
         val email = "apple@example.com"
         val nickname = "ParkMineum"
@@ -69,7 +70,7 @@ class CreateAppleUserServiceTest {
     }
 
     @Test
-    fun `기존 사용자가 있는 경우 조회하여 토큰 발급`() {
+    fun `기존 사용자가 있는 경우 조회하여 토큰 발급`() = runBlocking {
         // given
         val email = "apple@example.com"
         val socialId = "apple-social-id"

@@ -1,10 +1,12 @@
 package org.depromeet.team3.auth
 
-import jakarta.transaction.Transactional
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.exception.UserException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.UserMapper
 import org.springframework.stereotype.Repository
+import jakarta.transaction.Transactional
 
 /**
  * User Command Repository 구현체
@@ -14,16 +16,17 @@ import org.springframework.stereotype.Repository
 @Transactional
 class UserCommandRepositoryImpl(
     private val userJpaRepository: UserRepository,
-    private val userMapper: UserMapper
+    private val userMapper: UserMapper,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) : UserCommandRepository {
 
-    override fun save(user: User): User {
+    override suspend fun save(user: User): User = withContext(coroutineDispatchers.VT) {
         val entity = userMapper.toEntity(user)
         val savedEntity = userJpaRepository.save(entity)
-        return userMapper.toDomain(savedEntity)
+        userMapper.toDomain(savedEntity)
     }
 
-    override fun delete(user: User) {
+    override suspend fun delete(user: User): Unit = withContext(coroutineDispatchers.VT) {
         user.id?.let { userId ->
             userJpaRepository.deleteById(userId)
         } ?: throw UserException(

@@ -22,7 +22,7 @@ class CreateAppleUserService(
 ) {
 
     @Transactional(rollbackFor = [Exception::class])
-    fun saveUserAndGenerateTokens(
+    suspend fun saveUserAndGenerateTokens(
         email: String?,
         nickname: String,
         profileImage: String?,
@@ -42,7 +42,7 @@ class CreateAppleUserService(
         )
     }
 
-    private fun findOrCreateUser(
+    private suspend fun findOrCreateUser(
         email: String?,
         nickname: String,
         profileImage: String?,
@@ -53,7 +53,7 @@ class CreateAppleUserService(
         return existingUser ?: createNewUser(email, nickname, profileImage, socialId)
     }
 
-    private fun createNewUser(
+    private suspend fun createNewUser(
         email: String?,
         nickname: String,
         profileImage: String?,
@@ -73,7 +73,7 @@ class CreateAppleUserService(
         return userCommandRepository.save(newUser)
     }
 
-    private fun generateAuthenticationTokens(user: User, newProfileImage: String?): AuthTokens {
+    private suspend fun generateAuthenticationTokens(user: User, newProfileImage: String?): AuthTokens {
         val userId = user.id!!
         val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
         val refreshToken = jwtTokenProvider.generateRefreshToken(userId)

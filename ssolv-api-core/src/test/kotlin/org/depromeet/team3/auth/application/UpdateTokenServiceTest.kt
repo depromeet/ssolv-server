@@ -8,6 +8,7 @@ import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.util.TestDataFactory
 import org.depromeet.team3.common.exception.ErrorCode
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -44,7 +45,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - 유효하지 않은 Refresh Token`() {
+    fun `토큰 갱신 실패 - 유효하지 않은 Refresh Token`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "invalid-refresh-token")
         
@@ -60,7 +61,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - 사용자 정보 없음`() {
+    fun `토큰 갱신 실패 - 사용자 정보 없음`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         
@@ -78,7 +79,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - 사용자를 찾을 수 없음`() {
+    fun `토큰 갱신 실패 - 사용자를 찾을 수 없음`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val userId = 1L
@@ -99,7 +100,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - Refresh Token 불일치`() {
+    fun `토큰 갱신 실패 - Refresh Token 불일치`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val differentRefreshToken = "different-refresh-token"
@@ -126,7 +127,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 성공`() {
+    fun `토큰 갱신 성공`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val userId = 1L

@@ -1,6 +1,7 @@
 package org.depromeet.team3.surveycategory.application
 
-import org.assertj.core.api.Assertions.assertThatThrownBy
+import kotlinx.coroutines.runBlocking
+import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveycategory.SurveyCategoryRepository
@@ -9,10 +10,10 @@ import org.depromeet.team3.survey.util.SurveyTestDataFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
-import org.mockito.Mockito.`when`
-import org.mockito.Mockito.verify
+import org.mockito.kotlin.*
 import org.mockito.junit.jupiter.MockitoExtension
 
 @ExtendWith(MockitoExtension::class)
@@ -31,7 +32,7 @@ class DeleteSurveyCategoryServiceTest {
 
     @Test
     @DisplayName("하위 카테고리가 없는 카테고리를 성공적으로 삭제한다")
-    fun `하위 카테고리가 없는 카테고리를 성공적으로 삭제한다`() {
+    fun `하위 카테고리가 없는 카테고리를 성공적으로 삭제한다`() = runBlocking {
         // given
         val categoryId = 1L
         val categoryToDelete = SurveyTestDataFactory.createSurveyCategory(
@@ -41,8 +42,8 @@ class DeleteSurveyCategoryServiceTest {
             sortOrder = 1
         )
 
-        `when`(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
-        `when`(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
+        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
+        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
 
         // when
         deleteSurveyCategoryService(categoryId)
@@ -51,27 +52,28 @@ class DeleteSurveyCategoryServiceTest {
         verify(surveyCategoryRepository).findById(categoryId)
         verify(surveyCategoryRepository).existsByParentIdAndIsDeletedFalse(categoryId)
         verify(surveyCategoryRepository).save(
-            categoryToDelete.copy(isDeleted = true)
+            argThat { id == categoryId && name == "김치찌개" && isDeleted }
         )
     }
 
     @Test
     @DisplayName("존재하지 않는 카테고리 삭제 시 예외가 발생한다")
-    fun `존재하지 않는 카테고리 삭제 시 예외가 발생한다`() {
+    fun `존재하지 않는 카테고리 삭제 시 예외가 발생한다`() = runBlocking {
         // given
         val categoryId = 999L
 
-        `when`(surveyCategoryRepository.findById(categoryId)).thenReturn(null)
+        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(null)
 
         // when & then
-        assertThatThrownBy { deleteSurveyCategoryService(categoryId) }
-            .isInstanceOf(SurveyCategoryException::class.java)
-            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND)
+        val exception = assertThrows<SurveyCategoryException> {
+            deleteSurveyCategoryService(categoryId)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND)
     }
 
     @Test
     @DisplayName("하위 카테고리가 있는 카테고리 삭제 시 예외가 발생한다")
-    fun `하위 카테고리가 있는 카테고리 삭제 시 예외가 발생한다`() {
+    fun `하위 카테고리가 있는 카테고리 삭제 시 예외가 발생한다`() = runBlocking {
         // given
         val categoryId = 1L
         val categoryToDelete = SurveyTestDataFactory.createSurveyCategory(
@@ -81,18 +83,19 @@ class DeleteSurveyCategoryServiceTest {
             sortOrder = 1
         )
 
-        `when`(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
-        `when`(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(true)
+        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
+        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(true)
 
         // when & then
-        assertThatThrownBy { deleteSurveyCategoryService(categoryId) }
-            .isInstanceOf(SurveyCategoryException::class.java)
-            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_HAS_CHILDREN)
+        val exception = assertThrows<SurveyCategoryException> {
+            deleteSurveyCategoryService(categoryId)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_HAS_CHILDREN)
     }
 
     @Test
     @DisplayName("이미 삭제된 카테고리도 정상적으로 처리된다")
-    fun `이미 삭제된 카테고리도 정상적으로 처리된다`() {
+    fun `이미 삭제된 카테고리도 정상적으로 처리된다`() = runBlocking {
         // given
         val categoryId = 1L
         val alreadyDeletedCategory = SurveyTestDataFactory.createSurveyCategory(
@@ -103,8 +106,8 @@ class DeleteSurveyCategoryServiceTest {
             isDeleted = true
         )
 
-        `when`(surveyCategoryRepository.findById(categoryId)).thenReturn(alreadyDeletedCategory)
-        `when`(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
+        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(alreadyDeletedCategory)
+        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
 
         // when
         deleteSurveyCategoryService(categoryId)
@@ -113,7 +116,7 @@ class DeleteSurveyCategoryServiceTest {
         verify(surveyCategoryRepository).findById(categoryId)
         verify(surveyCategoryRepository).existsByParentIdAndIsDeletedFalse(categoryId)
         verify(surveyCategoryRepository).save(
-            alreadyDeletedCategory.copy(isDeleted = true)
+            argThat { id == categoryId && name == "김치찌개" && isDeleted }
         )
     }
 }

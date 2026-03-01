@@ -43,7 +43,7 @@ class SurveyCategoryController(
         ApiResponse(responseCode = "200", description = "카테고리 목록 조회 성공")
     )
     @GetMapping
-    fun getSurveyCategoryList(): DpmApiResponse<List<SurveyCategoryItem>> {
+    suspend fun getSurveyCategoryList(): DpmApiResponse<List<SurveyCategoryItem>> {
         val response = getSurveyCategoryService()
 
         return DpmApiResponse.ok(response)
@@ -57,7 +57,7 @@ class SurveyCategoryController(
         ApiResponse(responseCode = "200", description = "카테고리 생성 성공")
     )
     @PostMapping
-    fun create(
+    suspend fun create(
         @RequestBody @Valid request: CreateSurveyCategoryRequest
     ) : DpmApiResponse<CreateSurveyCategoryResponse> {
         val response = createSurveyCategoryService(request)
@@ -74,7 +74,7 @@ class SurveyCategoryController(
         ApiResponse(responseCode = "404", description = "카테고리를 찾을 수 없음")
     )
     @PutMapping("/{id}")
-    fun update(
+    suspend fun update(
         @Parameter(description = "카테고리 ID", example = "1")
         @PathVariable id: Long,
         @RequestBody @Valid request: UpdateSurveyCategoryRequest
@@ -94,7 +94,7 @@ class SurveyCategoryController(
         ApiResponse(responseCode = "400", description = "하위 카테고리가 존재하여 삭제 불가")
     )
     @DeleteMapping("/{id}")
-    fun delete(
+    suspend fun delete(
         @Parameter(description = "카테고리 ID", example = "1")
         @PathVariable id: Long
     ): DpmApiResponse<Unit> {

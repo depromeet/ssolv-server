@@ -1,6 +1,7 @@
 package org.depromeet.team3.surveycategory.application
 
-import org.assertj.core.api.Assertions.assertThatThrownBy
+import kotlinx.coroutines.runBlocking
+import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveycategory.SurveyCategoryRepository
@@ -10,10 +11,10 @@ import org.depromeet.team3.survey.util.SurveyTestDataFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
-import org.mockito.Mockito.`when`
-import org.mockito.Mockito.verify
+import org.mockito.kotlin.*
 import org.mockito.junit.jupiter.MockitoExtension
 import java.time.LocalDateTime
 
@@ -33,7 +34,7 @@ class UpdateSurveyCategoryServiceTest {
 
     @Test
     @DisplayName("존재하는 카테고리를 성공적으로 수정한다")
-    fun `존재하는 카테고리를 성공적으로 수정한다`() {
+    fun `존재하는 카테고리를 성공적으로 수정한다`() = runBlocking {
         // given
         val categoryId = 1L
         val existingCategory = SurveyTestDataFactory.createSurveyCategory(
@@ -50,7 +51,7 @@ class UpdateSurveyCategoryServiceTest {
             sortOrder = 2
         )
 
-        `when`(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(existingCategory)
+        whenever(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(existingCategory)
 
         // when
         updateSurveyCategoryService(categoryId, updateRequest)
@@ -58,16 +59,13 @@ class UpdateSurveyCategoryServiceTest {
         // then
         verify(surveyCategoryRepository).findByIdAndIsDeletedFalse(categoryId)
         verify(surveyCategoryRepository).save(
-            existingCategory.copy(
-                name = "전통한식",
-                sortOrder = 2
-            )
+            argThat { id == categoryId && name == "전통한식" && sortOrder == 2 }
         )
     }
 
     @Test
     @DisplayName("존재하지 않는 카테고리 수정 시 예외가 발생한다")
-    fun `존재하지 않는 카테고리 수정 시 예외가 발생한다`() {
+    fun `존재하지 않는 카테고리 수정 시 예외가 발생한다`() = runBlocking {
         // given
         val categoryId = 999L
         val updateRequest = UpdateSurveyCategoryRequest(
@@ -77,17 +75,18 @@ class UpdateSurveyCategoryServiceTest {
             sortOrder = 2
         )
 
-        `when`(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(null)
+        whenever(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(null)
 
         // when & then
-        assertThatThrownBy { updateSurveyCategoryService(categoryId, updateRequest) }
-            .isInstanceOf(SurveyCategoryException::class.java)
-            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND)
+        val exception = assertThrows<SurveyCategoryException> {
+            updateSurveyCategoryService(categoryId, updateRequest)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND)
     }
 
     @Test
     @DisplayName("카테고리의 모든 필드를 수정할 수 있다")
-    fun `카테고리의 모든 필드를 수정할 수 있다`() {
+    fun `카테고리의 모든 필드를 수정할 수 있다`() = runBlocking {
         // given
         val categoryId = 1L
         val existingCategory = SurveyTestDataFactory.createSurveyCategory(
@@ -104,22 +103,17 @@ class UpdateSurveyCategoryServiceTest {
             sortOrder = 5
         )
 
-        `when`(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(existingCategory)
-        `when`(surveyCategoryRepository.countChildrenByParentIdAndIsDeletedFalse(categoryId)).thenReturn(0L)
-        `when`(surveyCategoryRepository.existsByNameAndParentIdAndIsDeletedFalse("피해야할 재료", 2L, categoryId)).thenReturn(false)
-        `when`(surveyCategoryRepository.existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(5, 2L, categoryId)).thenReturn(false)
+        whenever(surveyCategoryRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(existingCategory)
+        whenever(surveyCategoryRepository.countChildrenByParentIdAndIsDeletedFalse(categoryId)).thenReturn(0L)
+        whenever(surveyCategoryRepository.existsByNameAndParentIdAndIsDeletedFalse("피해야할 재료", 2L, categoryId)).thenReturn(false)
+        whenever(surveyCategoryRepository.existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(5, 2L, categoryId)).thenReturn(false)
 
         // when
         updateSurveyCategoryService(categoryId, updateRequest)
 
         // then
         verify(surveyCategoryRepository).save(
-            existingCategory.copy(
-                parentId = 2L,
-                level = SurveyCategoryLevel.LEAF,
-                name = "피해야할 재료",
-                sortOrder = 5
-            )
+            argThat { id == categoryId && parentId == 2L && level == SurveyCategoryLevel.LEAF && name == "피해야할 재료" && sortOrder == 5 }
         )
     }
 }

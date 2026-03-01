@@ -19,7 +19,7 @@ class JoinMeetingService(
 ) {
 
     @Transactional
-    operator fun invoke(
+    suspend operator fun invoke(
         userId: Long,
         token: String,
     ): Unit {
@@ -39,7 +39,7 @@ class JoinMeetingService(
         meetingAttendeeRepository.save(meetingAttendee)
     }
 
-    private fun validateMeeting(meetingId: Long, userId: Long) {
+    private suspend fun validateMeeting(meetingId: Long, userId: Long) {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw MeetingException(
                 errorCode = ErrorCode.MEETING_NOT_FOUND,

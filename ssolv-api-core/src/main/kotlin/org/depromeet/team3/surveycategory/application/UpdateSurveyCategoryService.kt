@@ -15,7 +15,7 @@ class UpdateSurveyCategoryService(
 ) {
 
     @Transactional
-    operator fun invoke(id: Long, request: UpdateSurveyCategoryRequest): Unit {
+    suspend operator fun invoke(id: Long, request: UpdateSurveyCategoryRequest): Unit {
         // 1. 기존 카테고리 조회 및 삭제 상태 검증
         val existingCategory = surveyCategoryRepository.findByIdAndIsDeletedFalse(id)
             ?: throw SurveyCategoryException(ErrorCode.CATEGORY_NOT_FOUND, mapOf("id" to id))
@@ -54,7 +54,7 @@ class UpdateSurveyCategoryService(
         surveyCategoryRepository.save(updatedCategory)
     }
 
-    private fun validateLeafBranchRules(existingCategory: SurveyCategory, request: UpdateSurveyCategoryRequest) {
+    private suspend fun validateLeafBranchRules(existingCategory: SurveyCategory, request: UpdateSurveyCategoryRequest) {
         // BRANCH 카테고리는 자식을 가질 수 있어야 함
         if (request.level == SurveyCategoryLevel.BRANCH) {
             // BRANCH 카테고리는 자식을 가질 수 있으므로 추가 검증 불필요
