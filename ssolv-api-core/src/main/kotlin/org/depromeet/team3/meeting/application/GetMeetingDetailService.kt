@@ -143,11 +143,12 @@ class GetMeetingDetailService(
             val leafCategoriesForBranch = leafCategoryList
                 .filter { it.parentId == branchId }
                 .mapNotNull { leafCategory ->
-                    val leafId = leafCategory.id ?: return@mapNotNull null
-                    SelectedLeafCategory(
-                        id = leafId,
-                        name = leafCategory.name
-                    )
+                    leafCategory.id?.let { leafId ->
+                        SelectedLeafCategory(
+                            id = leafId,
+                            name = leafCategory.name
+                        )
+                    }
                 }
 
             ParticipantSelectedCategory(

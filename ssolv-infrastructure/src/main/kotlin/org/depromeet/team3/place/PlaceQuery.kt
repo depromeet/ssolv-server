@@ -52,8 +52,8 @@ class PlaceQuery(
             PlaceEntity(
                 id = existing?.id,
                 googlePlaceId = existing?.googlePlaceId ?: place.id,
-                name = place.displayName?.text ?: existing?.name ?: "Unknown",
-                address = place.formattedAddress ?: existing?.address ?: "",
+                name = place.displayName.text,
+                address = place.formattedAddress,
                 latitude = place.location?.latitude ?: existing?.latitude,
                 longitude = place.location?.longitude ?: existing?.longitude,
                 rating = place.rating ?: existing?.rating ?: 0.0,

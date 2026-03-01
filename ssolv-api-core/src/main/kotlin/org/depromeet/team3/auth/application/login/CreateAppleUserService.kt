@@ -48,9 +48,24 @@ class CreateAppleUserService(
         profileImage: String?,
         socialId: String
     ): User {
-        val existingUser = userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)
+        // 1. 소셜 ID로 기존 회원 확인
+        val existingUserBySocial = userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)
+        if (existingUserBySocial != null) {
+            return existingUserBySocial
+        }
 
-        return existingUser ?: createNewUser(email, nickname, profileImage, socialId)
+        // 2. 이메일 중복 확인 (다른 소셜 계정으로 이미 가입된 경우)
+        if (email != null) {
+            val existingUserByEmail = userQueryRepository.findByEmail(email)
+            if (existingUserByEmail != null) {
+                throw org.depromeet.team3.auth.exception.AuthException(
+                    errorCode = org.depromeet.team3.common.exception.ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
+                    detail = mapOf("provider" to existingUserByEmail.provider.name)
+                )
+            }
+        }
+
+        return createNewUser(email, nickname, profileImage, socialId)
     }
 
     private suspend fun createNewUser(

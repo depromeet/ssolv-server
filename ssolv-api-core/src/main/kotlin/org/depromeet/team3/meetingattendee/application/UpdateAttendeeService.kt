@@ -41,7 +41,7 @@ class UpdateAttendeeService(
             )
         }
         
-        validateNicknameDuplication(meetingId, attendeeNickname, currentNickname, userId)
+        validateNicknameDuplication(meetingId, attendeeNickname, userId)
         
         attendee.attendeeNickname = attendeeNickname
         attendee.muzziColor = MuzziColor.getOrDefault(color)
@@ -52,7 +52,6 @@ class UpdateAttendeeService(
     private suspend fun validateNicknameDuplication(
         meetingId: Long,
         attendeeNickname: String,
-        currentNickname: String?,
         userId: Long
     ) {
         // 같은 모임 내의 모든 참여자 조회

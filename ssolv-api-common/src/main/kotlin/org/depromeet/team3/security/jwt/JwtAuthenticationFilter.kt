@@ -37,7 +37,7 @@ class JwtAuthenticationFilter(
 
         try {
             // 2. 인증 처리
-            val authResult = processAuthentication(request, response)
+            val authResult = processAuthentication(request)
             setSecurityContext(authResult)
 
             filterChain.doFilter(request, response)
@@ -54,8 +54,7 @@ class JwtAuthenticationFilter(
      * 인증 처리 로직
      */
     private fun processAuthentication(
-        request: HttpServletRequest,
-        response: HttpServletResponse
+        request: HttpServletRequest
     ): AuthResult {
         val accessToken = jwtTokenProvider.extractToken(request)
             ?: return AuthResult.Failed

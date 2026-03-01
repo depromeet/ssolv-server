@@ -39,7 +39,8 @@ class AuthController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "로그인 성공"),
         ApiResponse(responseCode = "400", description = "잘못된 요청"),
-        ApiResponse(responseCode = "401", description = "카카오 인증 실패"),
+        ApiResponse(responseCode = "401", description = "카카오 인증 실패 (O001, O002)"),
+        ApiResponse(responseCode = "409", description = "다른 소셜 로그인으로 이미 가입된 이메일 (O007)"),
         ApiResponse(responseCode = "500", description = "서버 내부 오류")
     )
     @GetMapping("/kakao-login")
@@ -77,7 +78,8 @@ class AuthController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "로그인 성공"),
         ApiResponse(responseCode = "400", description = "잘못된 요청"),
-        ApiResponse(responseCode = "401", description = "애플 인증 실패"),
+        ApiResponse(responseCode = "401", description = "애플 인증 실패 (O011, O012, O018, O019)"),
+        ApiResponse(responseCode = "409", description = "다른 소셜 로그인으로 이미 가입된 이메일 (O007)"),
         ApiResponse(responseCode = "500", description = "서버 내부 오류")
     )
     @PostMapping("/apple-login")

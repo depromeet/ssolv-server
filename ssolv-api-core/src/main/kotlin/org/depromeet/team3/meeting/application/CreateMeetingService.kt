@@ -76,6 +76,16 @@ class CreateMeetingService(
 
             meetingId
         } ?: throw IllegalStateException("Transaction result is null")
+        val meetingAttendee = MeetingAttendee(
+            id = null,
+            meetingId = meetingId,
+            userId = userId,
+            attendeeNickname = user.nickname,
+            muzziColor = MuzziColor.DEFAULT,
+            createdAt = null,
+            updatedAt = null
+        )
+        meetingAttendeeRepository.save(meetingAttendee)
 
         // suspend 함수이므로 트랜잭션 블록 바깥에서 호출
         val inviteToken = inviteTokenService.generateInviteToken(meetingId)
