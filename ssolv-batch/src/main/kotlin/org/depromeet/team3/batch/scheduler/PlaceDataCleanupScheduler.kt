@@ -19,7 +19,7 @@ class PlaceDataCleanupScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(PlaceDataCleanupScheduler::class.java)
 
-    @Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시에 실행
+//    @Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시에 실행
     @Transactional
     fun cleanupStalePlaceData() {
         val thirtyDaysAgo = LocalDateTime.now().minusDays(30)
