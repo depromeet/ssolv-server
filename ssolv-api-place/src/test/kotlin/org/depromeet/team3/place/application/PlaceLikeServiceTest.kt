@@ -14,9 +14,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.MockitoAnnotations
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.transaction.support.TransactionTemplate
+import kotlinx.coroutines.Dispatchers
+import org.depromeet.team3.common.util.CoroutineDispatchers
 
 @ExtendWith(MockitoExtension::class)
 class PlaceLikeServiceTest {
@@ -27,13 +31,26 @@ class PlaceLikeServiceTest {
     @Mock
     private lateinit var placeLikeRepository: PlaceLikeRepository
 
+    private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var placeLikeService: PlaceLikeService
 
     @BeforeEach
     fun setUp() {
+        MockitoAnnotations.openMocks(this)
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
+
         placeLikeService = PlaceLikeService(
             meetingPlaceRepository = meetingPlaceRepository,
-            placeLikeRepository = placeLikeRepository
+            placeLikeRepository = placeLikeRepository,
+            transactionTemplate = transactionTemplate,
+            coroutineDispatchers = coroutineDispatchers
         )
     }
 

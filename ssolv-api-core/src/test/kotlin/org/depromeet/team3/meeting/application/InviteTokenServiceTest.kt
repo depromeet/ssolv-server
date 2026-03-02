@@ -65,7 +65,6 @@ class InviteTokenServiceTest {
     fun `존재하지 않는 모임으로 초대 토큰 생성 시 예외 발생`() = runBlocking {
         // Given
         val meetingId = 999L
-        val baseUrl = "https://app.ssolv.site"
 
         whenever(meetingRepository.findById(meetingId)).thenReturn(null)
 

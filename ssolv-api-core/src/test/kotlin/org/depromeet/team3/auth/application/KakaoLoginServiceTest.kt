@@ -36,6 +36,7 @@ class KakaoLoginServiceTest {
     private lateinit var kakaoProfile: KakaoResponse.KakaoProfile
     private lateinit var oAuthToken: KakaoResponse.OAuthToken
     
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeEach
     fun setUp() {
         whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())

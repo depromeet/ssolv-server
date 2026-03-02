@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.springframework.transaction.support.TransactionTemplate
 import java.util.ArrayDeque
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -35,13 +36,20 @@ class ExecutePlaceSearchServiceTest {
     private lateinit var searchService: MeetingPlaceSearchService
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
     private lateinit var coroutineDispatchers: CoroutineDispatchers
+    private lateinit var transactionTemplate: TransactionTemplate
 
     private lateinit var service: ExecutePlaceSearchService
 
     @BeforeEach
     fun setup() {
         coroutineDispatchers = mock()
-        placeQuery = FakePlaceQuery(coroutineDispatchers)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
+        
+        placeQuery = FakePlaceQuery(coroutineDispatchers, transactionTemplate)
         meetingPlaceRepository = mock()
         placeLikeRepository = mock()
         searchService = mock()
@@ -192,10 +200,12 @@ class ExecutePlaceSearchServiceTest {
 }
 
 private open class FakePlaceQuery(
-    coroutineDispatchers: CoroutineDispatchers
+    coroutineDispatchers: CoroutineDispatchers,
+    transactionTemplate: TransactionTemplate
 ) : PlaceQuery(
     googlePlacesClient = mock(),
     placeJpaRepository = mock(),
+    transactionTemplate = transactionTemplate,
     coroutineDispatchers = coroutineDispatchers
 ) {
     private val textSearchResponses = mutableMapOf<String, ArrayDeque<PlacesTextSearchResponse>>()
