@@ -1,113 +1,86 @@
 package org.depromeet.team3.auth.application.login
 
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.AuthProvider
-import org.depromeet.team3.auth.User
-import org.depromeet.team3.auth.UserCommandRepository
-import org.depromeet.team3.auth.UserQueryRepository
+import org.depromeet.team3.auth.UserEntity
+import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
+import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * 애플 로그인 Save Service
+ * withContext(VT) + transactionTemplate.execute 로 트랜잭션 경계를 동일 스레드에 고정.
  */
 @Service
 class CreateAppleUserService(
-    private val userQueryRepository: UserQueryRepository,
-    private val userCommandRepository: UserCommandRepository,
-    private val jwtTokenProvider: JwtTokenProvider
+    private val userJpaRepository: UserRepository,
+    private val jwtTokenProvider: JwtTokenProvider,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    @Transactional(rollbackFor = [Exception::class])
     suspend fun saveUserAndGenerateTokens(
         email: String?,
         nickname: String,
         profileImage: String?,
         socialId: String
-    ): LoginResponse {
-        val user = findOrCreateUser(email, nickname, profileImage, socialId)
-        val tokens = generateAuthenticationTokens(user, profileImage)
+    ): LoginResponse = withContext(coroutineDispatchers.VT) {
+        transactionTemplate.execute {
+            // 1. 소셜 ID로 기존 회원 확인
+            val existingBySocial = userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)
 
-        return LoginResponse(
-            accessToken = tokens.accessToken,
-            refreshToken = tokens.refreshToken,
-            userProfile = UserProfileResponse(
-                email = user.email,
-                nickname = user.nickname,
-                profileImage = tokens.updatedUserProfile?.profileImage
-            )
-        )
-    }
-
-    private suspend fun findOrCreateUser(
-        email: String?,
-        nickname: String,
-        profileImage: String?,
-        socialId: String
-    ): User {
-        // 1. 소셜 ID로 기존 회원 확인
-        val existingUserBySocial = userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)
-        if (existingUserBySocial != null) {
-            return existingUserBySocial
-        }
-
-        // 2. 이메일 중복 확인 (다른 소셜 계정으로 이미 가입된 경우)
-        if (email != null) {
-            val existingUserByEmail = userQueryRepository.findByEmail(email)
-            if (existingUserByEmail != null) {
-                throw org.depromeet.team3.auth.exception.AuthException(
-                    errorCode = org.depromeet.team3.common.exception.ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
-                    detail = mapOf("provider" to existingUserByEmail.provider.name)
+            val userEntity: UserEntity = if (existingBySocial != null) {
+                existingBySocial
+            } else {
+                // 2. 이메일 중복 확인
+                if (email != null) {
+                    userJpaRepository.findByEmail(email)?.let {
+                        throw AuthException(
+                            errorCode = ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
+                            detail = mapOf("provider" to it.provider.name)
+                        )
+                    }
+                }
+                // 3. 신규 회원 생성
+                userJpaRepository.save(
+                    UserEntity(
+                        provider = AuthProvider.APPLE,
+                        socialId = socialId,
+                        email = email ?: "apple_${socialId}@privaterelay.appleid.com",
+                        nickname = nickname,
+                        profileImage = profileImage,
+                        refreshToken = null
+                    )
                 )
             }
-        }
 
-        return createNewUser(email, nickname, profileImage, socialId)
+            // 4. 토큰 발급 및 프로필 업데이트
+            val userId = userEntity.id!!
+            val accessToken = jwtTokenProvider.generateAccessToken(userId, userEntity.email)
+            val refreshToken = jwtTokenProvider.generateRefreshToken(userId)
+
+            if (profileImage != null && profileImage != userEntity.profileImage) {
+                userEntity.profileImage = profileImage
+            }
+            userEntity.refreshToken = refreshToken
+            userJpaRepository.save(userEntity)
+
+            LoginResponse(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                userProfile = UserProfileResponse(
+                    email = userEntity.email,
+                    nickname = userEntity.nickname,
+                    profileImage = userEntity.profileImage
+                )
+            )
+        } ?: throw org.depromeet.team3.auth.exception.AuthException(org.depromeet.team3.common.exception.ErrorCode.INTERNAL_SERVER_ERROR)
     }
-
-    private suspend fun createNewUser(
-        email: String?,
-        nickname: String,
-        profileImage: String?,
-        socialId: String
-    ): User {
-        val newUser = User(
-            id = null,
-            provider = AuthProvider.APPLE,
-            socialId = socialId,
-            email = email ?: "apple_${socialId}@privaterelay.appleid.com",
-            nickname = nickname,
-            profileImage = profileImage,
-            refreshToken = null,
-            createdAt = LocalDateTime.now(),
-            updatedAt = null
-        )
-        return userCommandRepository.save(newUser)
-    }
-
-    private suspend fun generateAuthenticationTokens(user: User, newProfileImage: String?): AuthTokens {
-        val userId = user.id!!
-        val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
-        val refreshToken = jwtTokenProvider.generateRefreshToken(userId)
-
-        val shouldUpdateProfile = newProfileImage != null && newProfileImage != user.profileImage
-        val base = if (shouldUpdateProfile) user.copy(profileImage = newProfileImage) else user
-        val updatedUser = base.copy(
-            refreshToken = refreshToken,
-            updatedAt = LocalDateTime.now()
-        )
-
-        userCommandRepository.save(updatedUser)
-
-        return AuthTokens(accessToken, refreshToken, updatedUser)
-    }
-
-    private data class AuthTokens(
-        val accessToken: String,
-        val refreshToken: String,
-        val updatedUserProfile: User? = null
-    )
 }
+

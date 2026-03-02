@@ -1,6 +1,8 @@
 package org.depromeet.team3.meeting.application
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.util.MeetingTestDataFactory
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.assertThrows
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import java.time.LocalDateTime
 
@@ -22,12 +25,15 @@ class InviteTokenServiceTest {
     @Mock
     lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var inviteTokenService: InviteTokenService
 
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        inviteTokenService = InviteTokenService(meetingRepository, meetingAttendeeRepository)
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        inviteTokenService = InviteTokenService(meetingRepository, meetingAttendeeRepository, coroutineDispatchers)
     }
 
     @Test

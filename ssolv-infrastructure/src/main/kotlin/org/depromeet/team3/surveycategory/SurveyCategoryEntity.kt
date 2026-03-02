@@ -27,18 +27,18 @@ class SurveyCategoryEntity(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
-    val parent: SurveyCategoryEntity? = null,
+    var parent: SurveyCategoryEntity? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "level", nullable = false)
-    val level: SurveyCategoryLevel,
+    var level: SurveyCategoryLevel,
 
     @Column(name = "name", nullable = false)
-    val name: String,
+    var name: String,
 
     @Column(name = "sort_order", nullable = false)
-    val sortOrder: Int,
+    var sortOrder: Int,
 
     @Column(name = "is_deleted", nullable = false)
-    val isDeleted: Boolean = false
+    var isDeleted: Boolean = false
 ) : BaseTimeEntity()

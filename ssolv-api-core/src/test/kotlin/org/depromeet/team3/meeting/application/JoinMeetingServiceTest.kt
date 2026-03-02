@@ -57,9 +57,9 @@ class JoinMeetingServiceTest {
             meetingRepository,
             meetingAttendeeRepository,
             transactionTemplate,
-            coroutineDispatchers
+            coroutineDispatchers,
+            userRepository
         )
-        joinMeetingService = JoinMeetingService(meetingRepository, meetingAttendeeRepository, userRepository)
     }
 
     @Test

@@ -49,7 +49,7 @@ class UpdateTokenServiceTest {
         whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
-            callback.doInTransaction(mock())
+            callback.doInTransaction(org.mockito.kotlin.mock())
         }
         updateTokenService = UpdateTokenService(
             userQueryRepository,

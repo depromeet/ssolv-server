@@ -1,9 +1,13 @@
 package org.depromeet.team3.auth.application
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.AuthProvider
-import org.depromeet.team3.auth.UserCommandRepository
-import org.depromeet.team3.auth.UserQueryRepository
-import org.depromeet.team3.auth.util.TestDataFactory
+import org.depromeet.team3.auth.UserRepository
+import org.depromeet.team3.auth.application.login.CreateAppleUserService
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -11,41 +15,38 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
-import kotlinx.coroutines.runBlocking
-import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.auth.application.login.CreateAppleUserService
+import org.springframework.transaction.support.TransactionTemplate
 
 @ExtendWith(MockitoExtension::class)
 class CreateAppleUserServiceTest {
 
-    @Mock
-    private lateinit var userQueryRepository: UserQueryRepository
+    @Mock private lateinit var userJpaRepository: UserRepository
+    @Mock private lateinit var jwtTokenProvider: JwtTokenProvider
 
-    @Mock
-    private lateinit var userCommandRepository: UserCommandRepository
-
-    @Mock
-    private lateinit var jwtTokenProvider: JwtTokenProvider
-
+    private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var createAppleUserService: CreateAppleUserService
 
     @BeforeEach
     fun setUp() {
+        coroutineDispatchers = mock()
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(org.mockito.kotlin.mock())
+        }
         createAppleUserService = CreateAppleUserService(
-            userQueryRepository,
-            userCommandRepository,
-            jwtTokenProvider
+            userJpaRepository, jwtTokenProvider, transactionTemplate, coroutineDispatchers
         )
     }
 
     @Test
     fun `신규 사용자 저장 및 토큰 발급 성공`() = runBlocking {
-        // given
         val email = "apple@example.com"
         val nickname = "ParkMineum"
         val socialId = "apple-social-id"
-        
-        val user = TestDataFactory.createUser(
+        val userEntity = TestEntityFactory.createUserEntity(
             id = 1L,
             provider = AuthProvider.APPLE,
             socialId = socialId,
@@ -53,44 +54,41 @@ class CreateAppleUserServiceTest {
             nickname = nickname
         )
 
-        whenever(userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
-        whenever(userCommandRepository.save(any())).thenReturn(user)
-        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
+        whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
+        whenever(userJpaRepository.findByEmail(email)).thenReturn(null)
+        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
+        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
 
-        // when
         val result = createAppleUserService.saveUserAndGenerateTokens(email, nickname, null, socialId)
 
-        // then
         assertThat(result.accessToken).isEqualTo("access-token")
         assertThat(result.refreshToken).isEqualTo("refresh-token")
         assertThat(result.userProfile.email).isEqualTo(email)
-
-        verify(userCommandRepository, times(2)).save(any()) // 1: 생성, 2: 토큰 업데이트
+        // 신규 생성(save) + 토큰 업데이트용 save = 2회
+        verify(userJpaRepository, times(2)).save(any())
     }
 
     @Test
     fun `기존 사용자가 있는 경우 조회하여 토큰 발급`() = runBlocking {
-        // given
         val email = "apple@example.com"
         val socialId = "apple-social-id"
-        val existingUser = TestDataFactory.createUser(
+        val existingUser = TestEntityFactory.createUserEntity(
             id = 1L,
             provider = AuthProvider.APPLE,
             socialId = socialId,
             email = email
         )
 
-        whenever(userQueryRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(existingUser)
-        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
+        whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(existingUser)
+        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
+        whenever(userJpaRepository.save(any())).thenReturn(existingUser)
 
-        // when
         val result = createAppleUserService.saveUserAndGenerateTokens(email, "NewNickname", null, socialId)
 
-        // then
         assertThat(result.accessToken).isEqualTo("access-token")
-        verify(userCommandRepository, times(1)).save(any()) // 토큰 업데이트만 수행
-        verify(userCommandRepository, never()).save(argThat { id == null }) // 신규 생성은 안 함
+        // 토큰 업데이트용 save만 1회 (신규 생성 없음)
+        verify(userJpaRepository, times(1)).save(any())
     }
 }

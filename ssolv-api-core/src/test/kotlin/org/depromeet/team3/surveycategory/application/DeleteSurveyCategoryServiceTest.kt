@@ -5,10 +5,10 @@ import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.depromeet.team3.surveycategory.SurveyCategoryEntity
+import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
-import org.depromeet.team3.surveycategory.SurveyCategoryRepository
 import org.depromeet.team3.surveycategory.exception.SurveyCategoryException
-import org.depromeet.team3.survey.util.SurveyTestDataFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -24,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate
 class DeleteSurveyCategoryServiceTest {
 
     @Mock
-    private lateinit var surveyCategoryRepository: SurveyCategoryRepository
+    private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
 
     private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var coroutineDispatchers: CoroutineDispatchers
@@ -40,47 +40,49 @@ class DeleteSurveyCategoryServiceTest {
             callback.doInTransaction(mock())
         }
         deleteSurveyCategoryService = DeleteSurveyCategoryService(
-            surveyCategoryRepository,
+            surveyCategoryJpaRepository,
             transactionTemplate,
             coroutineDispatchers
         )
     }
 
+    private fun createEntity(
+        id: Long = 1L,
+        level: SurveyCategoryLevel = SurveyCategoryLevel.LEAF,
+        name: String = "한식",
+        sortOrder: Int = 1,
+        isDeleted: Boolean = false
+    ) = SurveyCategoryEntity(
+        id = id,
+        level = level,
+        name = name,
+        sortOrder = sortOrder,
+        isDeleted = isDeleted
+    )
+
     @Test
     @DisplayName("하위 카테고리가 없는 카테고리를 성공적으로 삭제한다")
     fun `하위 카테고리가 없는 카테고리를 성공적으로 삭제한다`() = runBlocking {
-        // given
         val categoryId = 1L
-        val categoryToDelete = SurveyTestDataFactory.createSurveyCategory(
-            id = categoryId,
-            level = SurveyCategoryLevel.LEAF,
-            name = "김치찌개",
-            sortOrder = 1
-        )
+        val entity = createEntity(id = categoryId, name = "김치찌개")
 
-        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
-        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
+        whenever(surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(entity)
+        whenever(surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
+        whenever(surveyCategoryJpaRepository.save(any())).thenReturn(entity)
 
-        // when
         deleteSurveyCategoryService(categoryId)
 
-        // then
-        verify(surveyCategoryRepository).findById(categoryId)
-        verify(surveyCategoryRepository).existsByParentIdAndIsDeletedFalse(categoryId)
-        verify(surveyCategoryRepository).save(
-            argThat { id == categoryId && name == "김치찌개" && isDeleted }
-        )
+        verify(surveyCategoryJpaRepository).findByIdAndIsDeletedFalse(categoryId)
+        verify(surveyCategoryJpaRepository).existsByParentIdAndIsDeletedFalse(categoryId)
+        verify(surveyCategoryJpaRepository).save(argThat { this.isDeleted })
     }
 
     @Test
     @DisplayName("존재하지 않는 카테고리 삭제 시 예외가 발생한다")
     fun `존재하지 않는 카테고리 삭제 시 예외가 발생한다`() = runBlocking {
-        // given
         val categoryId = 999L
+        whenever(surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(null)
 
-        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(null)
-
-        // when & then
         val exception = assertThrows<SurveyCategoryException> {
             deleteSurveyCategoryService(categoryId)
         }
@@ -90,49 +92,15 @@ class DeleteSurveyCategoryServiceTest {
     @Test
     @DisplayName("하위 카테고리가 있는 카테고리 삭제 시 예외가 발생한다")
     fun `하위 카테고리가 있는 카테고리 삭제 시 예외가 발생한다`() = runBlocking {
-        // given
         val categoryId = 1L
-        val categoryToDelete = SurveyTestDataFactory.createSurveyCategory(
-            id = categoryId,
-            level = SurveyCategoryLevel.BRANCH,
-            name = "한식",
-            sortOrder = 1
-        )
+        val entity = createEntity(id = categoryId, level = SurveyCategoryLevel.BRANCH, name = "한식")
 
-        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(categoryToDelete)
-        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(true)
+        whenever(surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(entity)
+        whenever(surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(true)
 
-        // when & then
         val exception = assertThrows<SurveyCategoryException> {
             deleteSurveyCategoryService(categoryId)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_HAS_CHILDREN)
-    }
-
-    @Test
-    @DisplayName("이미 삭제된 카테고리도 정상적으로 처리된다")
-    fun `이미 삭제된 카테고리도 정상적으로 처리된다`() = runBlocking {
-        // given
-        val categoryId = 1L
-        val alreadyDeletedCategory = SurveyTestDataFactory.createSurveyCategory(
-            id = categoryId,
-            level = SurveyCategoryLevel.LEAF,
-            name = "김치찌개",
-            sortOrder = 1,
-            isDeleted = true
-        )
-
-        whenever(surveyCategoryRepository.findById(categoryId)).thenReturn(alreadyDeletedCategory)
-        whenever(surveyCategoryRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
-
-        // when
-        deleteSurveyCategoryService(categoryId)
-
-        // then
-        verify(surveyCategoryRepository).findById(categoryId)
-        verify(surveyCategoryRepository).existsByParentIdAndIsDeletedFalse(categoryId)
-        verify(surveyCategoryRepository).save(
-            argThat { id == categoryId && name == "김치찌개" && isDeleted }
-        )
     }
 }

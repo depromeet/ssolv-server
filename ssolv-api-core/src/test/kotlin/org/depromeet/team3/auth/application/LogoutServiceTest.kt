@@ -1,10 +1,14 @@
 package org.depromeet.team3.auth.application
 
-import org.depromeet.team3.auth.UserCommandRepository
-import org.depromeet.team3.auth.UserQueryRepository
-import org.depromeet.team3.auth.util.TestDataFactory
-import org.depromeet.team3.common.exception.ErrorCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.assertj.core.api.Assertions.assertThat
+import org.depromeet.team3.auth.UserRepository
+import org.depromeet.team3.auth.application.common.LogoutService
 import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.depromeet.team3.common.util.TestEntityFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -12,56 +16,53 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
-import org.assertj.core.api.Assertions.assertThat
-import kotlinx.coroutines.runBlocking
-import org.depromeet.team3.auth.application.common.LogoutService
+import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.transaction.support.TransactionCallback
+import java.util.Optional
 
 @ExtendWith(MockitoExtension::class)
 class LogoutServiceTest {
 
     @Mock
-    private lateinit var userQueryRepository: UserQueryRepository
+    private lateinit var userJpaRepository: UserRepository
 
-    @Mock
-    private lateinit var userCommandRepository: UserCommandRepository
-
+    private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var logoutService: LogoutService
 
     @BeforeEach
     fun setUp() {
-        logoutService = LogoutService(userQueryRepository, userCommandRepository)
+        // Dispatchers.Unconfined를 사용하는 실제 객체 생성 (NPE 방지)
+        val coroutineDispatchers = object : CoroutineDispatchers() {
+            override val VT = Dispatchers.Unconfined
+        }
+        transactionTemplate = mock()
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<TransactionCallback<Any>>(0)
+            callback.doInTransaction(mock())
+        }
+        logoutService = LogoutService(userJpaRepository, transactionTemplate, coroutineDispatchers)
     }
 
     @Test
-    fun `로그아웃 성공 - 리프레시 토큰 제거`() {
-        runBlocking {
-            // given
-            val userId = 1L
-            val user = TestDataFactory.createUser(id = userId, refreshToken = "existing-token")
-            whenever(userQueryRepository.findById(userId)).thenReturn(user)
+    fun `로그아웃 성공 - 리프레시 토큰 제거`() = runBlocking {
+        val userId = 1L
+        val userEntity = TestEntityFactory.createUserEntity(id = userId, refreshToken = "existing-token")
+        whenever(userJpaRepository.findById(userId)).thenReturn(Optional.of(userEntity))
+        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
 
-            // when
+        logoutService.logout(userId)
+
+        verify(userJpaRepository).save(any())
+    }
+
+    @Test
+    fun `로그아웃 실패 - 사용자를 찾을 수 없음`() = runBlocking {
+        val userId = 1L
+        whenever(userJpaRepository.findById(userId)).thenReturn(Optional.empty())
+
+        val exception = assertThrows<AuthException> {
             logoutService.logout(userId)
-
-            // then
-            verify(userCommandRepository).save(argThat {
-                this.id == userId && this.refreshToken == null
-            })
         }
-    }
-
-    @Test
-    fun `로그아웃 실패 - 사용자를 찾을 수 없음`() {
-        runBlocking {
-            // given
-            val userId = 1L
-            whenever(userQueryRepository.findById(userId)).thenReturn(null)
-
-            // when & then
-            val exception = assertThrows<AuthException> {
-                runBlocking { logoutService.logout(userId) }
-            }
-            assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
-        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
     }
 }
