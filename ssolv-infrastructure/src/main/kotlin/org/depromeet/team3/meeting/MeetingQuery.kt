@@ -10,22 +10,21 @@ import org.springframework.stereotype.Repository
 class MeetingQuery(
     private val meetingMapper: MeetingMapper,
     private val meetingJpaRepository: MeetingJpaRepository,
-    private val stationRepository: StationRepository
+    private val stationRepository: StationRepository,
 ) : MeetingRepository {
 
     private val logger = KotlinLogging.logger { MeetingQuery::class.java.name }
 
-    override fun save(meeting: Meeting): Meeting {
+    override suspend fun save(meeting: Meeting): Meeting {
         val entity = meetingMapper.toEntity(meeting)
-
         return meetingMapper.toDomain(meetingJpaRepository.save(entity))
     }
 
-    override fun findMeetingsByUserId(userId: Long): List<Meeting> {
+    override suspend fun findMeetingsByUserId(userId: Long): List<Meeting> {
         return meetingJpaRepository.findByHostUserId(userId).map { meetingMapper.toDomain(it) }
     }
 
-    override fun findById(id: Long): Meeting? {
+    override suspend fun findById(id: Long): Meeting? {
         return meetingJpaRepository.findByIdOrNull(id)?.let { meetingMapper.toDomain(it) }
     }
     
@@ -33,7 +32,7 @@ class MeetingQuery(
      * Meeting의 Station 좌표 조회
      * Meeting과 Station을 함께 조회하여 좌표를 반환
      */
-    fun getStationCoordinates(meetingId: Long): StationCoordinates? {
+    suspend fun getStationCoordinates(meetingId: Long): StationCoordinates? {
         val meeting = findById(meetingId)
         if (meeting == null) {
             logger.warn { "Meeting not found: meetingId=$meetingId" }

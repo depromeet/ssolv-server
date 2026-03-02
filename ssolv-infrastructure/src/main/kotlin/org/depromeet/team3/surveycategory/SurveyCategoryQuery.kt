@@ -9,43 +9,43 @@ import org.depromeet.team3.surveycategory.QSurveyCategoryEntity
 class SurveyCategoryQuery (
     private val surveyCategoryMapper: SurveyCategoryMapper,
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
-    private val queryFactory: JPAQueryFactory
+    private val queryFactory: JPAQueryFactory,
 ) : SurveyCategoryRepository {
 
-    override fun save(surveyCategory: SurveyCategory): SurveyCategory {
+    override suspend fun save(surveyCategory: SurveyCategory): SurveyCategory {
         val entity = surveyCategoryMapper.toEntity(surveyCategory)
         return surveyCategoryMapper.toDomain(surveyCategoryJpaRepository.save(entity))
     }
 
-    override fun findById(id: Long): SurveyCategory? {
+    override suspend fun findById(id: Long): SurveyCategory? {
         return surveyCategoryJpaRepository.findById(id)
             .map { surveyCategoryMapper.toDomain(it) }
             .orElse(null)
     }
     
-    override fun findAllById(ids: List<Long>): List<SurveyCategory> {
+    override suspend fun findAllById(ids: List<Long>): List<SurveyCategory> {
         return surveyCategoryJpaRepository.findAllById(ids)
             .map { surveyCategoryMapper.toDomain(it) }
     }
 
-    override fun findActive(): List<SurveyCategory> {
+    override suspend fun findActive(): List<SurveyCategory> {
         return surveyCategoryJpaRepository.findByIsDeletedFalse()
             .map { surveyCategoryMapper.toDomain(it) }
     }
 
-    override fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean {
+    override suspend fun existsByParentIdAndIsDeletedFalse(parentId: Long): Boolean {
         return surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(parentId)
     }
     
-    override fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory? {
+    override suspend fun findByIdAndIsDeletedFalse(id: Long): SurveyCategory? {
         return surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)
             ?.let { surveyCategoryMapper.toDomain(it) }
     }
     
-    override fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long?): Boolean {
+    override suspend fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long?): Boolean {
         val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
         
-        val query = queryFactory.selectFrom(qSurveyCategory)
+        val firstMatch = queryFactory.selectFrom(qSurveyCategory)
             .where(
                 qSurveyCategory.name.eq(name)
                     .and(qSurveyCategory.isDeleted.eq(false))
@@ -64,14 +64,15 @@ class SurveyCategoryQuery (
                         }
                     )
             )
+            .fetchFirst()
         
-        return query.fetchFirst() != null
+        return firstMatch != null
     }
     
-    override fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long?): Boolean {
+    override suspend fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long?): Boolean {
         val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
         
-        val query = queryFactory.selectFrom(qSurveyCategory)
+        val firstMatch = queryFactory.selectFrom(qSurveyCategory)
             .where(
                 qSurveyCategory.sortOrder.eq(sortOrder)
                     .and(qSurveyCategory.isDeleted.eq(false))
@@ -90,15 +91,16 @@ class SurveyCategoryQuery (
                         }
                     )
             )
+            .fetchFirst()
         
-        return query.fetchFirst() != null
+        return firstMatch != null
     }
     
-    override fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long {
+    override suspend fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long {
         return surveyCategoryJpaRepository.countByParentIdAndIsDeletedFalse(parentId)
     }
 
-    override fun findByName(name: String): SurveyCategory? {
+    override suspend fun findByName(name: String): SurveyCategory? {
         return surveyCategoryJpaRepository.findByNameAndIsDeletedFalse(name)
             ?.let { surveyCategoryMapper.toDomain(it) }
     }

@@ -125,7 +125,7 @@ class AuthController(
         ApiResponse(responseCode = "500", description = "서버 내부 오류")
     )
     @PostMapping("/reissue-token")
-    fun refreshToken(
+    suspend fun refreshToken(
         @RequestBody request: RefreshTokenRequest
     ): DpmApiResponse<TokenResponse> {
         val command = RefreshTokenCommand(request.refreshToken)
@@ -142,7 +142,7 @@ class AuthController(
         ApiResponse(responseCode = "401", description = "인증 실패")
     )
     @PostMapping("/logout")
-    fun logout(@UserId userId: Long): DpmApiResponse<Unit> {
+    suspend fun logout(@UserId userId: Long): DpmApiResponse<Unit> {
         logoutService.logout(userId)
         return DpmApiResponse.ok()
     }

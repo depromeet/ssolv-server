@@ -15,7 +15,7 @@ class CreateSurveyKeywordService(
     private val selectSurveyKeywordsService: SelectSurveyKeywordsService
 ) {
 
-    fun getStationCoordinates(meetingId: Long): MeetingQuery.StationCoordinates? =
+    suspend fun getStationCoordinates(meetingId: Long): MeetingQuery.StationCoordinates? =
         meetingQuery.getStationCoordinates(meetingId)
 
     /**
@@ -27,7 +27,7 @@ class CreateSurveyKeywordService(
      *
      * @return 키워드 후보들과 역 좌표를 담은 계획 정보
      */
-    fun generateKeywordPlan(meetingId: Long): KeywordPlan {
+    suspend fun generateKeywordPlan(meetingId: Long): KeywordPlan {
         val aggregate = getSurveyAggregateService.load(meetingId)
         val keywordCandidates = selectSurveyKeywordsService.selectKeywords(aggregate)
         return KeywordPlan(

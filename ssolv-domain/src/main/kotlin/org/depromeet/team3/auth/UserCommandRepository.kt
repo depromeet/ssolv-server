@@ -5,6 +5,6 @@ package org.depromeet.team3.auth
  * 쓰기 작업만 담당
  */
 interface UserCommandRepository {
-    fun save(user: User): User
-    fun delete(user: User)
+    suspend fun save(user: User): User
+    suspend fun delete(user: User)
 }

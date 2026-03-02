@@ -35,27 +35,29 @@ class GetPlacesServiceTest {
     }
 
     @Test
-    fun `자동 검색 시 계획 수립 후 실행 서비스 호출`(): Unit = runBlocking {
-        // given
-        val request = PlacesSearchRequest(meetingId = 1L)
-        val plan = PlaceSearchPlan.Automatic(
-            keywords = emptyList(),
-            stationCoordinates = null,
-            fallbackKeyword = "잠실 맛집"
-        )
-        val expectedResponse = PlacesSearchResponse(emptyList())
+    fun `자동 검색 시 계획 수립 후 실행 서비스 호출`() {
+        runBlocking {
+            // given
+            val request = PlacesSearchRequest(meetingId = 1L)
+            val plan = PlaceSearchPlan.Automatic(
+                keywords = emptyList(),
+                stationCoordinates = null,
+                fallbackKeyword = "잠실 맛집"
+            )
+            val expectedResponse = PlacesSearchResponse(emptyList())
 
-        whenever(createPlaceSearchPlanService.resolve(request))
-            .thenReturn(plan)
-        whenever(executePlaceSearchService.search(request, plan))
-            .thenReturn(expectedResponse)
+            whenever(createPlaceSearchPlanService.resolve(request))
+                .thenReturn(plan)
+            whenever(executePlaceSearchService.search(request, plan))
+                .thenReturn(expectedResponse)
 
-        // when
-        val response = getPlacesService.textSearch(request)
+            // when
+            val response = getPlacesService.textSearch(request)
 
-        // then
-        assertThat(response).isEqualTo(expectedResponse)
-        verify(createPlaceSearchPlanService).resolve(request)
-        verify(executePlaceSearchService).search(request, plan)
+            // then
+            assertThat(response).isEqualTo(expectedResponse)
+            verify(createPlaceSearchPlanService).resolve(request)
+            verify(executePlaceSearchService).search(request, plan)
+        }
     }
 }

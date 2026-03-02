@@ -109,8 +109,8 @@ class AppleOAuthClient(
     /**
      * ID 토큰 서명 및 클레임 검증 후 사용자 정보 추출
      */
-    suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload {
-        return try {
+    suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload = withContext(coroutineDispatchers.VT) {
+        try {
             val claims = Jwts.parser()
                 .keyLocator { header ->
                     val kid = header["kid"] as? String ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)

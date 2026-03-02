@@ -1,109 +1,83 @@
 package org.depromeet.team3.auth.application.login
 
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.AuthProvider
-import org.depromeet.team3.auth.User
-import org.depromeet.team3.auth.UserCommandRepository
-import org.depromeet.team3.auth.UserQueryRepository
+import org.depromeet.team3.auth.UserEntity
+import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
+import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 
 @Service
 class CreateKakaoUserService(
-    private val userQueryRepository: UserQueryRepository,
-    private val userCommandRepository: UserCommandRepository,
-    private val jwtTokenProvider: JwtTokenProvider
+    private val userJpaRepository: UserRepository,
+    private val jwtTokenProvider: JwtTokenProvider,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    @Transactional(rollbackFor = [Exception::class])
-    fun saveUserAndGenerateTokens(
+    suspend fun saveUserAndGenerateTokens(
         email: String?,
         nickname: String,
         profileImage: String?,
         socialId: String
-    ): LoginResponse {
+    ): LoginResponse = withContext(coroutineDispatchers.VT) {
         val userEmail = email ?: "kakao_${socialId}@kakao.com"
-        val user = findOrCreateUser(userEmail, nickname, profileImage, socialId)
-        val tokens = generateAuthenticationTokens(user, profileImage)
 
-        return LoginResponse(
-            accessToken = tokens.accessToken,
-            refreshToken = tokens.refreshToken,
-            userProfile = UserProfileResponse(
-                email = user.email,
-                nickname = user.nickname,
-                profileImage = tokens.updatedUserProfile?.profileImage
+        transactionTemplate.execute {
+            // 1. 소셜 ID로 기존 회원 확인
+            val existingBySocial = userJpaRepository.findByProviderAndSocialId(AuthProvider.KAKAO, socialId)
+
+            val userEntity: UserEntity = if (existingBySocial != null) {
+                existingBySocial
+            } else {
+                // 2. 이메일 중복 확인
+                userJpaRepository.findByEmail(userEmail)?.let {
+                    throw AuthException(
+                        errorCode = ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
+                        detail = mapOf("provider" to it.provider.name)
+                    )
+                }
+                // 3. 신규 회원 생성
+                userJpaRepository.save(
+                    UserEntity(
+                        provider = AuthProvider.KAKAO,
+                        socialId = socialId,
+                        email = userEmail,
+                        nickname = nickname,
+                        profileImage = profileImage,
+                        refreshToken = null
+                    )
+                )
+            }
+
+            // 4. 토큰 발급 및 프로필 업데이트
+            val userId = userEntity.id!!
+            val accessToken = jwtTokenProvider.generateAccessToken(userId, userEntity.email)
+            val refreshToken = jwtTokenProvider.generateRefreshToken(userId)
+
+            if (profileImage != null && profileImage != userEntity.profileImage) {
+                userEntity.profileImage = profileImage
+            }
+            userEntity.refreshToken = refreshToken
+            userJpaRepository.save(userEntity)
+
+            LoginResponse(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                userProfile = UserProfileResponse(
+                    email = userEntity.email,
+                    nickname = userEntity.nickname,
+                    profileImage = userEntity.profileImage
+                )
             )
-        )
+        }!!
     }
-
-    private fun findOrCreateUser(
-        email: String,
-        nickname: String,
-        profileImage: String?,
-        socialId: String
-    ): User {
-        // 1. 소셜 ID로 기존 회원 확인
-        val existingUserBySocial = userQueryRepository.findByProviderAndSocialId(AuthProvider.KAKAO, socialId)
-        if (existingUserBySocial != null) {
-            return existingUserBySocial
-        }
-
-        // 2. 이메일 중복 확인 (다른 소셜 계정으로 이미 가입된 경우)
-        val existingUserByEmail = userQueryRepository.findByEmail(email)
-        if (existingUserByEmail != null) {
-            throw org.depromeet.team3.auth.exception.AuthException(
-                errorCode = org.depromeet.team3.common.exception.ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
-                detail = mapOf("provider" to existingUserByEmail.provider.name)
-            )
-        }
-
-        return createNewUser(email, nickname, profileImage, socialId)
-    }
-
-    private fun createNewUser(
-        email: String,
-        nickname: String,
-        profileImage: String?,
-        socialId: String
-    ): User {
-        val newUser = User(
-            id = null,
-            provider = AuthProvider.KAKAO,
-            socialId = socialId,
-            email = email,
-            nickname = nickname,
-            profileImage = profileImage,
-            refreshToken = null,
-            createdAt = LocalDateTime.now(),
-            updatedAt = null
-        )
-        return userCommandRepository.save(newUser)
-    }
-
-    private fun generateAuthenticationTokens(user: User, newProfileImage: String?): AuthTokens {
-        val userId = user.id!!
-        val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
-        val refreshToken = jwtTokenProvider.generateRefreshToken(userId)
-
-        val shouldUpdateProfile = newProfileImage != null && newProfileImage != user.profileImage
-        val base = if (shouldUpdateProfile) user.copy(profileImage = newProfileImage) else user
-        val updatedUser = base.copy(
-            refreshToken = refreshToken,
-            updatedAt = LocalDateTime.now()
-        )
-
-        userCommandRepository.save(updatedUser)
-
-        return AuthTokens(accessToken, refreshToken, updatedUser)
-    }
-
-    private data class AuthTokens(
-        val accessToken: String,
-        val refreshToken: String,
-        val updatedUserProfile: User? = null
-    )
 }
+

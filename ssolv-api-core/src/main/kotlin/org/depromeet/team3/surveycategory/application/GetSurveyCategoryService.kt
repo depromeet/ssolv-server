@@ -10,7 +10,7 @@ class GetSurveyCategoryService(
     private val surveyCategoryQuery: SurveyCategoryQuery
 ) {
 
-    operator fun invoke(): List<SurveyCategoryItem> {
+    suspend operator fun invoke(): List<SurveyCategoryItem> {
         // DB에서 모든 활성 카테고리 조회
         val allCategories = surveyCategoryQuery.findActive()
         

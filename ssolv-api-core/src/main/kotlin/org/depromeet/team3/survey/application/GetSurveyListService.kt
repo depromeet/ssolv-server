@@ -1,6 +1,8 @@
 package org.depromeet.team3.survey.application
 
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendee
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
@@ -12,19 +14,18 @@ import org.depromeet.team3.survey.dto.response.SurveyListResponse
 import org.depromeet.team3.survey.exception.SurveyException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class GetSurveyListService(
     private val surveyRepository: SurveyRepository,
     private val surveyResultRepository: SurveyResultRepository,
     private val meetingJpaRepository: MeetingJpaRepository,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeRepository: MeetingAttendeeRepository,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val logger = LoggerFactory.getLogger(GetSurveyListService::class.java)
 
-    @Transactional(readOnly = true)
-    fun invoke(meetingId: Long, userId: Long): SurveyListResponse {
+    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withContext(coroutineDispatchers.VT) {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)) {
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
@@ -92,15 +93,14 @@ class GetSurveyListService(
             )
         }
 
-        return SurveyListResponse(
+        SurveyListResponse(
             surveys = surveyItems,
             participationRate = participationRate,
             isCompleted = isCompleted
         )
     }
 
-    @Transactional(readOnly = true)
-    fun getRespondents(meetingId: Long): List<GetRespondents> {
+    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withContext(coroutineDispatchers.VT) {
         // 모든 참가자를 한 번에 조회 (N+1 문제 해결)
         val attendeeList = meetingAttendeeRepository.findByMeetingId(meetingId)
         val attendeeMap = attendeeList.associateBy { it.userId }
@@ -109,7 +109,7 @@ class GetSurveyListService(
         val participantIdList = surveyRepository.findByMeetingId(meetingId)
             .map { it.participantId }
         
-        return participantIdList
+        participantIdList
             .mapNotNull { id -> attendeeMap[id] }
             .map { attendee -> attendee.toGetRespondents() }
     }

@@ -6,26 +6,25 @@ import org.springframework.stereotype.Repository
 @Repository
 class MeetingAttendeeQuery(
     private val meetingAttendeeMapper: MeetingAttendeeMapper,
-    private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
+    private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
 ) : MeetingAttendeeRepository {
 
-    override fun save(meetingAttendee: MeetingAttendee): MeetingAttendee {
+    override suspend fun save(meetingAttendee: MeetingAttendee): MeetingAttendee {
         val entity = meetingAttendeeMapper.toEntity(meetingAttendee)
-
         return meetingAttendeeMapper.toDomain(meetingAttendeeJpaRepository.save(entity))
     }
 
-    override fun findByMeetingId(meetingId: Long): List<MeetingAttendee> {
+    override suspend fun findByMeetingId(meetingId: Long): List<MeetingAttendee> {
         return meetingAttendeeJpaRepository.findByMeetingId(meetingId)
             .map { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun findByUserId(userId: Long): List<MeetingAttendee> {
+    override suspend fun findByUserId(userId: Long): List<MeetingAttendee> {
         return meetingAttendeeJpaRepository.findByUserId(userId)
             .map { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun findByMeetingIdAndUserId(
+    override suspend fun findByMeetingIdAndUserId(
         meetingId: Long,
         userId: Long
     ): MeetingAttendee? {
@@ -33,14 +32,14 @@ class MeetingAttendeeQuery(
             ?.let { meetingAttendeeMapper.toDomain(it) }
     }
 
-    override fun existsByMeetingIdAndUserId(
+    override suspend fun existsByMeetingIdAndUserId(
         meetingId: Long,
         userId: Long
     ): Boolean {
         return meetingAttendeeJpaRepository.existsByMeetingIdAndUserId(meetingId, userId)
     }
 
-    override fun existsByMeetingIdAndNormalizedNickname(
+    override suspend fun existsByMeetingIdAndNormalizedNickname(
         meetingId: Long,
         nickname: String,
         excludeUserId: Long
@@ -48,11 +47,11 @@ class MeetingAttendeeQuery(
         return meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(meetingId, nickname, excludeUserId)
     }
 
-    override fun countByMeetingId(meetingId: Long): Int {
+    override suspend fun countByMeetingId(meetingId: Long): Int {
         return meetingAttendeeJpaRepository.countByMeetingId(meetingId)
     }
 
-    override fun deleteById(id: Long) {
+    override suspend fun deleteById(id: Long): Unit {
         meetingAttendeeJpaRepository.deleteById(id)
     }
 }

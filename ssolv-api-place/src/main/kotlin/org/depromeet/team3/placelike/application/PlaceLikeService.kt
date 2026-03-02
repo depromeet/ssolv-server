@@ -1,30 +1,38 @@
 package org.depromeet.team3.placelike.application
 
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meetingplace.MeetingPlaceRepository
 import org.depromeet.team3.meetingplace.exception.MeetingPlaceException
 import org.depromeet.team3.placelike.PlaceLike
 import org.depromeet.team3.placelike.PlaceLikeRepository
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class PlaceLikeService(
     private val meetingPlaceRepository: MeetingPlaceRepository,
-    private val placeLikeRepository: PlaceLikeRepository
+    private val placeLikeRepository: PlaceLikeRepository,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    @Transactional
-    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult {
-        val meetingPlaceId = getMeetingPlaceId(meetingId, placeId)
-        val isLiked = toggleLikeStatus(meetingPlaceId, userId)
-        val likeCount = placeLikeRepository.countByMeetingPlaceId(meetingPlaceId).toInt()
+    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
+        transactionTemplate.execute {
+            runBlocking {
+                val meetingPlaceId = getMeetingPlaceId(meetingId, placeId)
+                val isLiked = toggleLikeStatus(meetingPlaceId, userId)
+                val likeCount = placeLikeRepository.countByMeetingPlaceId(meetingPlaceId).toInt()
 
-        return PlaceLikeResult(
-            isLiked = isLiked,
-            likeCount = likeCount
-        )
+                PlaceLikeResult(
+                    isLiked = isLiked,
+                    likeCount = likeCount
+                )
+            }
+        }!!
     }
 
     private suspend fun getMeetingPlaceId(meetingId: Long, placeId: Long): Long {

@@ -25,7 +25,7 @@ class GetSurveyAggregateService(
     private val stationRepository: StationRepository
 ) {
 
-    fun load(meetingId: Long): PlaceSurveySummary {
+    suspend fun load(meetingId: Long): PlaceSurveySummary {
         val meeting = meetingQuery.findById(meetingId)
             ?: throw PlaceSearchException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
 

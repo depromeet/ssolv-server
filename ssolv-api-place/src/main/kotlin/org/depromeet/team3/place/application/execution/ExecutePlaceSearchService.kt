@@ -1,6 +1,5 @@
 package org.depromeet.team3.place.application.execution
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -82,7 +81,7 @@ class ExecutePlaceSearchService(
             .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
             .take(totalFetchSize + photoFallbackBuffer)
         
-        val savedEntities = withContext(Dispatchers.IO) {
+        val savedEntities = withContext(coroutineDispatchers.VT) {
             placeQuery.savePlacesFromTextSearch(placesToProcess)
         }
         
@@ -506,7 +505,7 @@ class ExecutePlaceSearchService(
     }
 
     private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>): Map<String, Long> {
-        return withContext(Dispatchers.IO) {
+        return withContext(coroutineDispatchers.VT) {
             placeQuery.findByGooglePlaceIds(googlePlaceIds)
                 .mapNotNull { place ->
                     val dbId = place.id ?: return@mapNotNull null
@@ -517,7 +516,7 @@ class ExecutePlaceSearchService(
         }
     }
 
-    private suspend fun createOrGetMeetingPlaces(meetingId: Long, placeDbIds: List<Long>): List<MeetingPlace> = withContext(Dispatchers.IO) {
+    private suspend fun createOrGetMeetingPlaces(meetingId: Long, placeDbIds: List<Long>): List<MeetingPlace> = withContext(coroutineDispatchers.VT) {
         val existingMeetingPlaces = meetingPlaceRepository.findByMeetingId(meetingId)
         val existingPlaceIds = existingMeetingPlaces.map { it.placeId }.toSet()
 
@@ -577,7 +576,7 @@ class ExecutePlaceSearchService(
         storedItems: List<PlacesSearchResponse.PlaceItem>,
         meetingId: Long,
         userId: Long?
-    ): List<PlacesSearchResponse.PlaceItem> = withContext(Dispatchers.IO) {
+    ): List<PlacesSearchResponse.PlaceItem> = withContext(coroutineDispatchers.VT) {
         if (storedItems.isEmpty()) return@withContext emptyList()
         
         // PlaceItem의 placeId는 DB ID이므로 직접 사용

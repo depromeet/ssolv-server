@@ -1,77 +1,67 @@
 package org.depromeet.team3.meetingattendee.application
 
+import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class UpdateAttendeeService(
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    @Transactional
-    operator fun invoke(
+    suspend operator fun invoke(
         userId: Long,
         meetingId: Long,
         attendeeNickname: String,
         color: String?
-    ): Unit {
-        val attendee = meetingAttendeeRepository.findByMeetingIdAndUserId(meetingId, userId)
-            ?: throw MeetingAttendeeException(
-                errorCode = ErrorCode.PARTICIPANT_NOT_FOUND,
-                detail = mapOf(
-                    "meetingId" to meetingId,
-                    "userId" to userId
+    ): Unit = withContext(coroutineDispatchers.VT) {
+        transactionTemplate.execute {
+            val entity = meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
+                ?: throw MeetingAttendeeException(
+                    errorCode = ErrorCode.PARTICIPANT_NOT_FOUND,
+                    detail = mapOf(
+                        "meetingId" to meetingId,
+                        "userId" to userId
+                    )
                 )
-            )
-        
-        val currentNickname = attendee.attendeeNickname
-        
-        // 현재 닉네임과 동일하면 바로 에러
-        if (currentNickname != null && currentNickname == attendeeNickname) {
-            throw MeetingAttendeeException(
-                errorCode = ErrorCode.DUPLICATE_NICKNAME,
-                detail = mapOf(
-                    "meetingId" to meetingId,
-                    "nickname" to attendeeNickname
-                )
-            )
-        }
-        
-        validateNicknameDuplication(meetingId, attendeeNickname, userId)
-        
-        attendee.attendeeNickname = attendeeNickname
-        attendee.muzziColor = MuzziColor.getOrDefault(color)
 
-        meetingAttendeeRepository.save(attendee)
-    }
-
-    private fun validateNicknameDuplication(
-        meetingId: Long,
-        attendeeNickname: String,
-        userId: Long
-    ) {
-        // 같은 모임 내의 모든 참여자 조회
-        val allAttendees = meetingAttendeeRepository.findByMeetingId(meetingId)
-        
-        // 다른 사용자가 같은 닉네임을 사용 중인지 확인 (본인 제외)
-        val hasDuplicate = allAttendees.any { attendee ->
-            attendee.userId != userId &&
-            attendee.attendeeNickname != null &&
-            attendee.attendeeNickname == attendeeNickname
-        }
-        
-        if (hasDuplicate) {
-            throw MeetingAttendeeException(
-                errorCode = ErrorCode.DUPLICATE_NICKNAME,
-                detail = mapOf(
-                    "meetingId" to meetingId,
-                    "nickname" to attendeeNickname
+            val currentNickname = entity.attendeeNickname
+            if (currentNickname != null && currentNickname == attendeeNickname) {
+                throw MeetingAttendeeException(
+                    errorCode = ErrorCode.DUPLICATE_NICKNAME,
+                    detail = mapOf(
+                        "meetingId" to meetingId,
+                        "nickname" to attendeeNickname
+                    )
                 )
+            }
+
+            // 닉네임 중복 검증 (본인 제외) - blocking
+            val hasDuplicate = meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(
+                meetingId = meetingId,
+                nickname = attendeeNickname,
+                excludeUserId = userId
             )
+            if (hasDuplicate) {
+                throw MeetingAttendeeException(
+                    errorCode = ErrorCode.DUPLICATE_NICKNAME,
+                    detail = mapOf(
+                        "meetingId" to meetingId,
+                        "nickname" to attendeeNickname
+                    )
+                )
+            }
+
+            entity.attendeeNickname = attendeeNickname
+            entity.muzziColor = MuzziColor.getOrDefault(color)
+            meetingAttendeeJpaRepository.save(entity)
         }
     }
 }

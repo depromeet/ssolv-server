@@ -24,7 +24,7 @@ class AttendeeController(
         description = "참여자의 닉네임과 무찌 색상을 수정합니다."
     )
     @PutMapping()
-    fun updateAttendee(
+    suspend fun updateAttendee(
         @UserId userId: Long,
 
         @Parameter(description = "모임 ID 또는 초대 토큰", required = true)

@@ -8,6 +8,9 @@ import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.util.TestDataFactory
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.CoroutineDispatchers
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -18,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.application.token.UpdateTokenService
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 
 @ExtendWith(MockitoExtension::class)
@@ -32,19 +36,32 @@ class UpdateTokenServiceTest {
     @Mock
     private lateinit var jwtTokenProvider: JwtTokenProvider
 
+    @Mock
+    private lateinit var transactionTemplate: TransactionTemplate
+
+    @Mock
+    private lateinit var coroutineDispatchers: CoroutineDispatchers
+
     private lateinit var updateTokenService: UpdateTokenService
     
     @BeforeEach
     fun setUp() {
+        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+            val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
+            callback.doInTransaction(org.mockito.kotlin.mock())
+        }
         updateTokenService = UpdateTokenService(
             userQueryRepository,
             userCommandRepository,
-            jwtTokenProvider
+            jwtTokenProvider,
+            transactionTemplate,
+            coroutineDispatchers
         )
     }
 
     @Test
-    fun `토큰 갱신 실패 - 유효하지 않은 Refresh Token`() {
+    fun `토큰 갱신 실패 - 유효하지 않은 Refresh Token`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "invalid-refresh-token")
         
@@ -60,7 +77,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - 사용자 정보 없음`() {
+    fun `토큰 갱신 실패 - 사용자 정보 없음`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         
@@ -78,7 +95,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - 사용자를 찾을 수 없음`() {
+    fun `토큰 갱신 실패 - 사용자를 찾을 수 없음`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val userId = 1L
@@ -99,7 +116,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 실패 - Refresh Token 불일치`() {
+    fun `토큰 갱신 실패 - Refresh Token 불일치`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val differentRefreshToken = "different-refresh-token"
@@ -126,7 +143,7 @@ class UpdateTokenServiceTest {
     }
 
     @Test
-    fun `토큰 갱신 성공`() {
+    fun `토큰 갱신 성공`() = runBlocking {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         val userId = 1L

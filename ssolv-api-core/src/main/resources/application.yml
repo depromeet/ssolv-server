@@ -3,12 +3,11 @@ server:
   forward-headers-strategy: framework
 
 spring:
-  application:
-    name: ssolv-api-core
-  
   threads:
     virtual:
       enabled: true
+  application:
+    name: ssolv-api-core
   
   cloud:
     config:

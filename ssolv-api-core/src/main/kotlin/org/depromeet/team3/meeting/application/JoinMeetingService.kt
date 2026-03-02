@@ -10,46 +10,53 @@ import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.depromeet.team3.util.DataEncoder
 import org.depromeet.team3.auth.UserRepository
+import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 
 @Service
 class JoinMeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
+    private val transactionTemplate: TransactionTemplate,
+    private val coroutineDispatchers: CoroutineDispatchers,
     private val userRepository: UserRepository
 ) {
 
-    @Transactional
-    operator fun invoke(
+    suspend operator fun invoke(
         userId: Long,
         token: String,
-    ): Unit {
-        val meetingId = parseTokenId(token)
-        validateMeeting(meetingId, userId)
+    ): Unit = withContext(coroutineDispatchers.VT) {
+        transactionTemplate.execute {
+            val meetingId = parseTokenId(token)
+            runBlocking { validateMeeting(meetingId, userId) }
 
-        val user = userRepository.findById(userId)
-            .orElseThrow { 
-                MeetingException(
-                    errorCode = ErrorCode.USER_NOT_FOUND,
-                    detail = mapOf("userId" to userId)
-                )
-            }
+            val user = userRepository.findById(userId)
+                .orElseThrow {
+                    MeetingException(
+                        errorCode = ErrorCode.USER_NOT_FOUND,
+                        detail = mapOf("userId" to userId)
+                    )
+                }
 
-        val meetingAttendee = MeetingAttendee(
-            id = null,
-            meetingId = meetingId,
-            userId = userId,
-            attendeeNickname = user.nickname,
-            muzziColor = MuzziColor.DEFAULT,
-            createdAt = null,
-            updatedAt = null
-        )
+            val meetingAttendee = MeetingAttendee(
+                id = null,
+                meetingId = meetingId,
+                userId = userId,
+                attendeeNickname = user.nickname,
+                muzziColor = MuzziColor.DEFAULT,
+                createdAt = null,
+                updatedAt = null
+            )
 
-        meetingAttendeeRepository.save(meetingAttendee)
+            runBlocking { meetingAttendeeRepository.save(meetingAttendee) }
+        }
+        Unit
     }
 
-    private fun validateMeeting(meetingId: Long, userId: Long) {
+    private suspend fun validateMeeting(meetingId: Long, userId: Long) {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw MeetingException(
                 errorCode = ErrorCode.MEETING_NOT_FOUND,

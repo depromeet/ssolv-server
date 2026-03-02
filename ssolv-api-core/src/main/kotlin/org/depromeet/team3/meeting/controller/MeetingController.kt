@@ -39,7 +39,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "모임 목록 조회 성공")
     )
     @GetMapping
-    fun getMeeting(
+    suspend fun getMeeting(
         @UserId userId: Long
     ) : DpmApiResponse<List<MeetingsResponse>> {
         val response = getMeetingService(userId)
@@ -55,7 +55,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "모임 상세 정보 조회 성공")
     )
     @GetMapping("/{identifier}")
-    fun getMeetingDetail(
+    suspend fun getMeetingDetail(
         @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
         @MeetingId("identifier") meetingId: Long,
         @UserId userId: Long
@@ -73,7 +73,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "종료된 모임 상세 정보 조회 성공")
     )
     @GetMapping("/{identifier}/history")
-    fun getMeetingDetailHistory(
+    suspend fun getMeetingDetailHistory(
         @Parameter(description = "모임 ID 또는 초대 토큰", example = "1")
         @MeetingId("identifier") meetingId: Long,
         @UserId userId: Long
@@ -92,7 +92,7 @@ class MeetingController(
         ApiResponse(responseCode = "400", description = "잘못된 요청 (모임이 존재하지 않거나 종료된 경우)")
     )
     @GetMapping("/{identifier}/invite-token")
-    fun getInviteToken(
+    suspend fun getInviteToken(
         @Parameter(description = "모임 ID 또는 초대 토큰", example = "5")
         @MeetingId("identifier") meetingId: Long
     ): DpmApiResponse<GetInviteTokenResponse> {
@@ -111,7 +111,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "토큰 검증 성공")
     )
     @GetMapping("/validate-invite")
-    fun validateInviteToken(
+    suspend fun validateInviteToken(
         @Parameter(description = "모임 초대 토큰", example = "abc123def456")
         @RequestParam token: String,
         @UserId userId: Long
@@ -129,7 +129,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "모임 생성 성공")
     )
     @PostMapping
-    fun create(
+    suspend fun create(
         @UserId userId: Long,
         @RequestBody @Valid request: CreateMeetingRequest,
     ) : DpmApiResponse<CreateMeetingResponse> {
@@ -146,7 +146,7 @@ class MeetingController(
         ApiResponse(responseCode = "200", description = "모임 참여 성공")
     )
     @PostMapping("/join")
-    fun join(
+    suspend fun join(
         @UserId userId: Long,
         @RequestBody @Valid request: JoinMeetingRequest
     ) : DpmApiResponse<Unit> {

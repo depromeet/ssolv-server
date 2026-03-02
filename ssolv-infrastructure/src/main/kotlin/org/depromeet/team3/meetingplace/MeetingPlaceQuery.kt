@@ -8,19 +8,16 @@ import org.depromeet.team3.meeting.exception.MeetingException
 import org.depromeet.team3.place.PlaceJpaRepository
 import org.depromeet.team3.place.exception.PlaceException
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 @Component
 class MeetingPlaceQuery(
     private val meetingPlaceJpaRepository: MeetingPlaceJpaRepository,
     private val meetingPlaceMapper: MeetingPlaceMapper,
     private val meetingJpaRepository: MeetingJpaRepository,
-    private val placeJpaRepository: PlaceJpaRepository
+    private val placeJpaRepository: PlaceJpaRepository,
 ) : MeetingPlaceRepository {
 
-    @Transactional
     override suspend fun save(meetingPlace: MeetingPlace): MeetingPlace {
-
         val meeting = meetingJpaRepository.findById(meetingPlace.meetingId)
             .orElseThrow { 
                 MeetingException(
@@ -41,7 +38,6 @@ class MeetingPlaceQuery(
         return meetingPlaceMapper.toDomain(saved)
     }
 
-    @Transactional
     override suspend fun saveAll(meetingPlaces: List<MeetingPlace>): List<MeetingPlace> {
         // Meeting과 Place를 미리 조회 (N+1 방지)
         val meetingIds = meetingPlaces.map { it.meetingId }.distinct()
@@ -71,30 +67,26 @@ class MeetingPlaceQuery(
         return saved.map { meetingPlaceMapper.toDomain(it) }
     }
 
-    @Transactional(readOnly = true)
     override suspend fun findByMeetingId(meetingId: Long): List<MeetingPlace> {
         return meetingPlaceJpaRepository.findByMeetingId(meetingId)
             .map { meetingPlaceMapper.toDomain(it) }
     }
 
-    @Transactional(readOnly = true)
     override suspend fun findByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): MeetingPlace? {
         return meetingPlaceJpaRepository.findByMeetingIdAndPlaceId(meetingId, placeId)
             ?.let { meetingPlaceMapper.toDomain(it) }
     }
 
-    @Transactional(readOnly = true)
     override suspend fun findIdByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Long? {
         return meetingPlaceJpaRepository.findIdByMeetingIdAndPlaceId(meetingId, placeId)
     }
 
-    @Transactional
-    override suspend fun deleteByMeetingId(meetingId: Long) {
+    override suspend fun deleteByMeetingId(meetingId: Long): Unit {
         meetingPlaceJpaRepository.deleteByMeetingId(meetingId)
     }
 
-    @Transactional(readOnly = true)
     override suspend fun existsByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Boolean {
         return meetingPlaceJpaRepository.existsByMeetingIdAndPlaceId(meetingId, placeId)
     }
 }
+

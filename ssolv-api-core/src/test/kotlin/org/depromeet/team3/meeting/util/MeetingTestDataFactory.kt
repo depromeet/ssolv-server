@@ -52,11 +52,10 @@ object MeetingTestDataFactory {
             station = station
         )
         // id를 리플렉션으로 설정 (테스트용)
-        if (id != null) {
-            val idField = MeetingEntity::class.java.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(meeting, id)
-        }
+        val idField = MeetingEntity::class.java.getDeclaredField("id")
+        idField.isAccessible = true
+        idField.set(meeting, id)
+        
         return meeting
     }
 

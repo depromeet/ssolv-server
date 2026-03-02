@@ -9,20 +9,20 @@ import org.springframework.stereotype.Repository
 class SurveyQuery(
     private val surveyMapper: SurveyMapper,
     private val surveyJpaRepository: SurveyJpaRepository,
-    private val queryFactory: JPAQueryFactory
+    private val queryFactory: JPAQueryFactory,
 ) : SurveyRepository {
     
-    override fun save(survey: Survey): Survey {
+    override suspend fun save(survey: Survey): Survey {
         val entity = surveyMapper.toEntity(survey)
         return surveyMapper.toDomain(surveyJpaRepository.save(entity))
     }
     
-    override fun findByMeetingIdAndParticipantId(meetingId: Long, participantId: Long): Survey? {
+    override suspend fun findByMeetingIdAndParticipantId(meetingId: Long, participantId: Long): Survey? {
         return surveyJpaRepository.findByMeetingIdAndParticipantId(meetingId, participantId)
             ?.let { surveyMapper.toDomain(it) }
     }
     
-    override fun findByMeetingId(meetingId: Long): List<Survey> {
+    override suspend fun findByMeetingId(meetingId: Long): List<Survey> {
         val qSurvey = QSurveyEntity.surveyEntity
         
         val entities = queryFactory
@@ -36,7 +36,7 @@ class SurveyQuery(
         return entities.map { surveyMapper.toDomain(it) }
     }
     
-    override fun existsByMeetingIdAndParticipantId(meetingId: Long, participantId: Long): Boolean {
+    override suspend fun existsByMeetingIdAndParticipantId(meetingId: Long, participantId: Long): Boolean {
         return surveyJpaRepository.existsByMeetingIdAndParticipantId(meetingId, participantId)
     }
 }

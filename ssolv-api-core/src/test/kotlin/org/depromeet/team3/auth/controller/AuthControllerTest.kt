@@ -112,131 +112,181 @@ class AuthControllerTest {
 
     @Test
     fun `토큰 재발급 성공 - 200 응답`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
-        val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
-        val tokenResponse = TokenResponse(
-            accessToken = "new-access-token",
-            refreshToken = "new-refresh-token"
-        )
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>())).thenReturn(tokenResponse)
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
+            val tokenResponse = TokenResponse(
+                accessToken = "new-access-token",
+                refreshToken = "new-refresh-token"
+            )
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doReturn(tokenResponse)
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
-            .andExpect(jsonPath("$.data.refreshToken").value("new-refresh-token"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("new-refresh-token"))
+        }
     }
 
     @Test
     fun `토큰 재발급 실패 - 401 에러 (Refresh Token 유효하지 않음)`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "invalid-refresh-token")
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>()))
-            .thenThrow(AuthException(ErrorCode.REFRESH_TOKEN_INVALID))
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "invalid-refresh-token")
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doThrow(AuthException(ErrorCode.REFRESH_TOKEN_INVALID))
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.error.code").value("J008"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isUnauthorized)
+                .andExpect(jsonPath("$.error.code").value("J008"))
+        }
     }
 
     @Test
     fun `토큰 재발급 실패 - 401 에러 (토큰 사용자 ID 유효하지 않음)`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>()))
-            .thenThrow(AuthException(ErrorCode.TOKEN_USER_ID_INVALID))
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doThrow(AuthException(ErrorCode.TOKEN_USER_ID_INVALID))
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.error.code").value("J012"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isUnauthorized)
+                .andExpect(jsonPath("$.error.code").value("J012"))
+        }
     }
 
     @Test
     fun `토큰 재발급 실패 - 404 에러 (사용자 정보 없음)`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>()))
-            .thenThrow(AuthException(ErrorCode.USER_NOT_FOUND_FOR_TOKEN))
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doThrow(AuthException(ErrorCode.USER_NOT_FOUND_FOR_TOKEN))
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.error.code").value("J011"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isNotFound)
+                .andExpect(jsonPath("$.error.code").value("J011"))
+        }
     }
 
     @Test
     fun `토큰 재발급 실패 - 401 에러 (Refresh Token 불일치)`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "different-refresh-token")
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>()))
-            .thenThrow(AuthException(ErrorCode.REFRESH_TOKEN_MISMATCH))
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "different-refresh-token")
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doThrow(AuthException(ErrorCode.REFRESH_TOKEN_MISMATCH))
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.error.code").value("J010"))
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isUnauthorized)
+                .andExpect(jsonPath("$.error.code").value("J010"))
+        }
     }
 
     @Test
     fun `서버 내부 오류 - 500 에러`() {
-        // given
-        val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
-        
-        whenever(updateTokenService.refresh(any<RefreshTokenCommand>()))
-            .thenThrow(RuntimeException("서버 오류"))
+        runTest {
+            // given
+            val refreshTokenRequest = RefreshTokenRequest(refreshToken = "valid-refresh-token")
+            
+            updateTokenService.stub {
+                onBlocking { refresh(any<RefreshTokenCommand>()) }.doThrow(RuntimeException("서버 오류"))
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/reissue-token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshTokenRequest))
-        )
-            .andExpect(status().isInternalServerError)
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/reissue-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshTokenRequest))
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isInternalServerError)
+        }
     }
 
     @Test
     fun `로그아웃 성공 - 200 응답`() {
-        // given
-        val userId = 1L
-        testUserIdArgumentResolver.setTestUserId(userId)
-        doNothing().whenever(logoutService).logout(userId)
+        runTest {
+            // given
+            val userId = 1L
+            testUserIdArgumentResolver.setTestUserId(userId)
+            logoutService.stub {
+                onBlocking { logout(userId) }.doAnswer { }
+            }
 
-        // when & then
-        mockMvc.perform(
-            post("/api/v1/auth/logout")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isOk)
-        
-        verify(logoutService).logout(userId)
+            // when & then
+            val mvcResult = mockMvc.perform(
+                post("/api/v1/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+            )
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk)
+            
+            verify(logoutService).logout(userId)
+        }
     }
 
     @Test
