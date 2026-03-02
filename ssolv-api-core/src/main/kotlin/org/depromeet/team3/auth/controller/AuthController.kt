@@ -60,7 +60,8 @@ class AuthController(
                     "http://localhost:3000/auth/callback",
                     "http://localhost:8080/auth/callback",
                     "https://www.ssolv.site/auth/callback",
-                    "https://api.ssolv.site/auth/callback"
+                    "https://api.ssolv.site/auth/callback",
+                    "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
                 ]
             )
         )
@@ -94,7 +95,8 @@ class AuthController(
                 type = "string",
                 allowableValues = [
                     "https://www.ssolv.site/auth/callback",
-                    "https://api.ssolv.site/auth/callback"
+                    "https://api.ssolv.site/auth/callback",
+                    "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
                 ]
             )
         )

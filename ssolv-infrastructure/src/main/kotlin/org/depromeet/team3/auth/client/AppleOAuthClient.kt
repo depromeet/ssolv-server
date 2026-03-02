@@ -45,7 +45,8 @@ class AppleOAuthClient(
             "http://192.168.35.119:3000/auth/callback",
             "http://localhost:8080/auth/callback",
             "https://api.ssolv.site/auth/callback",
-            "https://www.ssolv.site/auth/callback"
+            "https://www.ssolv.site/auth/callback",
+            "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
         )
         
         val configUris = appleProperties.redirectUris.toSet()
