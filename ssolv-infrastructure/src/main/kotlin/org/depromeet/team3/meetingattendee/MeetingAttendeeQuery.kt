@@ -1,7 +1,5 @@
 package org.depromeet.team3.meetingattendee
 
-import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.mapper.MeetingAttendeeMapper
 import org.springframework.stereotype.Repository
 

@@ -49,7 +49,7 @@ class ExecutePlaceSearchServiceTest {
             callback.doInTransaction(mock())
         }
         
-        placeQuery = FakePlaceQuery(coroutineDispatchers, transactionTemplate)
+        placeQuery = FakePlaceQuery(transactionTemplate)
         meetingPlaceRepository = mock()
         placeLikeRepository = mock()
         searchService = mock()
@@ -200,13 +200,11 @@ class ExecutePlaceSearchServiceTest {
 }
 
 private open class FakePlaceQuery(
-    coroutineDispatchers: CoroutineDispatchers,
     transactionTemplate: TransactionTemplate
 ) : PlaceQuery(
     googlePlacesClient = mock(),
     placeJpaRepository = mock(),
-    transactionTemplate = transactionTemplate,
-    coroutineDispatchers = coroutineDispatchers
+    transactionTemplate = transactionTemplate
 ) {
     private val textSearchResponses = mutableMapOf<String, ArrayDeque<PlacesTextSearchResponse>>()
     private var findByIdsProvider: (List<String>) -> List<PlaceEntity> = { emptyList() }

@@ -1,7 +1,5 @@
 package org.depromeet.team3.surveycategory
 
-import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.depromeet.team3.mapper.SurveyCategoryMapper
 import org.springframework.stereotype.Repository

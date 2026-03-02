@@ -1,7 +1,5 @@
 package org.depromeet.team3.place
 
-import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.client.GooglePlacesClient
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -15,7 +13,6 @@ class PlaceQuery(
     private val googlePlacesClient: GooglePlacesClient,
     private val placeJpaRepository: PlaceJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     /**
@@ -33,10 +30,10 @@ class PlaceQuery(
 
     suspend fun savePlacesFromTextSearch(
         places: List<PlacesTextSearchResponse.Place>
-    ): List<PlaceEntity> = withContext(coroutineDispatchers.VT) {
-        if (places.isEmpty()) return@withContext emptyList()
+    ): List<PlaceEntity> {
+        if (places.isEmpty()) return emptyList()
 
-        transactionTemplate.execute {
+        return transactionTemplate.execute {
             val googlePlaceIds = places.map { it.id }
             val existingPlaces = placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
                 .associateBy { it.googlePlaceId }
@@ -79,8 +76,8 @@ class PlaceQuery(
     }
 
     // Google Place ID 목록으로 Place 엔티티 조회
-    suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> = withContext(coroutineDispatchers.VT) {
-        placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
+    suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> {
+        return placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
     }
 
     // 사진 데이터 조회
