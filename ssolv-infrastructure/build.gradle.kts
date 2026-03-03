@@ -45,6 +45,9 @@ dependencies {
     // Kotlin Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
 
+    // Firebase (FCM)
+    implementation("com.google.firebase:firebase-admin:9.4.3")
+
     // JWT
     val jjwtVersion = rootProject.extra["jjwtVersion"]
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
