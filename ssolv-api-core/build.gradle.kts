@@ -12,6 +12,9 @@ dependencies {
 
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    
+    // Redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     val jjwtVersion = rootProject.extra["jjwtVersion"]
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
