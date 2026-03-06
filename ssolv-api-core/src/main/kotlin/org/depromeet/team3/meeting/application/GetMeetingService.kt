@@ -27,7 +27,7 @@ class GetMeetingService(
         // 2. 참가자로 참여한 모임 조회
         val attendeeList = meetingAttendeeRepository.findByUserId(userId)
         val attendedMeetingIds = attendeeList.map { it.meetingId }.distinct()
-        val attendedMeetings = attendedMeetingIds.mapNotNull { meetingRepository.findById(it) }
+        val attendedMeetings = meetingRepository.findAllById(attendedMeetingIds)
 
         // 3. 호스트 모임과 참가 모임 합치고 중복 제거
         val allMeetings = (hostMeetings + attendedMeetings)

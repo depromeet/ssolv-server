@@ -27,6 +27,10 @@ class MeetingQuery(
     override suspend fun findById(id: Long): Meeting? {
         return meetingJpaRepository.findByIdOrNull(id)?.let { meetingMapper.toDomain(it) }
     }
+
+    override suspend fun findAllById(ids: List<Long>): List<Meeting> {
+        return meetingJpaRepository.findAllById(ids).map { meetingMapper.toDomain(it) }
+    }
     
     /**
      * Meeting의 Station 좌표 조회

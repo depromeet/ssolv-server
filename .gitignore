@@ -66,3 +66,5 @@ module-infra/nginx/.htpasswd
 # nGrinder data
 ssolv-infrastructure/ngrinder/
 */bin
+
+/gemini_prompt/*
