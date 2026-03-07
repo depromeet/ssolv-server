@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":ssolv-api-common"))
     implementation(project(":ssolv-global-utils"))
+    implementation(project(":ssolv-api-place"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
@@ -54,7 +55,7 @@ jib {
         image = "eclipse-temurin:21-jre"
     }
     to {
-        image = "registry.ssolv.site/core-server"
+        image = "registry.ssolv.site/api-server"
         tags = setOf("latest", "${project.version}")
     }
     container {

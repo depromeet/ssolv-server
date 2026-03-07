@@ -26,7 +26,7 @@ jobs:
 
       - name: Build and Push with Jib
         run: |
-          ./gradlew :ssolv-api-core:jib :ssolv-api-place:jib \
+          ./gradlew :ssolv-api-core:jib \
             -Djib.to.auth.username=${{ secrets.REGISTRY_USERNAME }} \
             -Djib.to.auth.password=${{ secrets.REGISTRY_PASSWORD }} \
             -Djava.net.preferIPv4Stack=true
@@ -43,12 +43,12 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             
-            docker rmi -f registry.ssolv.site/core-server:latest registry.ssolv.site/place-server:latest || true
+            docker rmi -f registry.ssolv.site/api-server:latest registry.ssolv.site/core-server:latest registry.ssolv.site/place-server:latest || true
             
             docker-compose -f docker-compose.prod.yml pull
             
-            docker-compose -f docker-compose.prod.yml stop core-server place-server nginx-app
-            docker-compose -f docker-compose.prod.yml rm -f core-server place-server nginx-app
+            docker-compose -f docker-compose.prod.yml stop app-server-1 app-server-2 nginx-app
+            docker-compose -f docker-compose.prod.yml rm -f app-server-1 app-server-2 nginx-app
             
             docker-compose -f docker-compose.prod.yml up -d
             
