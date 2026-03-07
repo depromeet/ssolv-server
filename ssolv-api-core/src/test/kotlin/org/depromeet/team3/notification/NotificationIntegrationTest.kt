@@ -15,6 +15,7 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.depromeet.team3.notification.application.SendMeetingResultNotificationService
 import org.depromeet.team3.notification.domain.FcmClient
+import org.depromeet.team3.meeting.application.MeetingExpirationListener
 import org.depromeet.team3.station.StationJpaRepository
 import org.depromeet.team3.survey.SurveyJpaRepository
 import org.depromeet.team3.survey.application.CreateSurveyService
@@ -46,6 +47,9 @@ class NotificationIntegrationTest {
 
     @MockkBean
     private lateinit var fcmClient: FcmClient
+
+    @MockkBean
+    private lateinit var meetingExpirationListener: MeetingExpirationListener
 
     @Autowired
     private lateinit var meetingJpaRepository: MeetingJpaRepository
