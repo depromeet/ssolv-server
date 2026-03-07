@@ -1,0 +1,55 @@
+package org.depromeet.team3.meeting.application
+
+
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.data.redis.connection.Message
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.listener.KeyExpirationEventMessageListener
+import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.stereotype.Component
+import java.time.Duration
+
+/*
+ * Redis 키 만료 이벤트를 감지하여 모임 시간 만료 시 장소 검색을 실행하는 리스너
+ */
+@Component
+class MeetingExpirationListener(
+    @Qualifier("redisMessageListenerContainer") listenerContainer: RedisMessageListenerContainer,
+    private val stringRedisTemplate: StringRedisTemplate
+) : KeyExpirationEventMessageListener(listenerContainer) {
+
+    private val logger = LoggerFactory.getLogger(MeetingExpirationListener::class.java)
+
+    override fun onMessage(message: Message, pattern: ByteArray?) {
+        val expiredKey = message.toString()
+        if (!expiredKey.startsWith("meeting:expire:")) {
+            return
+        }
+
+        val meetingIdStr = expiredKey.removePrefix("meeting:expire:")
+        val meetingId = meetingIdStr.toLongOrNull() ?: return
+
+        // 분산 환경 중복 실행 방지를 위한 락 획득 (SETNX)
+        val lockKey = "lock:meeting:expire:$meetingId"
+        val acquired = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "locked", Duration.ofMinutes(10)) ?: false
+        if (!acquired) {
+            logger.debug("모임 $meetingId 만료 처리가 이미 다른 인스턴스에서 진행 중입니다.")
+            return
+        }
+
+        logger.info("모임 $meetingId 만료 발생! 비동기 장소 검색 및 알림 스트림을 발행합니다.")
+
+        // 1. 식당 검색 추천 요청 발행
+        val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
+            "meeting_calculation_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+        )
+        stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
+
+        // 2. 만료 알림 트리거 발행
+        val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
+            "meeting_notification_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+        )
+        stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
+    }
+}
