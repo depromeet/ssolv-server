@@ -59,23 +59,6 @@ services:
         max-size: "10m"
         max-file: "7"
 
-  registry-web:
-    image: hyper/docker-registry-web
-    container_name: registry-web
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      REGISTRY_URL: http://registry:5000/v2
-      REGISTRY_NAME: Depromeet Team 3 Private Docker Registry
-      REGISTRY_READONLY: "false"
-      REGISTRY_BASIC_AUTH: "ZGVwcm9tZWV0OjEyMzQ="
-      REGISTRY_TRUST_ANY_SSL: "true"
-    depends_on:
-      - registry
-    networks:
-      - ssolv_cicd_network
-
 volumes:
   registry_data:
     driver: local
