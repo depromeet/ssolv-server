@@ -1,5 +1,6 @@
 package org.depromeet.team3.notification.config
 
+import org.springframework.context.annotation.Profile
 import org.depromeet.team3.notification.application.MeetingResultSubscriber
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
@@ -22,6 +23,7 @@ import java.util.UUID
  * 2. 분산 서버 환경에서 메시지 중복 처리 방지 및 전달 신뢰성 보장
  */
 @Configuration
+@Profile("!test")
 class NotificationStreamsConfig(
     private val meetingResultSubscriber: MeetingResultSubscriber, // 알림 메시지 실처리기
     private val stringRedisTemplate: StringRedisTemplate

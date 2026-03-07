@@ -4,6 +4,7 @@ import org.depromeet.team3.place.application.execution.RequestMeetingResultCalcu
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.ReadOffset
@@ -22,6 +23,7 @@ import java.util.UUID
  * 2. 부하가 높은 계산 로직을 분산 처리하기 위한 메시지 큐 인프라 구축
  */
 @Configuration
+@Profile("!test")
 class PlaceStreamsConfig(
     private val calculationRequestListener: RequestMeetingResultCalculationListener, // 계산 요청 실처리기
     private val stringRedisTemplate: StringRedisTemplate
