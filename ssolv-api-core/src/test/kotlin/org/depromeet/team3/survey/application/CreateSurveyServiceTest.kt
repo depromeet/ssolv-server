@@ -38,6 +38,7 @@ class CreateSurveyServiceTest {
     @Mock private lateinit var meetingJpaRepository: MeetingJpaRepository
     @Mock private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
 
+    @Mock private lateinit var stringRedisTemplate: org.springframework.data.redis.core.StringRedisTemplate
     private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var createSurveyService: CreateSurveyService
 
@@ -68,7 +69,8 @@ class CreateSurveyServiceTest {
         
         createSurveyService = CreateSurveyService(
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
-            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers
+            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers,
+            stringRedisTemplate
         )
     }
 
