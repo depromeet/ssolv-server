@@ -4,7 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":ssolv-api-common"))
-    implementation(project(":ssolv-batch"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
     implementation("org.springframework:spring-jdbc:6.2.3")
