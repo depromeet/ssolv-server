@@ -16,7 +16,7 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 @Configuration
 @org.springframework.context.annotation.Profile("!test")
 @EnableRedisRepositories(
-    basePackages = ["org.depromeet.team3"],
+    basePackageClasses = [RedisConfig::class],
     enableKeyspaceEvents = org.springframework.data.redis.core.RedisKeyValueAdapter.EnableKeyspaceEvents.ON_STARTUP
 )
 class RedisConfig {

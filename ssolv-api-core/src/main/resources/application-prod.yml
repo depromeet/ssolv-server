@@ -32,3 +32,9 @@ kakao:
     - https://www.ssolv.site/auth/callback
     - https://api.ssolv.site/auth/callback
     - https://ec01-58-29-179-24.ngrok-free.app/auth/callback
+
+api:
+  google:
+    places:
+      api-key: ${GOOGLE_PLACES_API_KEY}
+      base-url: https://places.googleapis.com
