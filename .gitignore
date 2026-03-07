@@ -67,4 +67,4 @@ module-infra/nginx/.htpasswd
 ssolv-infrastructure/ngrinder/
 */bin
 
-/gemini_prompt/*
+/prompt/*
