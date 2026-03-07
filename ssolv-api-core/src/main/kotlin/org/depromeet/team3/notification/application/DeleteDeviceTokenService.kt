@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 class DeleteDeviceTokenService(
     private val deviceTokenCommandRepository: DeviceTokenCommandRepository
 ) {
-    fun execute(request: DeleteDeviceTokenRequest) {
-        deviceTokenCommandRepository.deleteByFcmToken(request.fcmToken)
+    fun execute(userId: Long, request: DeleteDeviceTokenRequest) {
+        deviceTokenCommandRepository.deleteByUserIdAndFcmToken(userId, request.fcmToken)
     }
 }

@@ -7,6 +7,7 @@ interface DeviceTokenJpaRepository : JpaRepository<DeviceTokenEntity, Long> {
     fun findByUserId(userId: Long): List<DeviceTokenEntity>
     fun findByFcmToken(fcmToken: String): DeviceTokenEntity?
     fun deleteByFcmToken(fcmToken: String)
+    fun deleteByUserIdAndFcmToken(userId: Long, fcmToken: String)
     fun deleteAllByUserId(userId: Long)
 
     @Query("""

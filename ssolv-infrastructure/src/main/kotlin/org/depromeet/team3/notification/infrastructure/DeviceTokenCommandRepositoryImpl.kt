@@ -17,8 +17,8 @@ class DeviceTokenCommandRepositoryImpl(
         return deviceTokenMapper.toDomain(savedEntity)
     }
 
-    override fun deleteByFcmToken(fcmToken: String) {
-        deviceTokenJpaRepository.deleteByFcmToken(fcmToken)
+    override fun deleteByUserIdAndFcmToken(userId: Long, fcmToken: String) {
+        deviceTokenJpaRepository.deleteByUserIdAndFcmToken(userId, fcmToken)
     }
 
     override fun deleteAllByUserId(userId: Long) {

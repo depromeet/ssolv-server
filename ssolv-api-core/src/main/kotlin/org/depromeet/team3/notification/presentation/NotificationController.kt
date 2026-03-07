@@ -82,7 +82,7 @@ class NotificationController(
         @Parameter(hidden = true) @UserId userId: Long,
         @Valid @RequestBody request: DeleteDeviceTokenRequest
     ): DpmApiResponse<Unit> {
-        deleteDeviceTokenService.execute(request)
+        deleteDeviceTokenService.execute(userId, request)
         return DpmApiResponse.ok()
     }
 }
