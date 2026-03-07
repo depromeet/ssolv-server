@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @WebMvcTest(SurveyCategoryController::class)
+@org.springframework.test.context.ContextConfiguration(classes = [org.depromeet.team3.CoreApiApplication::class])
 @Import(SecurityTestConfig::class)
 @ActiveProfiles("test")
 @WithMockUser

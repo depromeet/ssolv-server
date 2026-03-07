@@ -4,13 +4,15 @@ plugins {
 
 dependencies {
     implementation(project(":ssolv-api-common"))
-    implementation(project(":ssolv-batch"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
     implementation("org.springframework:spring-jdbc:6.2.3")
 
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    
+    // Redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     testImplementation("org.mockito:mockito-core:5.1.1")
     testImplementation("org.mockito:mockito-junit-jupiter:5.1.1")
@@ -33,10 +35,10 @@ dependencies {
 
 tasks {
     jar {
-        enabled = false
+        enabled = true
     }
     bootJar {
-        enabled = true
+        enabled = false
     }
 }
 

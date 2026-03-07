@@ -4,8 +4,9 @@ plugins {
 
 dependencies {
     implementation(project(":ssolv-api-common"))
-    implementation(project(":ssolv-global-utils"))
     implementation(project(":ssolv-api-place"))
+    implementation(project(":ssolv-batch"))
+    implementation(project(":ssolv-global-utils"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
@@ -13,6 +14,9 @@ dependencies {
 
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    
+    // Redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     val jjwtVersion = rootProject.extra["jjwtVersion"]
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
@@ -40,7 +44,7 @@ dependencies {
 
 tasks {
     jar {
-        enabled = false
+        enabled = true
     }
     bootJar {
         enabled = true

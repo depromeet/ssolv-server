@@ -5,21 +5,16 @@ import org.depromeet.team3.place.application.model.PlaceSurveySummary
 import org.depromeet.team3.surveycategory.SurveyCategory
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
+import org.depromeet.team3.place.application.plan.SelectSurveyKeywordsService
 import java.time.LocalDateTime
 
 /**
  * 장소 검색 통합 테스트
  * - SelectSurveyKeywordsService의 키워드 선정 로직을 실제 Spring Context에서 검증
  */
-@SpringBootTest
-@ActiveProfiles("test")
 class PlaceSearchIntegrationTest {
 
-    @Autowired
-    private lateinit var selectSurveyKeywordsService: SelectSurveyKeywordsService
+    private val selectSurveyKeywordsService = SelectSurveyKeywordsService()
 
     @Test
     fun `키워드 선정이 득표율에 따라 올바르게 동작함`() {
@@ -95,7 +90,7 @@ class PlaceSearchIntegrationTest {
     }
 
     @Test
-    fun `10% 미만 득표만 있으면 일반 키워드 반환`() {
+    fun `10퍼센트 미만 득표만 있으면 일반 키워드 반환`() {
         // given - 모두 10% 미만
         val summary = PlaceSurveySummary(
             stationName = "강남",

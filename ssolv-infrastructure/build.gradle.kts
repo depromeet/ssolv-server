@@ -23,6 +23,7 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("com.linecorp.kotlin-jdsl:jpql-dsl:3.5.5")
     implementation("com.linecorp.kotlin-jdsl:jpql-render:3.5.5")
     implementation("com.linecorp.kotlin-jdsl:hibernate-support:3.5.5")
@@ -44,6 +45,9 @@ dependencies {
     
     // Kotlin Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
+
+    // Firebase (FCM)
+    implementation("com.google.firebase:firebase-admin:9.4.3")
 
     // JWT
     val jjwtVersion = rootProject.extra["jjwtVersion"]

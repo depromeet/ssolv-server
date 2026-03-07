@@ -12,6 +12,7 @@ data class User(
     val nickname: String,
     var profileImage: String?,
     var refreshToken: String?,
+    var notificationEnabled: Boolean = true,
     val meetings: MutableList<Meeting> = mutableListOf(),
     override val createdAt: LocalDateTime,
     override val updatedAt: LocalDateTime? = null,

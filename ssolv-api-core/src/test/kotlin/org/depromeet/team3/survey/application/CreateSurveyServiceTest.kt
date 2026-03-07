@@ -6,6 +6,7 @@ import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
+import org.depromeet.team3.meeting.application.MeetingExpirationSchedulerService
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.survey.SurveyEntity
 import org.depromeet.team3.survey.SurveyJpaRepository
@@ -38,6 +39,8 @@ class CreateSurveyServiceTest {
     @Mock private lateinit var meetingJpaRepository: MeetingJpaRepository
     @Mock private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
 
+    @Mock private lateinit var stringRedisTemplate: org.springframework.data.redis.core.StringRedisTemplate
+    @Mock private lateinit var meetingExpirationSchedulerService: MeetingExpirationSchedulerService
     private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var createSurveyService: CreateSurveyService
 
@@ -68,7 +71,8 @@ class CreateSurveyServiceTest {
         
         createSurveyService = CreateSurveyService(
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
-            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers
+            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers,
+            stringRedisTemplate, meetingExpirationSchedulerService
         )
     }
 

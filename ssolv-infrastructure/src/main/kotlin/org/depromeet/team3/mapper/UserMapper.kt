@@ -16,6 +16,7 @@ class UserMapper : DomainMapper<User, UserEntity> {
             nickname = entity.nickname,
             profileImage = entity.profileImage,
             refreshToken = entity.refreshToken,
+            notificationEnabled = entity.notificationEnabled,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt,
             deletedAt = entity.deletedAt
@@ -31,6 +32,7 @@ class UserMapper : DomainMapper<User, UserEntity> {
             profileImage = domain.profileImage,
             refreshToken = domain.refreshToken,
             nickname = domain.nickname,
+            notificationEnabled = domain.notificationEnabled,
             deletedAt = domain.deletedAt
         )
         // Note: createdAt and updatedAt are now managed by JPA auditing

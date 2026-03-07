@@ -39,6 +39,9 @@ class UserEntity(
     @Column(nullable = false)
     var nickname: String = "",
 
+    @Column(name = "notification_enabled", nullable = false)
+    var notificationEnabled: Boolean = true,
+
     @OneToMany(mappedBy = "hostUser", fetch = FetchType.LAZY)
     val meetings: MutableList<MeetingEntity> = mutableListOf(),
 
