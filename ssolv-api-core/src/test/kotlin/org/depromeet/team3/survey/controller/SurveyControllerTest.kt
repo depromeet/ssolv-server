@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @WebMvcTest(SurveyController::class)
+@org.springframework.test.context.ContextConfiguration(classes = [org.depromeet.team3.CoreApiApplication::class])
 @Import(SecurityTestConfig::class)
 @ActiveProfiles("test")
 @DisplayName("[SURVEY] 설문 컨트롤러 테스트")

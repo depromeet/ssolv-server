@@ -34,6 +34,7 @@ class ExecutePlaceSearchServiceTest {
     private lateinit var meetingPlaceRepository: MeetingPlaceRepository
     private lateinit var placeLikeRepository: PlaceLikeRepository
     private lateinit var searchService: MeetingPlaceSearchService
+    private lateinit var createSurveyKeywordService: CreateSurveyKeywordService
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
     private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var transactionTemplate: TransactionTemplate
@@ -53,6 +54,7 @@ class ExecutePlaceSearchServiceTest {
         meetingPlaceRepository = mock()
         placeLikeRepository = mock()
         searchService = mock()
+        createSurveyKeywordService = mock()
         googlePlacesApiProperties = mock {
             on { proxyBaseUrl } doReturn "https://proxy.url"
         }
@@ -62,6 +64,7 @@ class ExecutePlaceSearchServiceTest {
             meetingPlaceRepository = meetingPlaceRepository,
             placeLikeRepository = placeLikeRepository,
             searchService = searchService,
+            createSurveyKeywordService = createSurveyKeywordService,
             googlePlacesApiProperties = googlePlacesApiProperties,
             coroutineDispatchers = coroutineDispatchers
         )

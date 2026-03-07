@@ -12,7 +12,7 @@ import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
-import org.depromeet.team3.notification.application.MeetingResultSubscriber
+import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.depromeet.team3.notification.application.SendMeetingResultNotificationService
 import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.station.StationJpaRepository
@@ -39,7 +39,7 @@ class NotificationIntegrationTest {
     private lateinit var createSurveyService: CreateSurveyService
 
     @Autowired
-    private lateinit var meetingResultSubscriber: MeetingResultSubscriber
+    private lateinit var meetingNotificationConsumer: MeetingNotificationConsumer
 
     @MockkBean
     private lateinit var stringRedisTemplate: StringRedisTemplate
@@ -104,6 +104,7 @@ class NotificationIntegrationTest {
         every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
         every { streamOps.add(any<MapRecord<String, String, String>>()) } returns RecordId.of("123-0")
         every { streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) } returns 1L
+        every { stringRedisTemplate.delete(any<String>()) } returns true  // cancelExpiration 호출 시 만료 키 삭제
 
         // 4. 1번째부터 6번째 유저까지 설문 완료 (알림 안 울려야 함)
         for (i in 0 until participantsCount - 1) {
@@ -129,7 +130,7 @@ class NotificationIntegrationTest {
 
         coEvery { fcmClient.sendMulticast(any(), any(), any(), any()) } returns Unit
 
-        meetingResultSubscriber.onMessage(mockRecord)
+        meetingNotificationConsumer.onMessage(mockRecord)
 
         // 최종 검증: 7명 전원에게 알림이 발송되었는가?
         val expectedTokens = users.map { "token-${it.id}" }

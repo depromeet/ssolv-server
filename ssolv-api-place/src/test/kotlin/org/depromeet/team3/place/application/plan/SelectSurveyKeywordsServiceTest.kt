@@ -138,7 +138,7 @@ class SelectSurveyKeywordsServiceTest {
     }
 
     @Test
-    fun `10% 미만 득표는 제외됨`() {
+    fun `10퍼센트 미만 득표는 제외됨`() {
         // given - 10명 중 한식 9명, 양식 1명(10% 미만)
         val summary = PlaceSurveySummary(
             stationName = "강남",
@@ -217,7 +217,7 @@ class SelectSurveyKeywordsServiceTest {
     }
 
     @Test
-    fun `10% 미만 득표만 있으면 일반 키워드 반환`() {
+    fun `10퍼센트 미만 득표만 있으면 일반 키워드 반환`() {
         // given - 모두 10% 미만
         val summary = PlaceSurveySummary(
             stationName = "강남",
