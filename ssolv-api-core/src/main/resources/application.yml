@@ -77,8 +77,6 @@ apple:
 
 springdoc:
   swagger-ui:
-    urls:
-      - name: Core API
-        url: /v3/api-docs
-      - name: Place API
-        url: /places/v3/api-docs
+    path: /swagger-ui.html
+    operations-sorter: alpha
+  packages-to-scan: org.depromeet.team3
