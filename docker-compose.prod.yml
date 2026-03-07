@@ -90,6 +90,18 @@ services:
     mem_limit: 256m
     mem_reservation: 64m
 
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --notify-keyspace-events Ex
+    ports:
+      - "6379:6379"
+    networks:
+      - ssolv_prod_network
+    restart: always
+    mem_limit: 150m
+    mem_reservation: 50m
+
 networks:
   ssolv_prod_network:
     external: true
