@@ -1,7 +1,7 @@
 package org.depromeet.team3.notification.config
 
 import org.springframework.context.annotation.Profile
-import org.depromeet.team3.notification.application.MeetingResultSubscriber
+import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -25,7 +25,7 @@ import java.util.UUID
 @Configuration
 @Profile("!test")
 class NotificationStreamsConfig(
-    private val meetingResultSubscriber: MeetingResultSubscriber, // 알림 메시지 실처리기
+    private val meetingNotificationConsumer: MeetingNotificationConsumer,
     private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(NotificationStreamsConfig::class.java)
@@ -58,7 +58,7 @@ class NotificationStreamsConfig(
         val subscription = container.receive(
             Consumer.from(groupName, consumerName),
             StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
-            meetingResultSubscriber
+            meetingNotificationConsumer
         )
         
         container.start()

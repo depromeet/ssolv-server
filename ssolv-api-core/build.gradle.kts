@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":ssolv-api-common"))
     implementation(project(":ssolv-api-place"))
+    implementation(project(":ssolv-batch"))
     implementation(project(":ssolv-global-utils"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
