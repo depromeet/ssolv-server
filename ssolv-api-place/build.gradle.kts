@@ -36,10 +36,10 @@ dependencies {
 
 tasks {
     jar {
-        enabled = false
+        enabled = true
     }
     bootJar {
-        enabled = true
+        enabled = false
     }
 }
 
