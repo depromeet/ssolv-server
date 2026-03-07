@@ -20,12 +20,16 @@ class PlaceLikeService(
     private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
+    private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
+
     suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
+        logger.info("Toggle Like Request - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
         transactionTemplate.execute {
             runBlocking {
                 val meetingPlaceId = getMeetingPlaceId(meetingId, placeId)
                 val isLiked = toggleLikeStatus(meetingPlaceId, userId)
                 val likeCount = placeLikeRepository.countByMeetingPlaceId(meetingPlaceId).toInt()
+                logger.info("Toggle result - isLiked: {}, likeCount: {}", isLiked, likeCount)
 
                 PlaceLikeResult(
                     isLiked = isLiked,
@@ -44,18 +48,23 @@ class PlaceLikeService(
     }
 
     private suspend fun toggleLikeStatus(meetingPlaceId: Long, userId: Long): Boolean {
-        return try {
-            placeLikeRepository.save(
-                PlaceLike(
-                    meetingPlaceId = meetingPlaceId,
-                    userId = userId
-                )
-            )
-            true
-        } catch (e: DataIntegrityViolationException) {
-            // 이미 좋아요가 존재하면 삭제 (Toggle)
+        val existing = placeLikeRepository.findByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
+        return if (existing != null) {
             placeLikeRepository.deleteByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
             false
+        } else {
+            try {
+                placeLikeRepository.save(
+                    PlaceLike(
+                        meetingPlaceId = meetingPlaceId,
+                        userId = userId
+                    )
+                )
+                true
+            } catch (e: DataIntegrityViolationException) {
+                placeLikeRepository.deleteByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
+                false
+            }
         }
     }
 

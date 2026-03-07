@@ -56,7 +56,7 @@ class ExecutePlaceSearchServiceTest {
         searchService = mock()
         createSurveyKeywordService = mock()
         googlePlacesApiProperties = mock {
-            on { proxyBaseUrl } doReturn "https://proxy.url"
+            on { apiKey } doReturn "fake-api-key"
         }
 
         service = ExecutePlaceSearchService(

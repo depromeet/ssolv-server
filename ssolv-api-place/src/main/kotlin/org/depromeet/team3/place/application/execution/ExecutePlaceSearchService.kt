@@ -186,20 +186,20 @@ class ExecutePlaceSearchService(
                 val scoreByPlaceId = items.associate { item ->
                     val weight = placeWeightByDbId[item.placeId] ?: 0.0
                     val likeScore = if (item.likeCount > 0) ln(item.likeCount.toDouble() + 1) * likeScoreMultiplier else 0.0
-                    val userLikedBoost = if (item.isLiked) 100.0 else 0.0  // 사용자가 좋아요 누른 항목 추가 부스트
+                    val userLikedBoost = if (item.isLiked) 100.0 else 0.0
                     val combinedScore = weight * weightScoreMultiplier + likeScore + userLikedBoost
                     item.placeId to combinedScore
                 }
 
                 items.sortedWith(
-                    compareByDescending<PlacesSearchResponse.PlaceItem> { hasPhoto(it) }
-                        .thenByDescending { scoreByPlaceId[it.placeId] ?: 0.0 }
+                    compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
                         .thenByDescending { it.likeCount }
                 )
             }
 
             else -> items.sortedWith(
-                compareByDescending<PlacesSearchResponse.PlaceItem> { hasPhoto(it) }
+                compareByDescending<PlacesSearchResponse.PlaceItem> { it.isLiked }
+                    .thenByDescending { it.likeCount }
             )
         }
 
@@ -623,13 +623,19 @@ class ExecutePlaceSearchService(
             .groupBy { meetingPlaceIdToPlaceDbId[it.meetingPlaceId] }
         
         // 각 아이템의 좋아요 정보 업데이트
-        storedItems.map { item ->
+        val items = storedItems.map { item ->
             val likes = likesByPlaceDbId[item.placeId] ?: emptyList()
             item.copy(
                 likeCount = likes.size,
                 isLiked = userId != null && likes.any { it.userId == userId }
             )
         }
+
+        // 좋아요 순으로 재정렬
+        items.sortedWith(
+            compareByDescending<PlacesSearchResponse.PlaceItem> { it.isLiked }
+                .thenByDescending { it.likeCount }
+        )
     }
 
     private data class KeywordSearchResult(
