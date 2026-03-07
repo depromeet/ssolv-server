@@ -4,8 +4,8 @@ plugins {
 
 dependencies {
     implementation(project(":ssolv-api-common"))
-    implementation(project(":ssolv-global-utils"))
     implementation(project(":ssolv-api-place"))
+    implementation(project(":ssolv-global-utils"))
     testImplementation(testFixtures(project(":ssolv-api-common")))
 
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
