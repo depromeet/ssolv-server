@@ -16,8 +16,6 @@ import org.depromeet.team3.meetingplace.MeetingPlaceRepository
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
-import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordCandidate
-import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordPlan
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
@@ -143,7 +141,9 @@ class ExecutePlaceSearchService(
                 PlacesSearchResponse.PlaceItem(
                     placeId = placeDbId,
                     name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
-                    address = entity.address.replace("대한민국 ", ""),
+                    address = entity.address.replace("대한민국 ", "")
+                        .replace(" South Korea", "")
+                        .replace(", South Korea", ""),
                     rating = entity.rating,
                     userRatingsTotal = entity.userRatingsTotal,
                     openNow = entity.openNow,
@@ -162,7 +162,9 @@ class ExecutePlaceSearchService(
                     },
                     priceRange = null, // Text Search에는 가격대 없음
                     addressDescriptor = entity.addressDescriptor?.let { desc ->
-                        PlacesSearchResponse.PlaceItem.AddressDescriptor(description = desc)
+                        PlacesSearchResponse.PlaceItem.AddressDescriptor(
+                            description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc)
+                        )
                     },
                     likeCount = likeInfo.likeCount,
                     isLiked = likeInfo.isLiked
