@@ -10,7 +10,7 @@ reviews:
   poem: false
   review_status: true
   collapse_walkthrough: false
-  sequence_diagrams: false            # Sequence Diagram 생성 비활성화
+  sequence_diagrams: true            # PR 변경 흐름 시퀀스 다이어그램 생성
 
   path_filters:                       # 리뷰에서 제외할 파일 패턴
     - "!**/README.md"                  # README.md 파일 제외
