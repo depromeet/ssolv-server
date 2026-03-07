@@ -8,6 +8,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.slf4j.MDCContext
+import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
@@ -41,6 +42,7 @@ class ExecutePlaceSearchService(
     private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
     private val createSurveyKeywordService: CreateSurveyKeywordService,
+    private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers,
 ) {
 
@@ -147,7 +149,9 @@ class ExecutePlaceSearchService(
                     rating = entity.rating,
                     userRatingsTotal = entity.userRatingsTotal,
                     openNow = entity.openNow,
-                    photos = entity.photos?.split(","),
+                    photos = entity.photos?.split(",")?.map { photoName ->
+                        "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
+                    },
                     link = entity.link ?: "",
                     weekdayText = entity.weekdayText?.split("\n"),
                     topReview = run {

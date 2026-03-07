@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.depromeet.team3.common.ContextConstants
+import org.depromeet.team3.common.annotation.MeetingId
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.common.response.DpmApiResponse
 import org.depromeet.team3.placelike.application.PlaceLikeService
@@ -30,8 +31,8 @@ class PlaceLikeController(
     )
     @PostMapping
     suspend fun toggleLike(
-        @Parameter(description = "모임 ID", required = true)
-        @PathVariable meetingId: Long,
+        @Parameter(description = "모임 ID 또는 초대 토큰", required = true)
+        @MeetingId("meetingId") meetingId: Long,
         @Parameter(description = "Place ID", required = true)
         @PathVariable placeId: Long,
         @UserId userId: Long
