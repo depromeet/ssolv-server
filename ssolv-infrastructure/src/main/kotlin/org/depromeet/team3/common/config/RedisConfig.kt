@@ -14,6 +14,7 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
  * 2. 캐시 및 메시지 큐 처리를 위한 StringRedisTemplate 빈 등록
  */
 @Configuration
+@org.springframework.context.annotation.Profile("!test")
 @EnableRedisRepositories(enableKeyspaceEvents = org.springframework.data.redis.core.RedisKeyValueAdapter.EnableKeyspaceEvents.ON_STARTUP)
 class RedisConfig {
 
