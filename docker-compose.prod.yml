@@ -1,7 +1,7 @@
 services:
-  core-server:
-    container_name: core-server
-    image: ${DOCKER_IMAGE_CORE:-registry.ssolv.site/core-server:latest}
+  app-server-1:
+    container_name: app-server-1
+    image: ${DOCKER_IMAGE_API:-registry.ssolv.site/api-server:latest}
     env_file:
       - .env
     environment:
@@ -9,6 +9,7 @@ services:
       - MYSQL_USER=${PROD_DB_USERNAME}
       - MYSQL_PASSWORD=${PROD_DB_PASSWORD}
       - MYSQL_URL=jdbc:mysql://${PROD_DB_ENDPOINT}:3306/${PROD_DB_NAME}
+      - REDIS_HOST=redis
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
       - OTLP_ENDPOINT=http://alloy:4318/v1/traces
     networks:
@@ -25,12 +26,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    mem_limit: 512m
-    mem_reservation: 256m
+    mem_limit: 768m
+    mem_reservation: 384m
 
-  place-server:
-    container_name: place-server
-    image: ${DOCKER_IMAGE_PLACE:-registry.ssolv.site/place-server:latest}
+  app-server-2:
+    container_name: app-server-2
+    image: ${DOCKER_IMAGE_API:-registry.ssolv.site/api-server:latest}
     env_file:
       - .env
     environment:
@@ -38,6 +39,8 @@ services:
       - MYSQL_USER=${PROD_DB_USERNAME}
       - MYSQL_PASSWORD=${PROD_DB_PASSWORD}
       - MYSQL_URL=jdbc:mysql://${PROD_DB_ENDPOINT}:3306/${PROD_DB_NAME}
+      - REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
       - OTLP_ENDPOINT=http://alloy:4318/v1/traces
     networks:
       - ssolv_prod_network
@@ -53,8 +56,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    mem_limit: 1024m
-    mem_reservation: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
   nginx-app:
     container_name: nginx-app
@@ -75,9 +78,9 @@ services:
         max-size: "10m"
         max-file: "5"
     depends_on:
-      core-server:
+      app-server-1:
         condition: service_healthy
-      place-server:
+      app-server-2:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost/stub_status" ]
