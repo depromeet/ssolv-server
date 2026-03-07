@@ -19,6 +19,9 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
+/*
+ * 새로운 모임을 생성하고 초기 참여자(호스트)를 등록하는 서비스
+ */
 @Service
 class CreateMeetingService(
     private val meetingJpaRepository: MeetingJpaRepository,
@@ -26,8 +29,9 @@ class CreateMeetingService(
     private val stationJpaRepository: StationJpaRepository,
     private val userJpaRepository: UserRepository,
     private val inviteTokenService: InviteTokenService,
-    private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
+    private val coroutineDispatchers: CoroutineDispatchers,
+    private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService,
+    private val transactionTemplate: TransactionTemplate
 ) {
 
     suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse =
@@ -79,6 +83,11 @@ class CreateMeetingService(
 
             // suspend 함수이므로 트랜잭션 블록 바깥에서 호출
             val inviteToken = inviteTokenService.generateInviteToken(meetingId)
+            
+            if (request.endAt != null) {
+                meetingExpirationSchedulerService.scheduleExpiration(meetingId, request.endAt)
+            }
+            
             CreateMeetingResponse(meetingId, inviteToken)
         }
 }
