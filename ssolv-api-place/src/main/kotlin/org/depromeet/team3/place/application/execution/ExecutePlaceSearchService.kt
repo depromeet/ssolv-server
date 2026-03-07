@@ -17,6 +17,8 @@ import org.depromeet.team3.meetingplace.MeetingPlaceRepository
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
+import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordCandidate
+import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordPlan
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
@@ -27,10 +29,13 @@ import org.springframework.stereotype.Service
 import kotlin.math.ln
 
 /**
- * PlaceSearchPlan(Manual/Automatic)에 따라 Google Places API 호출을 실행하고
- * 장소 상세 정보·좋아요·가중치 기반 정렬을 적용해 최종 검색 응답을 생성한다.
- *
- * - Automatic: 설문 기반으로 생성된 여러 키워드로 병렬 검색 후 가중치 기반 병합
+ * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
+ * 
+ * 주요 기능:
+ * 1. 설문 기반 자동 장소 검색 (Automatic Search): 다수 인원의 선호도(가중치)를 반영한 키워드 병합 검색
+ * 2. 수동 검색 (Manual Search): 특정 키워드에 대한 직접 검색 (추후 확장 가능)
+ * 3. 정렬 및 필터링: 구글 평점, 사용자 좋아요, 설문 가중치를 종합하여 최종 10건 도출
+ * 4. 결과 영속화: 검색된 결과를 DB에 저장하여 후속 요청 시 일관된 결과 제공
  */
 @Service
 class ExecutePlaceSearchService(
@@ -38,8 +43,9 @@ class ExecutePlaceSearchService(
     private val meetingPlaceRepository: MeetingPlaceRepository,
     private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
+    private val createSurveyKeywordService: CreateSurveyKeywordService,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
-    private val coroutineDispatchers: CoroutineDispatchers
+    private val coroutineDispatchers: CoroutineDispatchers,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -48,6 +54,27 @@ class ExecutePlaceSearchService(
     private val keywordFetchSize = 20  // 키워드당 API 요청 개수 (최대 20개까지 요금 동일하므로 최대로 설정)
     private val weightScoreMultiplier = 100.0
     private val likeScoreMultiplier = 50.0  // 좋아요 비중 증가 (15.0 → 50.0)
+ 
+    /**
+     * 모임의 설문 결과를 분석하여 자동으로 최적의 식당을 도출하고 저장한다.
+     * (Redis Stream Consumer 등 백그라운드 작업에서 주로 호출)
+     */
+    suspend fun execute(meetingId: Long): PlacesSearchResponse {
+        val plan = createSurveyKeywordService.generateKeywordPlan(meetingId)
+        
+        val searchRequest = PlacesSearchRequest(
+            meetingId = meetingId,
+            userId = null
+        )
+        
+        val searchPlan = PlaceSearchPlan.Automatic(
+            keywords = plan.keywords,
+            stationCoordinates = plan.stationCoordinates,
+            fallbackKeyword = plan.fallbackKeyword
+        )
+        
+        return search(searchRequest, searchPlan)
+    }
 
     suspend fun search(request: PlacesSearchRequest, plan: PlaceSearchPlan): PlacesSearchResponse = withContext(MDCContext()) {
         supervisorScope {

@@ -1,6 +1,6 @@
 package org.depromeet.team3.place.config
 
-import org.depromeet.team3.place.application.execution.RequestMeetingResultCalculationListener
+import org.depromeet.team3.place.application.execution.PlaceSearchConsumer
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -16,22 +16,22 @@ import java.time.Duration
 import java.util.UUID
 
 /**
- * 식당 도출 계산(Calculation) 처리를 위한 Redis Streams 설정 클래스
+ * 식당 도출(Place Recommendation) 처리를 위한 Redis Streams 설정 클래스
  * 
  * 주요 역할:
- * 1. 식당 도출 비동기 계산 요청 수신을 위한 Consumer Group 관리
- * 2. 부하가 높은 계산 로직을 분산 처리하기 위한 메시지 큐 인프라 구축
+ * 1. 식당 도출 비동기 요청 수신을 위한 Consumer Group 관리
+ * 2. 부하가 높은 검색 로직을 분산 처리하기 위한 메시지 큐 인프라 구축
  */
 @Configuration
 @Profile("!test")
 class PlaceStreamsConfig(
-    private val calculationRequestListener: RequestMeetingResultCalculationListener, // 계산 요청 실처리기
+    private val placeSearchConsumer: PlaceSearchConsumer, // 식당 도출 실처리기
     private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(PlaceStreamsConfig::class.java)
 
     @Bean
-    fun calculationStreamMessageListenerContainer(
+    fun placeSearchStreamMessageListenerContainer(
         redisConnectionFactory: RedisConnectionFactory
     ): Subscription {
         val streamKey = "meeting_calculation_stream"
@@ -58,7 +58,7 @@ class PlaceStreamsConfig(
         val subscription = container.receive(
             Consumer.from(groupName, consumerName),
             StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
-            calculationRequestListener
+            placeSearchConsumer
         )
         
         container.start()
