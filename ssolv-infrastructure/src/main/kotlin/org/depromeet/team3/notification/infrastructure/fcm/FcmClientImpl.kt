@@ -11,12 +11,17 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.depromeet.team3.notification.domain.FcmClient
+import org.depromeet.team3.notification.infrastructure.DeviceTokenJpaRepository
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
-class FcmClientImpl : FcmClient {
+class FcmClientImpl(
+    private val deviceTokenJpaRepository: DeviceTokenJpaRepository
+) : FcmClient {
     private val logger = KotlinLogging.logger {}
 
+    @Transactional
     override fun sendMulticast(tokens: List<String>, title: String, body: String, data: Map<String, String>) {
         if (tokens.isEmpty()) return
 
@@ -62,7 +67,8 @@ class FcmClientImpl : FcmClient {
                             
                             // 토큰이 유효하지 않은 경우 (삭제 대상)
                             if (errorCode == MessagingErrorCode.UNREGISTERED || errorCode == MessagingErrorCode.INVALID_ARGUMENT) {
-                                logger.warn { "FCM 전송 실패 - 관리가 필요한 토큰입니다. (token: ${chunk[i]}, error: $errorCode, message: $errorMessage)" }
+                                logger.warn { "FCM 전송 실패 - 유효하지 않은 토큰을 DB에서 삭제합니다. (token: ${chunk[i]}, error: $errorCode)" }
+                                deviceTokenJpaRepository.deleteByFcmToken(chunk[i])
                             } else {
                                 logger.error { "FCM 개별 전송 실패 (token: ${chunk[i]}, error: $errorCode, message: $errorMessage)" }
                             }
