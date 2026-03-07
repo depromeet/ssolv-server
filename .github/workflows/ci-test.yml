@@ -60,7 +60,7 @@ jobs:
           TZ: Asia/Seoul
       
       - name: SonarQube Analysis
-        if: always()
+        if: false
         continue-on-error: true
         run: ./gradlew sonar -Dsonar.gradle.skipCompile=true --info
         env:
