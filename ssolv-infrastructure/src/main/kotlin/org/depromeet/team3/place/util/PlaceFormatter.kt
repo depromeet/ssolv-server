@@ -1,7 +1,5 @@
 package org.depromeet.team3.place.util
 
-import org.depromeet.team3.common.ContextConstants
-
 /**
  * 장소 관련 포맷팅 및 단순 변환 담당
  */
@@ -14,14 +12,6 @@ object PlaceFormatter {
         return "https://m.place.naver.com/place/list?query=$placeName"
     }
 
-    /**
-     * Google Places Photo URL 생성 (프록시 엔드포인트 사용)
-     * Photo name 형식: places/{place_id}/photos/{photo_reference}
-     */
-    fun generatePhotoUrl(photoName: String, proxyBaseUrl: String): String {
-        return "${proxyBaseUrl}${ContextConstants.API_VERSION_V1}/places/photos/${photoName}"
-    }
-    
     /**
      * 장소 이름에서 한국어 부분만 추출하고 특수문자 정리
      */

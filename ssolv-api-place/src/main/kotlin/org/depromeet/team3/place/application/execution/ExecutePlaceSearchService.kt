@@ -8,7 +8,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.slf4j.MDCContext
-import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
@@ -44,7 +43,6 @@ class ExecutePlaceSearchService(
     private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
     private val createSurveyKeywordService: CreateSurveyKeywordService,
-    private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers,
 ) {
 
@@ -144,18 +142,12 @@ class ExecutePlaceSearchService(
 
                 PlacesSearchResponse.PlaceItem(
                     placeId = placeDbId,
-                    name = entity.name,
+                    name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
                     address = entity.address.replace("대한민국 ", ""),
                     rating = entity.rating,
                     userRatingsTotal = entity.userRatingsTotal,
                     openNow = entity.openNow,
-                    photos = entity.photos?.split(",")?.map { photoName ->
-                        // PlaceFormatter를 사용하여 프록시 URL 생성
-                        org.depromeet.team3.place.util.PlaceFormatter.generatePhotoUrl(
-                            photoName, 
-                            googlePlacesApiProperties.proxyBaseUrl
-                        )
-                    },
+                    photos = entity.photos?.split(","),
                     link = entity.link ?: "",
                     weekdayText = entity.weekdayText?.split("\n"),
                     topReview = run {

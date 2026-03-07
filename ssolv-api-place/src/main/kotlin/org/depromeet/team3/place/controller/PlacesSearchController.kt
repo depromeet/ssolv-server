@@ -9,7 +9,6 @@ import org.depromeet.team3.common.ContextConstants
 import org.depromeet.team3.common.annotation.MeetingId
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.common.response.DpmApiResponse
-import org.depromeet.team3.place.application.execution.PlacePhotoService
 import org.depromeet.team3.place.application.facade.GetPlacesService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
@@ -23,8 +22,7 @@ import java.util.concurrent.TimeUnit
 @RestController
 @RequestMapping("${ContextConstants.API_VERSION_V1}/places")
 class PlacesSearchController(
-    private val getPlacesService: GetPlacesService,
-    private val placePhotoService: PlacePhotoService
+    private val getPlacesService: GetPlacesService
 ) {
     @Operation(
         summary = "맛집 데이터 검색",
@@ -46,22 +44,5 @@ class PlacesSearchController(
         )
         val response = getPlacesService.textSearch(request)
         return DpmApiResponse.ok(response)
-    }
-
-    @Operation(
-        summary = "장소 사진 조회 (프록시)",
-        description = "구글 플레이스 사진을 프록시하여 반환합니다. "
-    )
-    @GetMapping("/photos/{photoName:.+}", produces = [MediaType.IMAGE_JPEG_VALUE])
-    suspend fun getPhoto(
-        @PathVariable photoName: String
-    ): ResponseEntity<ByteArray> {
-        val photoData = placePhotoService.getPhoto(photoName)
-            ?: return ResponseEntity.notFound().build()
-
-        return ResponseEntity.ok()
-            .contentType(MediaType.IMAGE_JPEG)
-            .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
-            .body(photoData)
     }
 }

@@ -50,7 +50,7 @@ class PlaceQuery(
                 PlaceEntity(
                     id = existing?.id,
                     googlePlaceId = existing?.googlePlaceId ?: place.id,
-                    name = place.displayName.text,
+                    name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(place.displayName.text),
                     address = place.formattedAddress,
                     latitude = place.location?.latitude ?: existing?.latitude,
                     longitude = place.location?.longitude ?: existing?.longitude,
@@ -78,10 +78,5 @@ class PlaceQuery(
     // Google Place ID 목록으로 Place 엔티티 조회
     suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> {
         return placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
-    }
-
-    // 사진 데이터 조회
-    suspend fun fetchPhoto(photoName: String): ByteArray? {
-        return googlePlacesClient.fetchPhoto(photoName)
     }
 }

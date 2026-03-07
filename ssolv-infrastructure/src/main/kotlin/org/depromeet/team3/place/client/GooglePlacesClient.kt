@@ -178,34 +178,6 @@ class GooglePlacesClient(
     }
 
     /**
-     * 사진 데이터 조회 (New API)
-     */
-    suspend fun fetchPhoto(photoName: String, maxHeightPx: Int = 1000, maxWidthPx: Int = 1000): ByteArray? = withContext(coroutineDispatchers.VT) {
-        retryWithExponentialBackoff(
-            operation = "사진 데이터 조회",
-            operationDetail = "photoName=$photoName"
-        ) {
-            try {
-                withTimeout(apiTimeoutMillis) {
-                    googlePlacesRestClient.get()
-                        .uri { uriBuilder ->
-                            uriBuilder.path("/v1/{photoName}/media")
-                                .queryParam("maxHeightPx", maxHeightPx)
-                                .queryParam("maxWidthPx", maxWidthPx)
-                                .queryParam("key", googlePlacesApiProperties.apiKey)
-                                .build(photoName)
-                        }
-                        .retrieve()
-                        .body(ByteArray::class.java)
-                }
-            } catch (e: Exception) {
-                logger.error(e) { "Google Places API 사진 조회 실패: photoName=$photoName" }
-                null
-            }
-        }
-    }
-
-    /**
      * Text Search용 Field Mask
      */
     private fun buildTextSearchFieldMask(): String {
