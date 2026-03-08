@@ -1,7 +1,8 @@
-package org.depromeet.team3.notification.application
+package org.depromeet.team3.batch.scheduler
 
 import org.slf4j.LoggerFactory
-import org.springframework.data.redis.connection.stream.PendingMessagesSummary
+import org.springframework.data.domain.Range
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -9,7 +10,7 @@ import java.time.Duration
 
 /**
  * Redis Streams의 미처리 메시지를 감시하고 재시도하는 스케줄러 (WatchDog)
- * 
+ *
  * 주요 역할:
  * 1. 3분마다 각 스트림의 PEL(Pending Entries List)을 확인
  * 2. 특정 시간(3분) 이상 ACK되지 않은 메시지를 감지하여 강제 재처리 수행
@@ -18,16 +19,13 @@ import java.time.Duration
 @Component
 @org.springframework.context.annotation.Profile("!test")
 class PendingMessageScheduler(
-    private val stringRedisTemplate: StringRedisTemplate,
-    private val meetingNotificationConsumer: MeetingNotificationConsumer,
-    private val placeSearchConsumer: org.depromeet.team3.place.application.execution.PlaceSearchConsumer
+    private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(PendingMessageScheduler::class.java)
 
-    // 모니터링할 대상: (Stream Key, Group Name, 해당 Listener)
     private val consumers = listOf(
-        Triple("meeting_notification_stream", "meeting_notification_group", meetingNotificationConsumer),
-        Triple("meeting_calculation_stream", "meeting_calculation_group", placeSearchConsumer)
+        "meeting_notification_stream" to "meeting_notification_group",
+        "meeting_calculation_stream" to "meeting_calculation_group"
     )
 
     // 3분마다 실행
@@ -35,10 +33,10 @@ class PendingMessageScheduler(
     fun processPendingMessages() {
         logger.debug("--- [WatchDog] 미처리 스트림 메시지 점검 시작 ---")
 
-        for ((streamKey, groupName) in consumers.map { Triple(it.first, it.second, it.third) }) {
+        for ((streamKey, groupName) in consumers) {
             try {
                 // 1. 해당 그룹의 Pending Summary 확인
-                val pendingSummary: PendingMessagesSummary? = stringRedisTemplate.opsForStream<String, String>()
+                val pendingSummary = stringRedisTemplate.opsForStream<String, String>()
                     .pending(streamKey, groupName)
 
                 if (pendingSummary == null || pendingSummary.totalPendingMessages == 0L) {
@@ -47,13 +45,11 @@ class PendingMessageScheduler(
 
                 logger.info("스트림 {} 의 미처리 메시지 {} 건 발견", streamKey, pendingSummary.totalPendingMessages)
 
-                // 2. Pending 메시지 상세 조회 (최근 1시간 내, N개 제한)
                 val pendingMessages = stringRedisTemplate.opsForStream<String, String>()
                     .pending(
                         streamKey, 
-                        // groupName 대신 Consumer 인스턴스를 전달하든지 직접 그룹을 전달하든지 오버로딩에 맞춤
                         org.springframework.data.redis.connection.stream.Consumer.from(groupName, "any"), 
-                        org.springframework.data.domain.Range.unbounded<String>(), 
+                        Range.unbounded<String>(), 
                         100L
                     )
 
@@ -64,14 +60,14 @@ class PendingMessageScheduler(
                 for (pending in pendingMessages) {
                     // 3분 이상 처리되지 않은 메시지만 대상
                     if (pending.elapsedTimeSinceLastDelivery.toMillis() > Duration.ofMinutes(3).toMillis()) {
-                        logger.warn("WatchDog: {} 에서 3분 이상 정체된 메시지 ({}) 발견. 강제 재처리 수행", streamKey, pending.id)
+                        logger.warn("WatchDog: {} 에서 3분 이상 정체된 메시지 ({}) 발견. 재발행 수행", streamKey, pending.id)
 
-                        // 메시지 본문 직접 조회 시도
+                        // 3. 메시지 본문 조회
                         val messageRecordList = stringRedisTemplate.opsForStream<String, String>()
-                            .range(streamKey, org.springframework.data.domain.Range.just(pending.idAsString))
+                            .range(streamKey, Range.just(pending.idAsString))
                             
                         if (messageRecordList.isNullOrEmpty()) {
-                            // 이미 지워졌거나 만료된 메시지이면 ACK 처리만 수행
+                            // 이미 지워졌거나 만료된 메시지이면 ACK 처리만 수행하여 PEL에서 제거
                             stringRedisTemplate.opsForStream<String, String>().acknowledge(streamKey, groupName, pending.id)
                             continue
                         }
@@ -79,14 +75,16 @@ class PendingMessageScheduler(
                         val messageRecord = messageRecordList[0]
 
                         try {
-                            // 리스너를 직접 호출하여 재처리
-                            if (streamKey == "meeting_notification_stream") {
-                                meetingNotificationConsumer.onMessage(messageRecord)
-                            } else if (streamKey == "meeting_calculation_stream") {
-                                placeSearchConsumer.onMessage(messageRecord)
-                            }
+                            // 4. 새 메시지로 다시 발행 (Re-publish)
+                            val reRecord = MapRecord.create(streamKey, messageRecord.value)
+                            stringRedisTemplate.opsForStream<String, String>().add(reRecord)
+                            
+                            // 5. 기존 펜딩 메시지는 ACK 처리하여 PEL에서 제거 (무한 재발행 방지)
+                            stringRedisTemplate.opsForStream<String, String>().acknowledge(streamKey, groupName, pending.id)
+                            
+                            logger.info("WatchDog: 메시지 ({}) 재발행 및 기존 메시지 ACK 완료", pending.id)
                         } catch (e: Exception) {
-                            logger.error("WatchDog: 메시지 ({}) 재처리 도중 오류 발생", pending.id, e)
+                            logger.error("WatchDog: 메시지 ({}) 재발행 도중 오류 발생", pending.id, e)
                         }
                     }
                 }
