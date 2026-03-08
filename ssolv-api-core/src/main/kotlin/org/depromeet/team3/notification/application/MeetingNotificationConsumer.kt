@@ -21,28 +21,28 @@ class MeetingNotificationConsumer(
     private val scope = CoroutineScope(Dispatchers.Default)
 
     override fun onMessage(message: MapRecord<String, String, String>) {
-        val meetingIdStr = message.value["meetingId"]
-        val meetingId = meetingIdStr?.toLongOrNull()
+        val meetingId = message.value["meetingId"]?.toLongOrNull()
+        val userId = message.value["userId"]?.toLongOrNull()
 
-        if (meetingId != null) {
-            logger.info("식당 확정 알림 요청 수신 (meetingId: {}, messageId: {})", meetingId, message.id)
+        if (meetingId != null && userId != null) {
+            logger.debug("식당 확정 알림 요청 수신 (meetingId: {}, userId: {}, messageId: {})", meetingId, userId, message.id)
             scope.launch(coroutineDispatchers.VT) {
                 try {
-                    sendMeetingResultNotificationService.send(meetingId)
+                    sendMeetingResultNotificationService.send(meetingId, userId)
                     // 처리 성공 시 XACK (Pending 해제)
                     val ackCount = stringRedisTemplate.opsForStream<String, String>()
                         .acknowledge("meeting_notification_group", message)
                     
                     if (ackCount != null && ackCount > 0) {
-                        logger.info("식당 확정 알림 처리 성공 및 ACK 완료 (meetingId: {})", meetingId)
+                        logger.debug("식당 확정 알림 처리 성공 및 ACK 완료 (meetingId: {}, userId: {})", meetingId, userId)
                     }
                 } catch (e: Exception) {
-                    logger.error("식당 확정 푸시 알림 전송 로직 실패 (meetingId: $meetingId): ", e)
+                    logger.error("식당 확정 푸시 알림 전송 로직 실패 (meetingId: $meetingId, userId: $userId): ", e)
                     // 실패 시 ACK하지 않아 PEL에 머무르게 됨. 이후 WatchDog(Scheduler)가 재처리
                 }
             }
         } else {
-            logger.warn("Stream 메시지 파싱 실패: meetingId가 존재하지 않거나 유효하지 않음 (message: {})", message)
+            logger.warn("Stream 메시지 파싱 실패: meetingId 또는 userId가 존재하지 않음 (message: {})", message)
             // 잘못된 형식의 메시지는 무시하고 삭제 처리(ACK)
             stringRedisTemplate.opsForStream<String, String>().acknowledge("meeting_notification_group", message)
         }

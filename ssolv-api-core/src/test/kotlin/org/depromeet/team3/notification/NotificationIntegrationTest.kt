@@ -123,28 +123,35 @@ class NotificationIntegrationTest {
         // 5. 마지막 7번째 유저 설문 완료 (알림 울려야 함)
         createSurveyService.invoke(meeting.id!!, users.last().id!!, SurveyCreateRequest(listOf(cat.id!!)))
 
-        // then: 알림 스트림(meeting_notification_stream) 1회 발행 확인
-        verify(exactly = 1) { 
+        // then: 알림 스트림(meeting_notification_stream)이 참여자 수(7명)만큼 발행되었는지 확인
+        verify(exactly = participantsCount) { 
             streamOps.add(match { it.stream == "meeting_notification_stream" }) 
         }
 
         // 6. 리스너(Subscriber) 동작 및 FCM 발송 검증
-        val mockRecord = MapRecord.create("meeting_notification_stream", mapOf("meetingId" to meeting.id.toString()))
-            .withId(RecordId.of("123-1"))
-
         coEvery { fcmClient.sendMulticast(any(), any(), any(), any()) } returns Unit
 
-        meetingNotificationConsumer.onMessage(mockRecord)
+        // 각 유저별로 발행된 메시지를 수신하는 시뮬레이션
+        users.forEach { user ->
+            val mockRecord = MapRecord.create(
+                "meeting_notification_stream", 
+                mapOf(
+                    "meetingId" to meeting.id.toString(),
+                    "userId" to user.id.toString()
+                )
+            ).withId(RecordId.of("123-${user.id}"))
 
-        // 최종 검증: 7명 전원에게 알림이 발송되었는가?
-        val expectedTokens = users.map { "token-${it.id}" }
-        coVerify(timeout = 5000) { 
-            fcmClient.sendMulticast(
-                tokens = match { it.containsAll(expectedTokens) && it.size == participantsCount },
-                title = any(),
-                body = any(),
-                data = any()
-            )
+            meetingNotificationConsumer.onMessage(mockRecord)
+            
+            // 최종 검증: 각 참여자별로 알림이 발송되었는가?
+            coVerify(timeout = 5000) { 
+                fcmClient.sendMulticast(
+                    tokens = match { it.contains("token-${user.id}") && it.size == 1 },
+                    title = any(),
+                    body = any(),
+                    data = any()
+                )
+            }
         }
     }
 }
