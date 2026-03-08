@@ -19,14 +19,14 @@ class MeetingPlaceSearchCleanupScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(MeetingPlaceSearchCleanupScheduler::class.java)
 
-//    @Scheduled(cron = "0 0 * * * *")  // 매시간 정각에 실행
+    @Scheduled(cron = "0 0 * * * *")  // 매시간 정각에 실행
     @Transactional
     fun deleteExpired() {
         val now = LocalDateTime.now()
 
         try {
             val deletedCount = repository.deleteExpired(now)
-            logger.info("만료된 모임 장소 검색 결과 삭제 완료: {}건", deletedCount)
+            logger.debug("만료된 모임 장소 검색 결과 삭제 완료: {}건", deletedCount)
         } catch (e: Exception) {
             logger.error("모임 장소 검색 결과 삭제 중 오류 발생", e)
         }
