@@ -51,9 +51,6 @@ jwt:
   access-token-validity: 43200000   # 12시간
   refresh-token-validity: 604800000   # 1주일
 
-firebase:
-  service-account-key: ${FIREBASE_SERVICE_ACCOUNT_KEY:}
-
 # 앱 설정
 app:
   env: local
