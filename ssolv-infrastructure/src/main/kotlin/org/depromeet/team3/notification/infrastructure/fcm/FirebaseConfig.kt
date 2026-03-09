@@ -23,12 +23,14 @@ class FirebaseConfig(
             return
         }
 
+        val path = serviceAccountPath.replace("\r", "").replace("\n", "").trim()
+
         try {
-            logger.info { "Firebase 초기화 시도 중... 설정 경로: $serviceAccountPath" }
-            val resource = resourceLoader.getResource(serviceAccountPath)
+            logger.info { "Firebase 초기화 시도 중... 설정 경로: $path" }
+            val resource = resourceLoader.getResource(path)
             
             if (!resource.exists()) {
-                logger.warn { "Firebase 서비스 계정 파일이 존재하지 않습니다. 경로: $serviceAccountPath" }
+                logger.warn { "Firebase 서비스 계정 파일이 존재하지 않습니다. 경로: $path" }
                 return
             }
 
