@@ -19,37 +19,60 @@ class FirebaseConfig(
 
     @PostConstruct
     fun init() {
-        if (FirebaseApp.getApps().isNotEmpty()) {
-            return
-        }
+        if (FirebaseApp.getApps().isNotEmpty()) return
 
-        val ubuntuPath = "file:/home/ubuntu/17th-team3-Server/firebase-service-account.json"
-        val ubuntuFile = resourceLoader.getResource(ubuntuPath)
-        
-        val path = if (ubuntuFile.exists()) {
-            ubuntuPath
-        } else {
-             serviceAccountPath.filter { it.code in 32..126 }.trim()
+        // 시도해볼 후보 경로들 (절대 경로 및 상대 경로)
+        val candidatePaths = listOf(
+            "/home/ubuntu/17th-team3-Server/firebase-service-account.json",
+            "firebase-service-account.json",
+            serviceAccountPath.replace("file:", "").filter { it.code in 32..126 }.trim()
+        )
+
+        var finalFile: java.io.File? = null
+
+        for (p in candidatePaths) {
+            try {
+                val file = java.io.File(p)
+                if (file.exists() && file.isFile) {
+                    finalFile = file
+                    break
+                }
+            } catch (e: Exception) {
+                continue
+            }
         }
 
         try {
-            logger.info { "Firebase 초기화 시도 중... 설정 경로: $path" }
-            val resource = resourceLoader.getResource(path)
-            
-            if (!resource.exists()) {
-                logger.warn { "Firebase 서비스 계정 파일이 존재하지 않습니다. 경로: $path" }
+            if (finalFile != null) {
+                logger.info { "Firebase 초기화 시도 중 (파일 시스템): ${finalFile.absolutePath}" }
+                val credentials = GoogleCredentials.fromStream(finalFile.inputStream())
+                val options = FirebaseOptions.builder()
+                    .setCredentials(credentials)
+                    .build()
+
+                FirebaseApp.initializeApp(options)
+                logger.info { "✅ Firebase 초기화 성공! (파일: ${finalFile.absolutePath})" }
                 return
             }
 
-            val credentials = GoogleCredentials.fromStream(resource.inputStream)
-            val options = FirebaseOptions.builder()
-                .setCredentials(credentials)
-                .build()
+            // 파일 시스템에서 못 찾은 경우에만 클래스패스(ResourceLoader) 시도
+            val cleanPath = serviceAccountPath.trim()
+            val resource = resourceLoader.getResource(cleanPath)
+            
+            if (resource.exists()) {
+                logger.info { "Firebase 초기화 시도 중 (리소스): $cleanPath" }
+                val credentials = GoogleCredentials.fromStream(resource.inputStream)
+                val options = FirebaseOptions.builder()
+                    .setCredentials(credentials)
+                    .build()
 
-            FirebaseApp.initializeApp(options)
-            logger.info { "Firebase 애플리케이션이 파일($serviceAccountPath)을 통해 성공적으로 초기화되었습니다." }
+                FirebaseApp.initializeApp(options)
+                logger.info { "✅ Firebase 초기화 성공! (리소스: $cleanPath)" }
+            } else {
+                logger.warn { "❌ Firebase 초기화 실패: 파일을 찾을 수 없습니다. (후보 경로 확인 필요)" }
+            }
         } catch (e: Exception) {
-            logger.error(e) { "Firebase 초기화 중 오류 발생: ${e.message}" }
+            logger.error(e) { "❌ Firebase 초기화 중 오류 발생: ${e.message}" }
         }
     }
 }
