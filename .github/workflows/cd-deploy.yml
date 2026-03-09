@@ -37,8 +37,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: FIREBASE_SERVICE_ACCOUNT
           script: |
             cd ~/17th-team3-Server
+            
+            # Create Firebase Service Account JSON from secret
+            echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
+            chmod 600 firebase-service-account.json
             
             git fetch origin
             git reset --hard origin/main
@@ -64,3 +69,5 @@ jobs:
             echo "Deployment Successful!"
             
             docker image prune -f
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

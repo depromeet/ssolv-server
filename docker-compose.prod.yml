@@ -12,6 +12,8 @@ services:
       - REDIS_HOST=redis
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
       - OTLP_ENDPOINT=http://alloy:4318/v1/traces
+    volumes:
+      - ./firebase-service-account.json:/home/ubuntu/17th-team3-Server/firebase-service-account.json:ro
     networks:
       - ssolv_prod_network
     restart: unless-stopped
@@ -42,6 +44,8 @@ services:
       - REDIS_HOST=redis
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
       - OTLP_ENDPOINT=http://alloy:4318/v1/traces
+    volumes:
+      - ./firebase-service-account.json:/home/ubuntu/17th-team3-Server/firebase-service-account.json:ro
     networks:
       - ssolv_prod_network
     restart: unless-stopped

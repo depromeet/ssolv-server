@@ -38,3 +38,6 @@ api:
     places:
       api-key: ${GOOGLE_PLACES_API_KEY}
       base-url: https://places.googleapis.com
+
+firebase:
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:file:/home/ubuntu/17th-team3-Server/firebase-service-account.json}
