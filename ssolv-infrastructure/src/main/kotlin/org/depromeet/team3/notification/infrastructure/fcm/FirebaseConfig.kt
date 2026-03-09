@@ -52,19 +52,39 @@ class FirebaseConfig(
         }
 
         try {
-            // [핵심] 수동 문자열 정제 로직을 모두 제거하고 스트림을 직접 전달합니다.
-            // GoogleCredentials는 표준 JSON 및 PEM 형식을 직접 파싱하여 '+' 문자 포함 시에도 정상 작동합니다.
+            // JSON을 문자열로 읽고, private_key 내부의 비표준 문자(\f 폼피드 등)를 제거합니다.
+            // 원인: Firebase 서비스 계정 JSON의 private_key 값에 \f(Form Feed, ASCII 12) 등
+            // 비표준 문자가 섞이면 PEM 블록이 깨져 Base64DecodingException이 발생합니다.
+            val rawJson = inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+
+            val privateKeyRegex = Regex("(\"private_key\"\\s*:\\s*\")(.*?)(\")", RegexOption.DOT_MATCHES_ALL)
+            val cleanedJson = privateKeyRegex.replace(rawJson) { match ->
+                val prefix = match.groupValues[1]
+                val keyValue = match.groupValues[2]
+                val suffix = match.groupValues[3]
+
+                // \f(폼피드), \r(캐리지리턴), \t(탭) 및 기타 제어문자 제거
+                // 허용: Base64 표준문자(A-Z,a-z,0-9,+,/,=), 이스케이프 문자(\n, \\), 공백/대시(헤더용)
+                val cleanedKey = keyValue
+                    .replace("\u000C", "") // \f Form Feed 제거 (핵심 원인)
+                    .replace("\r", "")     // \r 제거
+                    .replace("\t", "")     // \t 제거
+                    .filter { it == '\n' || it == '\\' || it.code in 32..126 }
+
+                "$prefix$cleanedKey$suffix"
+            }
+
+            println("[FCM_DEBUG] 🧹 private_key 비표준 문자 정제 완료 (\\f 등 제거)")
+
             val options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(inputStream))
+                .setCredentials(GoogleCredentials.fromStream(cleanedJson.byteInputStream(Charsets.UTF_8)))
                 .build()
-            
+
             FirebaseApp.initializeApp(options)
             println("[FCM_DEBUG] 🚀 [최종 성공] Firebase 초기화가 완료되었습니다!")
         } catch (e: Exception) {
             println("[FCM_DEBUG] ❌ 초기화 실패: ${e.message}")
             e.printStackTrace()
-        } finally {
-            inputStream.close()
         }
         println("----------------------------------------------")
     }
