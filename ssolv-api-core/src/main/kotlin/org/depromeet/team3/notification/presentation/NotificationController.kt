@@ -12,6 +12,8 @@ import org.depromeet.team3.notification.dto.DeleteDeviceTokenRequest
 import org.depromeet.team3.notification.dto.NotificationSettingResponse
 import org.depromeet.team3.notification.dto.RegisterDeviceTokenRequest
 import org.depromeet.team3.notification.dto.UpdateNotificationSettingRequest
+import org.depromeet.team3.notification.dto.FcmTestRequest
+import org.depromeet.team3.notification.domain.FcmClient
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -28,7 +30,8 @@ class NotificationController(
     private val getNotificationSettingService: GetNotificationSettingService,
     private val updateNotificationSettingService: UpdateNotificationSettingService,
     private val registerDeviceTokenService: RegisterDeviceTokenService,
-    private val deleteDeviceTokenService: DeleteDeviceTokenService
+    private val deleteDeviceTokenService: DeleteDeviceTokenService,
+    private val fcmClient: FcmClient
 ) {
 
     @Operation(
@@ -83,6 +86,24 @@ class NotificationController(
         @Valid @RequestBody request: DeleteDeviceTokenRequest
     ): DpmApiResponse<Unit> {
         deleteDeviceTokenService.execute(userId, request)
+        return DpmApiResponse.ok()
+    }
+
+    @Operation(
+        summary = "FCM 테스트 발송",
+        description = "특정 토큰으로 테스트 푸시 알림을 발송합니다.",
+        responses = [ApiResponse(responseCode = "200", description = "발송 요청 성공")]
+    )
+    @PostMapping("/test")
+    fun testFcm(
+        @Valid @RequestBody request: FcmTestRequest
+    ): DpmApiResponse<Unit> {
+        fcmClient.sendMulticast(
+            tokens = listOf(request.token),
+            title = request.title,
+            body = request.body,
+            data = mapOf("test" to "true")
+        )
         return DpmApiResponse.ok()
     }
 }
