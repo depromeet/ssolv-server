@@ -3,69 +3,79 @@ package org.depromeet.team3.notification.infrastructure.fcm
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
-import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.io.ResourceLoader
 import java.io.File
-import java.io.FileInputStream
-import java.io.InputStream
 
 @Configuration
 class FirebaseConfig(
     @Value("\${firebase.service-account-path:classpath:firebase-service-account.json}")
     private val serviceAccountPath: String,
-    private val resourceLoader: ResourceLoader
 ) {
-    private val logger = KotlinLogging.logger {}
 
     @PostConstruct
     fun init() {
         if (FirebaseApp.getApps().isNotEmpty()) return
 
         println("----------------------------------------------")
-        println("[FCM_DEBUG] Firebase 초기화 프로세스 시작 (Direct File Access Mode)")
+        println("[FCM_DEBUG] Firebase 초기화 프로세스 시작 (Resilient Cleaning Mode)")
 
-        // 1. 절대 경로 리터럴 사용 (모든 설정값 무시)
         val fixedPath = "/home/ubuntu/17th-team3-Server/firebase-service-account.json"
         val fixedFile = File(fixedPath)
         
-        println("[FCM_DEBUG] 파일 확인 시도 1 (정적 경로): ${fixedFile.absolutePath} -> 존재: ${fixedFile.exists()}")
-
-        var inputStream: InputStream? = null
+        var jsonContent: String? = null
 
         if (fixedFile.exists() && fixedFile.isFile) {
-            println("[FCM_DEBUG] ✅ 정적 경로에서 파일을 발견했습니다.")
-            inputStream = FileInputStream(fixedFile)
+            println("[FCM_DEBUG] ✅ 파일을 찾았습니다: ${fixedFile.absolutePath}")
+            jsonContent = fixedFile.readText(Charsets.UTF_8)
         } else {
-            // 2. 설정값(serviceAccountPath)을 이용한 확인
             val envPath = serviceAccountPath.replace("file:", "").filter { it.code in 32..126 }.trim()
-            if (envPath.isNotBlank()) {
-                val envFile = File(envPath)
-                println("[FCM_DEBUG] 파일 확인 시도 2 (설정 경로): ${envFile.absolutePath} -> 존재: ${envFile.exists()}")
-                if (envFile.exists() && envFile.isFile) {
-                    println("[FCM_DEBUG] ✅ 설정 경로에서 파일을 발견했습니다.")
-                    inputStream = FileInputStream(envFile)
-                }
+            val envFile = File(envPath)
+            if (envFile.exists()) {
+                println("[FCM_DEBUG] ✅ 설정 경로에서 파일을 찾았습니다: ${envFile.absolutePath}")
+                jsonContent = envFile.readText(Charsets.UTF_8)
             }
         }
 
-        // 3. 최종 초기화
+        if (jsonContent == null) {
+            println("[FCM_DEBUG] ❌ 파일을 찾지 못해 초기화를 중단합니다.")
+            println("----------------------------------------------")
+            return
+        }
+
         try {
-            if (inputStream != null) {
-                val options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(inputStream))
-                    .build()
-                FirebaseApp.initializeApp(options)
-                println("[FCM_DEBUG] 🚀 Firebase 초기화가 최종적으로 성공했습니다!")
-            } else {
-                println("[FCM_DEBUG] ❌ 모든 경로에서 파일을 찾지 못했습니다.")
-                println("[FCM_DEBUG] 현재 실행 중인 OS 유저: ${System.getProperty("user.name")}")
-                println("[FCM_DEBUG] 상위 디렉토리 존재 확인: ${File("/home/ubuntu/17th-team3-Server").exists()}")
+            // [핵심] JSON 내용 정제: private_key 내부에 섞인 실제 줄바꿈이나 공백을 강제로 제거
+            // FCM 키의 private_key 값 안에는 \n(문자)은 있어야 하지만, 실제 Enter나 공백은 없어야 합니다.
+            var cleanedJson = jsonContent
+            
+            // 1. private_key 필드를 찾아서 그 안의 실제 개행 문자(\r, \n)와 공백을 제거
+            val privateKeyRegex = "\"private_key\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+            val match = privateKeyRegex.find(cleanedJson)
+            
+            if (match != null) {
+                val rawKeyValue = match.groupValues[1]
+                // 실제 줄바꿈과 공백을 싹 제거 (단, \\n 문자열은 유지해야 하므로 조심스럽게 처리)
+                val cleanKeyValue = rawKeyValue
+                    .replace("\r", "")
+                    .replace("\n", "")
+                    .replace(" ", "")
+                
+                cleanedJson = cleanedJson.replace(rawKeyValue, cleanKeyValue)
+                println("[FCM_DEBUG] 🧹 private_key 필드의 지저분한 문자를 청소했습니다.")
             }
+
+            val options = FirebaseOptions.builder()
+                .setCredentials(GoogleCredentials.fromStream(cleanedJson.byteInputStream()))
+                .build()
+            
+            FirebaseApp.initializeApp(options)
+            println("[FCM_DEBUG] 🚀 [최종 성공] Firebase 초기화가 완료되었습니다!")
         } catch (e: Exception) {
-            println("[FCM_DEBUG] ❌ Firebase initializeApp 실행 중 오류: ${e.message}")
+            println("[FCM_DEBUG] ❌ 초기화 실패: ${e.message}")
+            if (e.message?.contains("DecodingException") == true) {
+                println("[FCM_DEBUG] 💡 팁: private_key 내부의 Base64 형식이 여전히 잘못되었습니다.")
+            }
             e.printStackTrace()
         }
         println("----------------------------------------------")
