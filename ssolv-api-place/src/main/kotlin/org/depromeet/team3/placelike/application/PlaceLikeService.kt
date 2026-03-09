@@ -23,13 +23,13 @@ class PlaceLikeService(
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
 
     suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
-        logger.info("Toggle Like Request - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
+        logger.debug("Toggle Like Request - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
         transactionTemplate.execute {
             runBlocking {
                 val meetingPlaceId = getMeetingPlaceId(meetingId, placeId)
                 val isLiked = toggleLikeStatus(meetingPlaceId, userId)
                 val likeCount = placeLikeRepository.countByMeetingPlaceId(meetingPlaceId).toInt()
-                logger.info("Toggle result - isLiked: {}, likeCount: {}", isLiked, likeCount)
+                logger.debug("Toggle result - isLiked: {}, likeCount: {}", isLiked, likeCount)
 
                 PlaceLikeResult(
                     isLiked = isLiked,
