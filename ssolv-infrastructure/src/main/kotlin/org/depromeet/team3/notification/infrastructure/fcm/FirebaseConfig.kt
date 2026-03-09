@@ -23,7 +23,14 @@ class FirebaseConfig(
             return
         }
 
-        val path = serviceAccountPath.replace("\r", "").replace("\n", "").trim()
+        val ubuntuPath = "file:/home/ubuntu/17th-team3-Server/firebase-service-account.json"
+        val ubuntuFile = resourceLoader.getResource(ubuntuPath)
+        
+        val path = if (ubuntuFile.exists()) {
+            ubuntuPath
+        } else {
+             serviceAccountPath.filter { it.code in 32..126 }.trim()
+        }
 
         try {
             logger.info { "Firebase 초기화 시도 중... 설정 경로: $path" }
