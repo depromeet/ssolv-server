@@ -24,67 +24,50 @@ class FirebaseConfig(
     fun init() {
         if (FirebaseApp.getApps().isNotEmpty()) return
 
-        // 1. 로그 라이브러리 문제를 배제하기 위해 표준 출력(println) 사용
         println("----------------------------------------------")
-        println("[FCM_DEBUG] Firebase 초기화 프로세스 시작")
+        println("[FCM_DEBUG] Firebase 초기화 프로세스 시작 (Direct File Access Mode)")
+
+        // 1. 절대 경로 리터럴 사용 (모든 설정값 무시)
+        val fixedPath = "/home/ubuntu/17th-team3-Server/firebase-service-account.json"
+        val fixedFile = File(fixedPath)
         
-        // 2. 경로 시도 목록 (가장 확실한 절대 경로 우선)
-        val candidatePaths = listOf(
-            "/home/ubuntu/17th-team3-Server/firebase-service-account.json",
-            serviceAccountPath.replace("file:", "").filter { it.code in 32..126 }.trim(),
-            "firebase-service-account.json"
-        )
+        println("[FCM_DEBUG] 파일 확인 시도 1 (정적 경로): ${fixedFile.absolutePath} -> 존재: ${fixedFile.exists()}")
 
-        var selectedStream: InputStream? = null
-        var foundBy: String? = null
+        var inputStream: InputStream? = null
 
-        for (path in candidatePaths) {
-            try {
-                val file = File(path)
-                println("[FCM_DEBUG] 경로 확인 중: ${file.absolutePath}")
-                if (file.exists() && file.isFile) {
-                    println("[FCM_DEBUG] ✅ 파일 발견: ${file.absolutePath}")
-                    selectedStream = FileInputStream(file)
-                    foundBy = "FileSystem: ${file.absolutePath}"
-                    break
+        if (fixedFile.exists() && fixedFile.isFile) {
+            println("[FCM_DEBUG] ✅ 정적 경로에서 파일을 발견했습니다.")
+            inputStream = FileInputStream(fixedFile)
+        } else {
+            // 2. 설정값(serviceAccountPath)을 이용한 확인
+            val envPath = serviceAccountPath.replace("file:", "").filter { it.code in 32..126 }.trim()
+            if (envPath.isNotBlank()) {
+                val envFile = File(envPath)
+                println("[FCM_DEBUG] 파일 확인 시도 2 (설정 경로): ${envFile.absolutePath} -> 존재: ${envFile.exists()}")
+                if (envFile.exists() && envFile.isFile) {
+                    println("[FCM_DEBUG] ✅ 설정 경로에서 파일을 발견했습니다.")
+                    inputStream = FileInputStream(envFile)
                 }
-            } catch (e: Exception) {
-                println("[FCM_DEBUG] ⚠️ 경로 확인 중 오류 ($path): ${e.message}")
             }
         }
 
-        // 3. 파일로 못 찾았을 경우 리소스 로더 fallback
-        if (selectedStream == null) {
-            try {
-                val res = resourceLoader.getResource(serviceAccountPath.trim())
-                if (res.exists()) {
-                    println("[FCM_DEBUG] ✅ 리소스 로더에서 발견: $serviceAccountPath")
-                    selectedStream = res.inputStream
-                    foundBy = "ResourceLoader: $serviceAccountPath"
-                }
-            } catch (e: Exception) {
-                println("[FCM_DEBUG] ⚠️ 리소스 로딩 중 오류: ${e.message}")
-            }
-        }
-
-        // 4. 최종 초기화
-        if (selectedStream != null) {
-            try {
+        // 3. 최종 초기화
+        try {
+            if (inputStream != null) {
                 val options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(selectedStream))
+                    .setCredentials(GoogleCredentials.fromStream(inputStream))
                     .build()
                 FirebaseApp.initializeApp(options)
-                println("[FCM_DEBUG] 🚀 Firebase 초기화 성공! (출처: $foundBy)")
-                println("----------------------------------------------")
-            } catch (e: Exception) {
-                println("[FCM_DEBUG] ❌ Firebase initializeApp 실패: ${e.message}")
-                e.printStackTrace()
-                println("----------------------------------------------")
+                println("[FCM_DEBUG] 🚀 Firebase 초기화가 최종적으로 성공했습니다!")
+            } else {
+                println("[FCM_DEBUG] ❌ 모든 경로에서 파일을 찾지 못했습니다.")
+                println("[FCM_DEBUG] 현재 실행 중인 OS 유저: ${System.getProperty("user.name")}")
+                println("[FCM_DEBUG] 상위 디렉토리 존재 확인: ${File("/home/ubuntu/17th-team3-Server").exists()}")
             }
-        } else {
-            println("[FCM_DEBUG] ❌ 모든 경로에서 키 파일을 찾지 못했습니다.")
-            println("[FCM_DEBUG] 확인된 후보들: $candidatePaths")
-            println("----------------------------------------------")
+        } catch (e: Exception) {
+            println("[FCM_DEBUG] ❌ Firebase initializeApp 실행 중 오류: ${e.message}")
+            e.printStackTrace()
         }
+        println("----------------------------------------------")
     }
 }
