@@ -6,8 +6,8 @@ prometheus.scrape "node_exporter" {
 
 prometheus.scrape "spring_boot" {
   targets    = [
-    {"__address__" = "core-server:8080", "service" = "core-server"},
-    {"__address__" = "place-server:8080", "service" = "place-server"},
+    {"__address__" = "app-server-1:8080", "service" = "ssolv-api", "instance" = "app-server-1"},
+    {"__address__" = "app-server-2:8080", "service" = "ssolv-api", "instance" = "app-server-2"},
   ]
   metrics_path = "/actuator/prometheus"
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
