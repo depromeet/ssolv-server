@@ -117,7 +117,6 @@ class GlobalExceptionHandler {
     @ExceptionHandler(Exception::class)
     fun handleGenericException(e: Exception): ResponseEntity<DpmApiResponse<Unit>> {
         logger.error("Unexpected exception: ${e.message}", e)
-        io.sentry.Sentry.captureException(e)
         return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.httpStatus)
             .body(DpmApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR))
     }

@@ -22,5 +22,7 @@ app:
 
 sentry:
   dsn: ${SENTRY_DSN:}
-  traces-sample-rate: 1.0
-  exception-resolver-order: -2147483648
+  traces-sample-rate: 0.1
+  exception-resolver-order: 1
+  logging:
+    mdc-tags: request_id,user_id,meeting_id,fcm_token
