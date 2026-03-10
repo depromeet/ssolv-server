@@ -44,7 +44,9 @@ management:
     metrics:
       export:
         enabled: true
-
+  metrics:
+    tags:
+      application: ${spring.application.name}
 # JWT 설정
 jwt:
   secret: ${JWT_SECRET}
