@@ -30,6 +30,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(DpmException::class)
     fun handleDpmException(e: DpmException): ResponseEntity<DpmApiResponse<Unit>> {
         logger.warn("Business exception: [${e.errorCode.name}] ${e.message}", e)
+        io.sentry.Sentry.captureException(e)
         return ResponseEntity.status(e.errorCode.httpStatus)
             .body(DpmApiResponse.error(e))
     }
@@ -40,6 +41,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<DpmApiResponse<Unit>> {
         logger.warn("Validation failed: ${e.message}", e)
+        io.sentry.Sentry.captureException(e)
         val errorDetails = mutableMapOf<String, Any?>()
         e.bindingResult.fieldErrors.forEach { fieldError ->
             errorDetails[fieldError.field] = fieldError.defaultMessage
@@ -54,6 +56,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException::class)
     fun handleMissingServletRequestParameterException(e: MissingServletRequestParameterException): ResponseEntity<DpmApiResponse<Unit>> {
         logger.warn("Missing required parameter: ${e.parameterName}", e)
+        io.sentry.Sentry.captureException(e)
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(DpmApiResponse.error(ErrorCode.MISSING_PARAMETER))
     }
@@ -64,6 +67,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException::class)
     fun handleHttpMessageNotReadableException(e: HttpMessageNotReadableException): ResponseEntity<DpmApiResponse<Unit>> {
         logger.warn("JSON parse error: ${e.message}", e)
+        io.sentry.Sentry.captureException(e)
 
         val detail: Map<String, Any?>? = when (val cause = e.cause) {
             is InvalidFormatException -> {
@@ -98,6 +102,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(e: IllegalArgumentException): ResponseEntity<DpmApiResponse<Unit>> {
         logger.warn("Illegal argument: ${e.message}", e)
+        io.sentry.Sentry.captureException(e)
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(DpmApiResponse.error(ErrorCode.INVALID_PARAMETER))
     }

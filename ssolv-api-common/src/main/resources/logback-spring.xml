@@ -8,6 +8,13 @@
         </encoder>
     </appender>
 
+    <!-- Sentry Appender -->
+    <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+        <dsn>${SENTRY_DSN}</dsn>
+        <minimumEventLevel>ERROR</minimumEventLevel>
+        <minimumBreadcrumbLevel>INFO</minimumBreadcrumbLevel>
+    </appender>
+
     <!-- 로그 레벨 설정 -->
     <logger name="org.depromeet.team3" level="INFO"/>
     <logger name="org.springframework" level="INFO"/>
@@ -16,5 +23,6 @@
     <!-- Root 로거 -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SENTRY"/>
     </root>
 </configuration>
