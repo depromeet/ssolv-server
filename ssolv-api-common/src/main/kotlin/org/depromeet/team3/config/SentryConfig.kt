@@ -12,6 +12,11 @@ import org.springframework.security.core.context.SecurityContextHolder
  */
 @Configuration
 class SentryConfig {
+    private val logger = org.slf4j.LoggerFactory.getLogger(SentryConfig::class.java)
+
+    init {
+        logger.info("Sentry Configuration initialized and enabled.")
+    }
 
     /**
      * SecurityContext에서 사용자 ID를 추출하여 Sentry에 전달하는 Provider

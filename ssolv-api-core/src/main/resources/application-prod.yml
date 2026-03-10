@@ -44,7 +44,7 @@ firebase:
 
 sentry:
   dsn: ${SENTRY_DSN:}
-  traces-sample-rate: 0.1
+  traces-sample-rate: 0.5
   exception-resolver-order: 1
   logging:
     mdc-tags: request_id,user_id,meeting_id,fcm_token
