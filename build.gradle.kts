@@ -112,6 +112,8 @@ subprojects {
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
+            add("implementation", "org.springframework.boot:spring-boot-starter-actuator")
+            add("implementation", "io.micrometer:micrometer-registry-prometheus")
             add("implementation", "io.sentry:sentry-spring-boot-starter-jakarta:${rootProject.extra["sentryVersion"]}")
             add("implementation", "io.sentry:sentry-logback:${rootProject.extra["sentryVersion"]}")
         }
