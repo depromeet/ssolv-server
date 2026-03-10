@@ -11,6 +11,7 @@ plugins {
 
 // 중복 의존성 관리 및 보안 버전 중앙화
 extra["jjwtVersion"] = "0.13.0"
+extra["sentryVersion"] = "7.14.0"
 
 // 모든 프로젝트 공통 설정
 allprojects {
@@ -111,6 +112,8 @@ subprojects {
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
             add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
+            add("implementation", "io.sentry:sentry-spring-boot-starter-jakarta:${rootProject.extra["sentryVersion"]}")
+            add("implementation", "io.sentry:sentry-logback:${rootProject.extra["sentryVersion"]}")
         }
     }
 }
