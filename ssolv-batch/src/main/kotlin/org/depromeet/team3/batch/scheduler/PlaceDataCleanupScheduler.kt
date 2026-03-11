@@ -2,9 +2,11 @@ package org.depromeet.team3.batch.scheduler
 
 import org.depromeet.team3.place.PlaceJpaRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.LocalDateTime
 
 /**
@@ -15,13 +17,23 @@ import java.time.LocalDateTime
  */
 @Component
 class PlaceDataCleanupScheduler(
-    private val placeJpaRepository: PlaceJpaRepository
+    private val placeJpaRepository: PlaceJpaRepository,
+    private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(PlaceDataCleanupScheduler::class.java)
 
     @Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시에 실행
     @Transactional
     fun cleanupStalePlaceData() {
+        // 분산 환경 중복 실행 방지를 위한 락 획득 (SETNX)
+        val lockKey = "lock:cleanup:place-data"
+        val acquired = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "locked", Duration.ofMinutes(10)) ?: false
+
+        if (!acquired) {
+            logger.debug("--- 다른 인스턴스에서 오래된 장소 데이터 정리를 진행 중입니다. ---")
+            return
+        }
+
         val thirtyDaysAgo = LocalDateTime.now().minusDays(30)
 
         try {
