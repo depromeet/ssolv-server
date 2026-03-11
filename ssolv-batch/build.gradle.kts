@@ -8,6 +8,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
+    testImplementation("org.springframework.boot:spring-boot-starter-web")
+    testImplementation("org.springframework.boot:spring-boot-starter-actuator")
+    testImplementation("io.micrometer:micrometer-registry-prometheus")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation(project(":ssolv-api-core"))
+    testRuntimeOnly("com.h2database:h2")
     runtimeOnly("com.mysql:mysql-connector-j")
 }
 
