@@ -25,7 +25,6 @@ import kotlinx.coroutines.runBlocking
 @Service
 class SendMeetingResultNotificationService(
     private val meetingRepository: MeetingRepository,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository,
     private val deviceTokenQueryRepository: DeviceTokenQueryRepository,
     private val fcmClient: FcmClient,
     private val stationRepository: StationRepository,
