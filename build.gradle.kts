@@ -62,15 +62,6 @@ subprojects {
         // Java 21+에서 Mockito 및 Java Agent 관련 경고 제거
         jvmArgs("-XX:+EnableDynamicAgentLoading")
 
-        // Mockito Agent를 명시적으로 로드하여 self-attachment 경고 제거
-        doFirst {
-             val mockitoAgent = configurations["testRuntimeClasspath"]
-                 .find { it.name.contains("mockito-core") }
-             if (mockitoAgent != null) {
-                 jvmArgs("-javaagent:${mockitoAgent.absolutePath}")
-             }
-        }
-
         // 테스트 리포트 설정
         reports {
             junitXml.required.set(true)
