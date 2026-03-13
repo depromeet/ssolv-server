@@ -1,5 +1,6 @@
 package org.depromeet.team3.notification.application
  
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,7 +32,7 @@ class MeetingNotificationConsumer(
                     sendMeetingResultNotificationService.send(meetingId, userId)
                     // 처리 성공 시 XACK (Pending 해제)
                     val ackCount = stringRedisTemplate.opsForStream<String, String>()
-                        .acknowledge("meeting_notification_group", message)
+                        .acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, message)
                     
                     if (ackCount != null && ackCount > 0) {
                         logger.debug("식당 확정 알림 처리 성공 및 ACK 완료 (meetingId: {}, userId: {})", meetingId, userId)
@@ -44,7 +45,7 @@ class MeetingNotificationConsumer(
         } else {
             logger.warn("Stream 메시지 파싱 실패: meetingId 또는 userId가 존재하지 않음 (message: {})", message)
             // 잘못된 형식의 메시지는 무시하고 삭제 처리(ACK)
-            stringRedisTemplate.opsForStream<String, String>().acknowledge("meeting_notification_group", message)
+            stringRedisTemplate.opsForStream<String, String>().acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, message)
         }
     }
 }

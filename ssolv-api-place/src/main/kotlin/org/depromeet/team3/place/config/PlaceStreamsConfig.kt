@@ -1,5 +1,6 @@
 package org.depromeet.team3.place.config
 
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.depromeet.team3.place.application.execution.PlaceSearchConsumer
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
@@ -34,8 +35,8 @@ class PlaceStreamsConfig(
     fun placeSearchStreamMessageListenerContainer(
         redisConnectionFactory: RedisConnectionFactory
     ): Subscription {
-        val streamKey = "meeting_calculation_stream"
-        val groupName = "meeting_calculation_group"
+        val streamKey = RedisStreamConstants.MEETING_CALCULATION_STREAM
+        val groupName = RedisStreamConstants.MEETING_CALCULATION_GROUP
         val consumerName = "app_server_${UUID.randomUUID()}"
 
         // Consumer Group 초기화 (존재하지 않으면 생성)

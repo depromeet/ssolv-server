@@ -1,5 +1,6 @@
 package org.depromeet.team3.notification.config
 
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.springframework.context.annotation.Profile
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.slf4j.LoggerFactory
@@ -34,8 +35,8 @@ class NotificationStreamsConfig(
     fun notificationStreamMessageListenerContainer(
         redisConnectionFactory: RedisConnectionFactory
     ): Subscription {
-        val streamKey = "meeting_notification_stream"
-        val groupName = "meeting_notification_group"
+        val streamKey = RedisStreamConstants.MEETING_NOTIFICATION_STREAM
+        val groupName = RedisStreamConstants.MEETING_NOTIFICATION_GROUP
         val consumerName = "app_server_${UUID.randomUUID()}"
 
         // Consumer Group 초기화 (존재하지 않으면 생성)

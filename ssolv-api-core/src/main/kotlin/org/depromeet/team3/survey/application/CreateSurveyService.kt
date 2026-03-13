@@ -15,6 +15,7 @@ import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveyresult.SurveyResultEntity
 import org.depromeet.team3.surveyresult.SurveyResultJpaRepository
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
@@ -123,8 +124,8 @@ class CreateSurveyService(
                     
                     // 1. 식당 검색 추천 요청 발행
                     // 부하가 걸릴 수 있는 검색 로직을 별도 워커나 비동기 리스너에서 처리하도록 큐에 적재합니다.
-                    val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                        "meeting_calculation_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+                    val calcRecord = MapRecord.create(
+                        RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
@@ -133,7 +134,7 @@ class CreateSurveyService(
                     val attendees = meetingAttendeeJpaRepository.findByMeetingId(meetingId)
                     attendees.forEach { attendee ->
                         val notarRecord = MapRecord.create(
-                            "meeting_notification_stream", 
+                            RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
                             mapOf(
                                 "meetingId" to meetingId.toString(),
                                 "userId" to attendee.user.id.toString()

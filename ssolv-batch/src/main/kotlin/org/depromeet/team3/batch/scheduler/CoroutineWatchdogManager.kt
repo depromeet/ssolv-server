@@ -75,54 +75,58 @@ class CoroutineWatchdogManager(
         }
 
 
-        val watchdogScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        val watchdogJob = watchdogScope.launch {
-            while (isActive) {
-                // 남은 TTL의 절반 시점마다 연장 시도 (성능과 안전성 사이의 최적점 설계)
-                // 첫 번째 시도가 실패하더라도 절반의 시간만큼 재시도 기회 확보
-                delay(actualInitialTtl / 2)
+        coroutineScope {
+            // 2. 비즈니스 로직 코루틴 생성
+            val actionJob = launch { action() }
 
-                try {
-                    val result = stringRedisTemplate.execute(
-                        extendScript,
-                        listOf(lockKey),
-                        lockValue,
-                        actualExtensionTtl.toString()
-                    )
+            // 3. 워치독 코루틴 실행
+            val watchdogJob = launch(Dispatchers.IO) {
+                while (isActive) {
+                    // 남은 TTL의 절반 시점마다 연장 시도
+                    delay(minOf(actualInitialTtl, actualExtensionTtl) / 2)
 
-                    if (result != null && result > 0L) {
+                    try {
+                        val result = stringRedisTemplate.execute(
+                            extendScript,
+                            listOf(lockKey),
+                            lockValue,
+                            actualExtensionTtl.toString()
+                        )
+
+                        if (result == null || result <= 0L) {
+                            logger.warn("{} : Lock lost. Cancelling action.", lockKey)
+                            actionJob.cancel()
+                            break
+                        }
                         logger.debug("{} : Lock extended by {}ms.", lockKey, actualExtensionTtl)
-                    } else {
-                        logger.warn("{} : Lock extension failed (already expired or taken).", lockKey)
-                        break
+                    } catch (e: Exception) {
+                        logger.error("Watchdog: 락 연장 시도 중 에러 발생. 대상 키: {}", lockKey, e)
                     }
-                } catch (e: Exception) {
-                    logger.error("Watchdog: 락 연장 시도 중 에러 발생. 대상 키: {}", lockKey, e)
                 }
             }
-        }
 
-        try {
-            // 3. 실제 비즈니스 로직(작업) 수행
-            action()
-        } finally {
-            // 4. 작업이 끝나면 (또는 예외가 발생하면) 즉시 Watchdog 코루틴 종료
-            watchdogJob.cancel()
-
-            // 5. 안전한 락 해제 (Safe Release)
             try {
-                val result = stringRedisTemplate.execute(
-                    unlockScript,
-                    listOf(lockKey),
-                    lockValue
-                )
-                if (result != null && result > 0L) {
-                    logger.debug("🔓 {} : Releasing lock.", lockKey)
-                } else {
-                    logger.warn("{} : Lock release failed (already expired).", lockKey)
+                // 4. 비즈니스 로직 완료 대기
+                actionJob.join()
+            } finally {
+                // 5. 작업이 끝나거나 취소되면 워치독 종료
+                watchdogJob.cancel()
+
+                // 6. 안전한 락 해제 (Safe Release)
+                try {
+                    val result = stringRedisTemplate.execute(
+                        unlockScript,
+                        listOf(lockKey),
+                        lockValue
+                    )
+                    if (result != null && result > 0L) {
+                        logger.debug("🔓 {} : Releasing lock.", lockKey)
+                    } else {
+                        logger.warn("{} : Lock release failed (already expired).", lockKey)
+                    }
+                } catch (e: Exception) {
+                    logger.error("락 해제 중 에러 발생. 대상 키: {}", lockKey, e)
                 }
-            } catch (e: Exception) {
-                logger.error("락 해제 중 에러 발생. 대상 키: {}", lockKey, e)
             }
         }
     }

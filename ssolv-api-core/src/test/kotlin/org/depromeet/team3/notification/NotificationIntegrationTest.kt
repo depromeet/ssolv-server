@@ -30,6 +30,7 @@ import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
@@ -120,7 +121,7 @@ class NotificationIntegrationTest {
             
             // then: 아직 전원이 아니므로 알림 스트림이 발행되지 않아야 함
             verify(exactly = 0) { 
-                streamOps.add(match { it.stream == "meeting_notification_stream" }) 
+                streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM }) 
             }
         }
 
@@ -129,7 +130,7 @@ class NotificationIntegrationTest {
 
         // then: 알림 스트림(meeting_notification_stream)이 참여자 수(7명)만큼 발행되었는지 확인
         verify(exactly = participantsCount) { 
-            streamOps.add(match { it.stream == "meeting_notification_stream" }) 
+            streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM }) 
         }
 
         // 6. 리스너(Subscriber) 동작 및 FCM 발송 검증
@@ -138,7 +139,7 @@ class NotificationIntegrationTest {
         // 각 유저별로 발행된 메시지를 수신하는 시뮬레이션
         users.forEach { user ->
             val mockRecord = MapRecord.create(
-                "meeting_notification_stream", 
+                RedisStreamConstants.MEETING_NOTIFICATION_STREAM, 
                 mapOf(
                     "meetingId" to meeting.id.toString(),
                     "userId" to user.id.toString()
@@ -146,8 +147,10 @@ class NotificationIntegrationTest {
             ).withId(RecordId.of("123-${user.id}"))
 
             meetingNotificationConsumer.onMessage(mockRecord)
-            
-            // 최종 검증: 각 참여자별로 알림이 발송되었는가?
+        }
+
+        // 최종 검증: 각 참여자별로 알림이 발송되었는가?
+        users.forEach { user ->
             coVerify(timeout = 5000) { 
                 fcmClient.sendMulticast(
                     tokens = match { it.contains("token-${user.id}") && it.size == 1 },
@@ -156,6 +159,35 @@ class NotificationIntegrationTest {
                     data = any()
                 )
             }
+        }
+    }
+
+    @Test
+    @DisplayName("이미 전송된 동일한 유저/모임의 알림 메시지가 수신되면 FCM 발송이 중복되지 않는다")
+    fun `중복 메시지 멱등성 검증`() = runBlocking {
+        // setup
+        val meetingId = 1L
+        val userId = 100L
+        val mockRecord = MapRecord.create(
+            RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+            mapOf(
+                "meetingId" to meetingId.toString(),
+                "userId" to userId.toString()
+            )
+        ).withId(RecordId.of("999-0"))
+
+        val valueOps = mockk<ValueOperations<String, String>>()
+        every { stringRedisTemplate.opsForValue() } returns valueOps
+        
+        // Redis에 이미 키가 있다고 가정 (setIfAbsent가 false 반환)
+        every { valueOps.setIfAbsent(any(), any(), any()) } returns false
+
+        // when
+        meetingNotificationConsumer.onMessage(mockRecord)
+
+        // then
+        coVerify(exactly = 0) { 
+            fcmClient.sendMulticast(any(), any(), any(), any()) 
         }
     }
 }

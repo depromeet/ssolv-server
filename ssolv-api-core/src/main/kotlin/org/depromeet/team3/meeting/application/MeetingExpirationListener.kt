@@ -1,5 +1,6 @@
 package org.depromeet.team3.meeting.application
 
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.slf4j.LoggerFactory
@@ -44,7 +45,7 @@ class MeetingExpirationListener(
 
         // 1. 식당 검색 추천 요청 발행 (계산은 모임당 1회)
         val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-            "meeting_calculation_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+            RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
         )
         stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
@@ -54,7 +55,7 @@ class MeetingExpirationListener(
             
             attendees.forEach { attendee ->
                 val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                    "meeting_notification_stream",
+                    RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
                     mapOf<String, String>(
                         "meetingId" to meetingId.toString(),
                         "userId" to attendee.userId.toString()
