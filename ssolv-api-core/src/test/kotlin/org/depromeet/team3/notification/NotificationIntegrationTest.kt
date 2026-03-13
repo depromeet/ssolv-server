@@ -29,6 +29,7 @@ import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.ValueOperations
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
@@ -105,7 +106,10 @@ class NotificationIntegrationTest {
 
         // 3. Redis Mock 설정
         val streamOps = mockk<StreamOperations<String, String, String>>()
+        val valueOps = mockk<ValueOperations<String, String>>()
         every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
+        every { stringRedisTemplate.opsForValue() } returns valueOps
+        every { valueOps.setIfAbsent(any(), any(), any()) } returns true
         every { streamOps.add(any<MapRecord<String, String, String>>()) } returns RecordId.of("123-0")
         every { streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) } returns 1L
         every { stringRedisTemplate.delete(any<String>()) } returns true  // cancelExpiration 호출 시 만료 키 삭제
