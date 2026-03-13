@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
+import org.springframework.data.redis.core.StringRedisTemplate
 
 /**
  * 모임 결과(확정된 식당) 또는 설문 완료 정보를 기반으로 FCM 푸시 알림을 발송하는 서비스
@@ -30,11 +31,27 @@ class SendMeetingResultNotificationService(
     private val stationRepository: StationRepository,
     private val inviteTokenService: InviteTokenService,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
+    private val coroutineDispatchers: CoroutineDispatchers,
+    private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = org.slf4j.LoggerFactory.getLogger(SendMeetingResultNotificationService::class.java)
 
+    companion object {
+        private const val IDEMPOTENCY_KEY_PREFIX = "sent:notification:MEETING_RESULT"
+        private val IDEMPOTENCY_TTL = java.time.Duration.ofHours(1)
+    }
+
     suspend fun send(meetingId: Long, userId: Long) = withContext(coroutineDispatchers.VT) {
+        // 0. 멱등성 체크 (중복 발송 방지)
+        val idempotencyKey = "$IDEMPOTENCY_KEY_PREFIX:$meetingId:$userId"
+        val isNew = stringRedisTemplate.opsForValue()
+            .setIfAbsent(idempotencyKey, "true", IDEMPOTENCY_TTL) ?: false
+
+        if (!isNew) {
+            logger.debug("중복 처리 방지: 이미 발송된 알림입니다. (meetingId: $meetingId, userId: $userId)")
+            return@withContext
+        }
+
         val meeting = transactionTemplate.execute {
             runBlocking { meetingRepository.findById(meetingId) }
         } ?: throw MeetingException(org.depromeet.team3.common.exception.ErrorCode.MEETING_NOT_FOUND)
@@ -50,7 +67,7 @@ class SendMeetingResultNotificationService(
         } ?: emptyList()
 
         if (validTokens.isEmpty()) {
-            logger.info("모임 결과 알림을 보낼 유효한 FCM 토큰이 없습니다. (meetingId: $meetingId, userId: $userId)")
+            logger.debug("모임 결과 알림을 보낼 유효한 FCM 토큰이 없습니다. (meetingId: $meetingId, userId: $userId)")
             return@withContext
         }
 
