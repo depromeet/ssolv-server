@@ -13,7 +13,6 @@ import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
-import org.depromeet.team3.notification.application.SendMeetingResultNotificationService
 import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.meeting.application.MeetingExpirationListener
 import org.depromeet.team3.station.StationJpaRepository
@@ -32,7 +31,6 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest(classes = [CoreApiApplication::class])
 @ActiveProfiles("test")
@@ -128,9 +126,12 @@ class NotificationIntegrationTest {
         // 5. 마지막 7번째 유저 설문 완료 (알림 울려야 함)
         createSurveyService.invoke(meeting.id!!, users.last().id!!, SurveyCreateRequest(listOf(cat.id!!)))
 
-        // then: 알림 스트림(meeting_notification_stream)이 참여자 수(7명)만큼 발행되었는지 확인
+        // then: 마지막 7번째 유저 제출 시 알림 스트림(7명분)과 계산 스트림(1회)이 발행되었는지 확인
         verify(exactly = participantsCount) { 
             streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM }) 
+        }
+        verify(exactly = 1) {
+            streamOps.add(match { it.stream == RedisStreamConstants.MEETING_CALCULATION_STREAM })
         }
 
         // 6. 리스너(Subscriber) 동작 및 FCM 발송 검증
@@ -188,6 +189,82 @@ class NotificationIntegrationTest {
         // then
         coVerify(exactly = 0) { 
             fcmClient.sendMulticast(any(), any(), any(), any()) 
+        }
+    }
+
+    @Test
+    @DisplayName("FCM 전송 중 예외 발생 시 acknowledge가 호출되지 않아야 한다")
+    fun `FCM 전송 실패 시 재시도를 위해 ACK를 생략한다`() = runBlocking {
+        // setup
+        
+        // 유저 정보는 DB에 있어야 하므로 저장
+        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "fail-user", email = "fail@test.com"))
+        deviceTokenJpaRepository.save(org.depromeet.team3.notification.infrastructure.DeviceTokenEntity(
+            userId = user.id!!, fcmToken = "fail-token", platform = org.depromeet.team3.notification.domain.DevicePlatform.IOS
+        ))
+        val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
+        val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(id = null, hostUser = user, station = station))
+
+        val mockRecord = MapRecord.create(
+            RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+            mapOf(
+                "meetingId" to meeting.id.toString(),
+                "userId" to user.id.toString()
+            )
+        ).withId(RecordId.of("888-0"))
+
+        val streamOps = mockk<StreamOperations<String, String, String>>()
+        val valueOps = mockk<ValueOperations<String, String>>()
+        every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
+        every { stringRedisTemplate.opsForValue() } returns valueOps
+        every { valueOps.setIfAbsent(any(), any(), any()) } returns true
+        
+        // FCM 발송 시 에러 발생 시뮬레이션
+        coEvery { fcmClient.sendMulticast(any(), any(), any(), any()) } throws RuntimeException("FCM 서버 장애")
+
+        // when
+        meetingNotificationConsumer.onMessage(mockRecord)
+
+        // then: 에러가 발생했으므로 ACK가 호출되지 않아야 함 (그래야 나중에 PendingMessageScheduler가 쥠)
+        // 비동기 처리가 완료될 때까지 잠시 대기
+        kotlinx.coroutines.delay(500)
+        verify(exactly = 0) { 
+            streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) 
+        }
+    }
+
+    @Test
+    @DisplayName("토큰이 없는 유저의 경우 알림 발송은 스킵되지만 메시지는 정상 처리(ACK)되어야 한다")
+    fun `토큰 부재 시 알림 스킵 및 정상 ACK 처리 검증`() = runBlocking {
+        // setup: 토큰을 등록하지 않은 유저 생성
+        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "no-token-user", email = "notoken@test.com"))
+        val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
+        val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(id = null, hostUser = user, station = station))
+
+        val mockRecord = MapRecord.create(
+            RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+            mapOf(
+                "meetingId" to meeting.id.toString(),
+                "userId" to user.id.toString()
+            )
+        ).withId(RecordId.of("777-0"))
+
+        val streamOps = mockk<StreamOperations<String, String, String>>()
+        val valueOps = mockk<ValueOperations<String, String>>()
+        every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
+        every { stringRedisTemplate.opsForValue() } returns valueOps
+        every { valueOps.setIfAbsent(any(), any(), any()) } returns true
+        every { streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) } returns 1L
+
+        // when
+        meetingNotificationConsumer.onMessage(mockRecord)
+
+        // then: 토큰이 없으므로 전송 시도는 0회, 하지만 메시지 자체는 유효하므로 ACK 호출
+        coVerify(exactly = 0) { 
+            fcmClient.sendMulticast(any(), any(), any(), any()) 
+        }
+        verify(exactly = 1, timeout = 5000) { 
+            streamOps.acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, any<MapRecord<String, String, String>>()) 
         }
     }
 }

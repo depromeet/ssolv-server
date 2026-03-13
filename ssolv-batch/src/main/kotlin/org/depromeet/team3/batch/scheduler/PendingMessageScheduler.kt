@@ -94,11 +94,13 @@ class PendingMessageScheduler(
                                         pending.id, updatedValue["retryCount"])
                                 } catch (e: Exception) {
                                     logger.error("WatchDog: 메시지 ({}) 재발행 도중 오류 발생", pending.id, e)
+                                    io.sentry.Sentry.captureException(e)
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         logger.error("WatchDog: 스트림 {} 에 대한 Pending 확인 오류", streamKey, e)
+                        io.sentry.Sentry.captureException(e)
                     }
                 }
             }

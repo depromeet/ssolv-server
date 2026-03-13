@@ -39,6 +39,7 @@ class MeetingNotificationConsumer(
                     }
                 } catch (e: Exception) {
                     logger.error("식당 확정 푸시 알림 전송 로직 실패 (meetingId: $meetingId, userId: $userId): ", e)
+                    io.sentry.Sentry.captureException(e)
                     // 실패 시 ACK하지 않아 PEL에 머무르게 됨. 이후 WatchDog(Scheduler)가 재처리
                 }
             }

@@ -43,6 +43,7 @@ class PlaceSearchConsumer(
                     }
                 } catch (e: Exception) {
                     logger.error("모임 $meetingId 의 식당 검색 도출 중 오류 발생", e)
+                    io.sentry.Sentry.captureException(e)
                     // 실패 시 ACK하지 않아 PEL에 머무르게 됨. 이후 WatchDog(Scheduler)가 재처리
                 }
             }
