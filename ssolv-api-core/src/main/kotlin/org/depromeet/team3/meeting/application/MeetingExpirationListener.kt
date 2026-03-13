@@ -1,6 +1,8 @@
 package org.depromeet.team3.meeting.application
 
-
+import org.depromeet.team3.common.constants.RedisStreamConstants
+import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.connection.Message
@@ -16,7 +18,8 @@ import java.time.Duration
 @Component
 class MeetingExpirationListener(
     @Qualifier("redisMessageListenerContainer") listenerContainer: RedisMessageListenerContainer,
-    private val stringRedisTemplate: StringRedisTemplate
+    private val stringRedisTemplate: StringRedisTemplate,
+    private val meetingAttendeeRepository: MeetingAttendeeRepository
 ) : KeyExpirationEventMessageListener(listenerContainer) {
 
     private val logger = LoggerFactory.getLogger(MeetingExpirationListener::class.java)
@@ -40,16 +43,28 @@ class MeetingExpirationListener(
 
         logger.info("모임 $meetingId 만료 발생! 비동기 장소 검색 및 알림 스트림을 발행합니다.")
 
-        // 1. 식당 검색 추천 요청 발행
+        // 1. 식당 검색 추천 요청 발행 (계산은 모임당 1회)
         val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-            "meeting_calculation_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+            RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
         )
         stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
-        // 2. 만료 알림 트리거 발행
-        val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-            "meeting_notification_stream", mapOf<String, String>("meetingId" to meetingId.toString())
-        )
-        stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
+        // 2. 만료 알림 트리거 발행 (Fan-out: 구성원 한 명 당 1개 메시지)
+        runBlocking {
+            val attendees = meetingAttendeeRepository.findByMeetingId(meetingId)
+            
+            attendees.forEach { attendee ->
+                val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
+                    RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+                    mapOf<String, String>(
+                        "meetingId" to meetingId.toString(),
+                        "userId" to attendee.userId.toString()
+                    )
+                )
+                stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
+                logger.debug("모임 {} 만료 알림 발행 완료 (대상 사용자: {})", meetingId, attendee.userId)
+            }
+            logger.debug("모임 {} 의 참여자 {} 명에 대해 알림 스트림 발행을 완료했습니다.", meetingId, attendees.size)
+        }
     }
 }

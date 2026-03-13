@@ -59,6 +59,9 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
         
+        // Java 21+에서 Mockito 및 Java Agent 관련 경고 제거
+        jvmArgs("-XX:+EnableDynamicAgentLoading")
+
         // 테스트 리포트 설정
         reports {
             junitXml.required.set(true)

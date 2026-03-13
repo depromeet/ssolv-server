@@ -68,3 +68,7 @@ ssolv-infrastructure/ngrinder/
 */bin
 
 /prompt/*
+
+# Benchmark related
+/benchmark/
+ssolv-batch/src/test/kotlin/org/depromeet/team3/batch/benchmark/

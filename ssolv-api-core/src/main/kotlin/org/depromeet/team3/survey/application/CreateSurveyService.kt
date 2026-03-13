@@ -15,6 +15,8 @@ import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveyresult.SurveyResultEntity
 import org.depromeet.team3.surveyresult.SurveyResultJpaRepository
+import org.depromeet.team3.common.constants.RedisStreamConstants
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -122,25 +124,31 @@ class CreateSurveyService(
                     
                     // 1. 식당 검색 추천 요청 발행
                     // 부하가 걸릴 수 있는 검색 로직을 별도 워커나 비동기 리스너에서 처리하도록 큐에 적재합니다.
-                    val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                        "meeting_calculation_stream", mapOf<String, String>("meetingId" to meetingId.toString())
+                    val calcRecord = MapRecord.create(
+                        RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
-                    // 2. 전 멤버 설문 완료 알림 트리거 (User-facing)
-                    // 유저들에게 즉시 알림을 보내어 식당 추천 결과 페이지로 유입되도록 유도합니다.
-                    val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                        "meeting_notification_stream", mapOf<String, String>("meetingId" to meetingId.toString())
-                    )
-                    stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
+                    // 2. 전 멤버 설문 완료 알림 트리거 (Fan-out: 구성원 한 명 당 1개 메시지)
+                    // 개별 유저별 전송 성공 여부를 추적하기 위해 메시지를 분할하여 발행합니다.
+                    val attendees = meetingAttendeeJpaRepository.findByMeetingId(meetingId)
+                    attendees.forEach { attendee ->
+                        val notarRecord = MapRecord.create(
+                            RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+                            mapOf(
+                                "meetingId" to meetingId.toString(),
+                                "userId" to attendee.user.id.toString()
+                            )
+                        )
+                        stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
+                    }
 
                     // 3. 기존 만료 타이머 제거 (Case 2 방지)
-                    // 전원 완료로 일찍 끝났으므로, 모임 시간 만료 시점에 불필요한 알림이 중복 발송되지 않도록 타이머를 제거합니다.
                     meetingExpirationSchedulerService.cancelExpiration(meetingId)
                 }
 
                 SurveyCreateResponse()
             } ?: throw IllegalStateException("Transaction result is null")
-        }
+    }
 }
 
