@@ -54,9 +54,7 @@ class PlaceLikeServiceTest {
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any<String>(),
-            any<String>(),
-            any<String>()
+            any(), any(), any()
         )).thenReturn(listOf(1L, 1L))
 
         // when
@@ -76,7 +74,7 @@ class PlaceLikeServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요 토글 - 좋아요 취소 시 Lua 스크립트 결과가 반영된다")
+    @DisplayName("좋아요 토글 - 좋아요 취소 시 Lua 스크립트 결과 반영")
     fun `좋아요 취소 시 Lua 스크립트 결과 반영`() = runTest {
         // given
         val meetingId = 1L
@@ -87,9 +85,7 @@ class PlaceLikeServiceTest {
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any<String>(),
-            any<String>(),
-            any<String>()
+            any(), any(), any()
         )).thenReturn(listOf(0L, 0L))
 
         // when

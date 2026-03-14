@@ -58,8 +58,8 @@ class PlaceLikeService(
             likeScoreMultiplier.toString()
         ) as List<*>
 
-        val isLiked = (result[0] as Long) == 1L
-        val likeCount = result[1] as Long
+        val isLiked = (result[0] as Number).toLong() == 1L
+        val likeCount = (result[1] as Number).toLong()
 
         PlaceLikeResult(
             isLiked = isLiked,
