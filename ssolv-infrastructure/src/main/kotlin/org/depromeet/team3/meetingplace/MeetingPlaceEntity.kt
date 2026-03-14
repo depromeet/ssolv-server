@@ -27,7 +27,4 @@ class MeetingPlaceEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = false)
     val place: PlaceEntity,
-
-    @Column(name = "like_count", nullable = false)
-    val likeCount: Int = 0
 ) : BaseTimeEntity()

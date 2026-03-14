@@ -13,7 +13,6 @@ class MeetingPlaceMapper {
             id = entity.id,
             meetingId = entity.meeting.id!!,
             placeId = entity.place.id!!,
-            likeCount = entity.likeCount,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt
         )
@@ -28,7 +27,6 @@ class MeetingPlaceMapper {
             id = domain.id,
             meeting = meeting,
             place = place,
-            likeCount = domain.likeCount
         )
     }
 }

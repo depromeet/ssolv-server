@@ -7,7 +7,6 @@ data class MeetingPlace(
     val id: Long? = null,
     val meetingId: Long,
     val placeId: Long,
-    val likeCount: Int = 0,
     override val createdAt: LocalDateTime? = null,
     override val updatedAt: LocalDateTime? = null,
 ) : BaseTimeDomain(createdAt, updatedAt)
