@@ -12,8 +12,7 @@ import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
-import org.depromeet.team3.meetingplace.MeetingPlace
-import org.depromeet.team3.meetingplace.MeetingPlaceRepository
+import org.depromeet.team3.place.PlaceEntity
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
@@ -21,10 +20,9 @@ import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.depromeet.team3.placelike.PlaceLikeRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import kotlin.math.ln
 
 /**
  * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
@@ -38,12 +36,11 @@ import kotlin.math.ln
 @Service
 class ExecutePlaceSearchService(
     private val placeQuery: PlaceQuery,
-    private val meetingPlaceRepository: MeetingPlaceRepository,
-    private val placeLikeRepository: PlaceLikeRepository,
     private val searchService: MeetingPlaceSearchService,
     private val createSurveyKeywordService: CreateSurveyKeywordService,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers,
+    private val redisTemplate: StringRedisTemplate,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -114,30 +111,23 @@ class ExecutePlaceSearchService(
             return@supervisorScope PlacesSearchResponse(emptyList())
         }
 
-        val meetingPlaces = if (request.meetingId != null) {
-            val placeDbIds = savedEntities.mapNotNull { it.id }
-            createOrGetMeetingPlaces(request.meetingId, placeDbIds)
-        } else {
-            emptyList()
-        }
-
         val googlePlaceIds = savedEntities.mapNotNull { it.googlePlaceId }
         val placeIdMap = getPlaceStringIdToDbIdMap(googlePlaceIds)
         val placeWeightByDbId = keywordResult.placeWeights.mapNotNull { (googleId, weight) ->
             placeIdMap[googleId]?.let { it to weight }
         }.toMap()
 
-        val likesMap = if (meetingPlaces.isNotEmpty()) {
-            buildLikesMap(googlePlaceIds, meetingPlaces, request.userId)
+        // Redis 기반 실시간 좋아요 정보 조회 (이미 좋아요가 있을 수 있으므로)
+        val likesMap = if (request.meetingId != null) {
+            buildLikesMapFromRedis(request.meetingId, savedEntities, request.userId)
         } else {
             emptyMap()
         }
 
         val items = savedEntities.mapNotNull { entity ->
             runCatching {
-                val googleId = entity.googlePlaceId ?: return@mapNotNull null
                 val placeDbId = entity.id ?: return@mapNotNull null
-                val likeInfo = likesMap[googleId] ?: PlaceLikeInfo(0, false)
+                val likeInfo = likesMap[placeDbId] ?: PlaceLikeInfo(0, false)
 
                 PlacesSearchResponse.PlaceItem(
                     placeId = placeDbId,
@@ -181,7 +171,6 @@ class ExecutePlaceSearchService(
         val scoreByPlaceId = items.associate { item ->
             val weight = placeWeightByDbId[item.placeId] ?: 0.0
             val weightScore = weight * weightScoreMultiplier
-            // 초기 적재 시점에는 기존 저장된 좋아요 정보를 반영하여 점수 산출 (이후 추가 좋아요는 ZINCRBY로 실시간 반영)
             val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
             val combinedScore = weightScore + likeScore
             item.placeId to combinedScore
@@ -204,6 +193,22 @@ class ExecutePlaceSearchService(
         }
     }
 
+    private suspend fun buildLikesMapFromRedis(
+        meetingId: Long,
+        places: List<PlaceEntity>,
+        userId: Long?
+    ): Map<Long, PlaceLikeInfo> {
+        return places.mapNotNull { it.id }.associateWith { placeId ->
+            val likeKey = searchService.getLikeKey(meetingId, placeId)
+            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
+            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) == true else false
+            
+            PlaceLikeInfo(
+                likeCount = likeCount.toInt(),
+                isLiked = isLiked
+            )
+        }
+    }
 
     private fun hasPhoto(item: PlacesSearchResponse.PlaceItem): Boolean =
         item.photos?.isNullOrEmpty() == false
@@ -529,103 +534,6 @@ class ExecutePlaceSearchService(
                 }
                 .toMap()
         }
-    }
-
-    private suspend fun createOrGetMeetingPlaces(meetingId: Long, placeDbIds: List<Long>): List<MeetingPlace> = withContext(coroutineDispatchers.VT) {
-        val existingMeetingPlaces = meetingPlaceRepository.findByMeetingId(meetingId)
-        val existingPlaceIds = existingMeetingPlaces.map { it.placeId }.toSet()
-
-        val newMeetingPlaces = placeDbIds
-            .filter { it !in existingPlaceIds }
-            .map { placeDbId ->
-                MeetingPlace(
-                    meetingId = meetingId,
-                    placeId = placeDbId
-                )
-            }
-
-        if (newMeetingPlaces.isNotEmpty()) {
-            val saved = meetingPlaceRepository.saveAll(newMeetingPlaces)
-            existingMeetingPlaces + saved
-        } else {
-            existingMeetingPlaces
-        }
-    }
-
-    private suspend fun buildLikesMap(
-        googlePlaceIds: List<String>,
-        meetingPlaces: List<MeetingPlace>,
-        userId: Long?
-    ): Map<String, PlaceLikeInfo> {
-        val placeStringIdToDbId = getPlaceStringIdToDbIdMap(googlePlaceIds)
-        val meetingPlaceIds = meetingPlaces.mapNotNull { it.id }
-
-        if (meetingPlaceIds.isEmpty()) {
-            return emptyMap()
-        }
-
-        val placeLikes = placeLikeRepository.findByMeetingPlaceIds(meetingPlaceIds)
-
-        val meetingPlaceIdToPlaceDbId = meetingPlaces
-            .filter { it.id != null }
-            .associate { it.id!! to it.placeId }
-
-        val likesByPlaceDbId = placeLikes
-            .groupBy { meetingPlaceIdToPlaceDbId[it.meetingPlaceId] }
-
-        return googlePlaceIds.associateWith { googlePlaceId ->
-            val placeDbId = placeStringIdToDbId[googlePlaceId]
-            val likes = if (placeDbId != null) likesByPlaceDbId[placeDbId] ?: emptyList() else emptyList()
-
-            PlaceLikeInfo(
-                likeCount = likes.size,
-                isLiked = userId != null && likes.any { it.userId == userId }
-            )
-        }
-    }
-
-    /**
-     * 저장된 검색 결과의 좋아요 정보만 업데이트
-     */
-    private suspend fun updateLikesForStoredItems(
-        storedItems: List<PlacesSearchResponse.PlaceItem>,
-        meetingId: Long,
-        userId: Long?
-    ): List<PlacesSearchResponse.PlaceItem> = withContext(coroutineDispatchers.VT) {
-        if (storedItems.isEmpty()) return@withContext emptyList()
-        
-        // PlaceItem의 placeId는 DB ID이므로 직접 사용
-        val placeDbIds = storedItems.map { it.placeId }
-        val meetingPlaces = createOrGetMeetingPlaces(meetingId, placeDbIds)
-        
-        if (meetingPlaces.isEmpty()) {
-            return@withContext storedItems
-        }
-        
-        // MeetingPlace ID -> Place DB ID 매핑
-        val meetingPlaceIdToPlaceDbId = meetingPlaces
-            .filter { it.id != null }
-            .associate { it.id!! to it.placeId }
-        
-        // 좋아요 정보 조회
-        val placeLikes = placeLikeRepository.findByMeetingPlaceIds(meetingPlaceIdToPlaceDbId.keys.toList())
-        val likesByPlaceDbId = placeLikes
-            .groupBy { meetingPlaceIdToPlaceDbId[it.meetingPlaceId] }
-        
-        // 각 아이템의 좋아요 정보 업데이트
-        val items = storedItems.map { item ->
-            val likes = likesByPlaceDbId[item.placeId] ?: emptyList()
-            item.copy(
-                likeCount = likes.size,
-                isLiked = userId != null && likes.any { it.userId == userId }
-            )
-        }
-
-        // 좋아요 순으로 재정렬
-        items.sortedWith(
-            compareByDescending<PlacesSearchResponse.PlaceItem> { it.isLiked }
-                .thenByDescending { it.likeCount }
-        )
     }
 
     private data class KeywordSearchResult(

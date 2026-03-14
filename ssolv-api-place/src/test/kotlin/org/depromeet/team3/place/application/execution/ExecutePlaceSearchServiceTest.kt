@@ -11,7 +11,6 @@ import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.depromeet.team3.placelike.PlaceLikeRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
@@ -32,12 +31,13 @@ class ExecutePlaceSearchServiceTest {
 
     private lateinit var placeQuery: FakePlaceQuery
     private lateinit var meetingPlaceRepository: MeetingPlaceRepository
-    private lateinit var placeLikeRepository: PlaceLikeRepository
     private lateinit var searchService: MeetingPlaceSearchService
     private lateinit var createSurveyKeywordService: CreateSurveyKeywordService
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
     private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var transactionTemplate: TransactionTemplate
+    private lateinit var redisTemplate: org.springframework.data.redis.core.StringRedisTemplate
+    private lateinit var setOps: org.springframework.data.redis.core.SetOperations<String, String>
 
     private lateinit var service: ExecutePlaceSearchService
 
@@ -52,21 +52,22 @@ class ExecutePlaceSearchServiceTest {
         
         placeQuery = FakePlaceQuery(transactionTemplate)
         meetingPlaceRepository = mock()
-        placeLikeRepository = mock()
         searchService = mock()
         createSurveyKeywordService = mock()
         googlePlacesApiProperties = mock {
             on { apiKey } doReturn "fake-api-key"
         }
+        redisTemplate = mock()
+        setOps = mock()
+        whenever(redisTemplate.opsForSet()).thenReturn(setOps)
 
         service = ExecutePlaceSearchService(
             placeQuery = placeQuery,
-            meetingPlaceRepository = meetingPlaceRepository,
-            placeLikeRepository = placeLikeRepository,
             searchService = searchService,
             createSurveyKeywordService = createSurveyKeywordService,
             googlePlacesApiProperties = googlePlacesApiProperties,
-            coroutineDispatchers = coroutineDispatchers
+            coroutineDispatchers = coroutineDispatchers,
+            redisTemplate = redisTemplate
         )
 
         searchService.stub {
@@ -80,9 +81,6 @@ class ExecutePlaceSearchServiceTest {
             }
         }
 
-        placeLikeRepository.stub {
-            onBlocking { findByMeetingPlaceIds(any()) }.doReturn(emptyList())
-        }
     }
 
     @Test
