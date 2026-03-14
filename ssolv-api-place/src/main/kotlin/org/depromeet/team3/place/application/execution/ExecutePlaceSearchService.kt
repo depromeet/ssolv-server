@@ -78,14 +78,13 @@ class ExecutePlaceSearchService(
         supervisorScope {
         // DB 저장된 결과 확인 (Automatic 검색 + meetingId 있을 때만)
         val storedResult = if (plan is PlaceSearchPlan.Automatic && request.meetingId != null) {
-            searchService.find(request.meetingId)
+            searchService.find(request.meetingId, request.userId)
         } else null
         
-        // 저장된 결과가 있으면 좋아요 정보만 업데이트해서 반환
+        // 저장된 결과가 있으면 반환 (MeetingPlaceSearchService.find에서 이미 좋아요 정보를 결합함)
         if (storedResult != null && request.meetingId != null) {
             logger.debug("저장된 검색 결과 사용 - meetingId=${request.meetingId}, places=${storedResult.items.size}개")
-            val updatedItems = updateLikesForStoredItems(storedResult.items, request.meetingId, request.userId)
-            return@supervisorScope PlacesSearchResponse(updatedItems)
+            return@supervisorScope storedResult
         }
         
         // 저장된 결과 없음 -> 새로 검색
@@ -178,42 +177,33 @@ class ExecutePlaceSearchService(
             }.getOrNull()
         }
 
-        // 정렬 우선순위:
-        // 자동 검색(가중치 있음): (설문가중치 * 100) + (ln(좋아요+1) * 50) 점수 → 좋아요 순
-        // 사용자가 좋아요 누른 항목은 추가 부스트 적용
-        val sortedItems = when {
-            placeWeightByDbId.isNotEmpty() -> {
-                val scoreByPlaceId = items.associate { item ->
-                    val weight = placeWeightByDbId[item.placeId] ?: 0.0
-                    val likeScore = if (item.likeCount > 0) ln(item.likeCount.toDouble() + 1) * likeScoreMultiplier else 0.0
-                    val userLikedBoost = if (item.isLiked) 100.0 else 0.0
-                    val combinedScore = weight * weightScoreMultiplier + likeScore + userLikedBoost
-                    item.placeId to combinedScore
-                }
-
-                items.sortedWith(
-                    compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
-                        .thenByDescending { it.likeCount }
-                )
-            }
-
-            else -> items.sortedWith(
-                compareByDescending<PlacesSearchResponse.PlaceItem> { it.isLiked }
-                    .thenByDescending { it.likeCount }
-            )
+        // 정렬 및 점수 산출
+        val scoreByPlaceId = items.associate { item ->
+            val weight = placeWeightByDbId[item.placeId] ?: 0.0
+            val weightScore = weight * weightScoreMultiplier
+            // 초기 적재 시점에는 기존 저장된 좋아요 정보를 반영하여 점수 산출 (이후 추가 좋아요는 ZINCRBY로 실시간 반영)
+            val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
+            val combinedScore = weightScore + likeScore
+            item.placeId to combinedScore
         }
+
+        val sortedItems = items.sortedWith(
+            compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
+                .thenByDescending { it.likeCount }
+        )
 
         val finalItems = sortedItems.take(totalFetchSize)
         val response = PlacesSearchResponse(finalItems)
         
-        // DB에 검색 결과 저장 (meetingId가 있을 때만)
+        // Redis에 검색 결과 및 점수 저장 (meetingId가 있을 때만)
         if (request.meetingId != null && finalItems.isNotEmpty()) {
-            searchService.save(request.meetingId, response)
+            searchService.save(request.meetingId, response, scoreByPlaceId)
         }
 
         response
         }
     }
+
 
     private fun hasPhoto(item: PlacesSearchResponse.PlaceItem): Boolean =
         item.photos?.isNullOrEmpty() == false

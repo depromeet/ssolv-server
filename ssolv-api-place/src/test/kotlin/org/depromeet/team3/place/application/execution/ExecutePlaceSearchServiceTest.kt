@@ -70,7 +70,7 @@ class ExecutePlaceSearchServiceTest {
         )
 
         searchService.stub {
-            onBlocking { find(any()) }.doReturn(null)
+            onBlocking { find(any(), anyOrNull()) }.doReturn(null)
         }
 
         meetingPlaceRepository.stub {
@@ -129,7 +129,7 @@ class ExecutePlaceSearchServiceTest {
             )
 
             searchService.stub {
-                onBlocking { find(1L) }.doReturn(
+                onBlocking { find(eq(1L), anyOrNull()) }.doReturn(
                     org.depromeet.team3.place.dto.response.PlacesSearchResponse(
                         items = listOf(storedItem1, storedItem2)
                     )

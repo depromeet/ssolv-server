@@ -28,57 +28,69 @@ class MeetingPlaceSearchService(
 
     private val MEETING_KEY_PREFIX = "meeting:places:"
     private val PLACE_KEY_PREFIX = "place:details:"
+    private val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
 
     /**
-     * 검색 결과 저장 (Redis 기반)
+     * 검색 결과 저장 (Redis 기반 - ZSET 및 개별 상세정보 캐싱)
      */
-    suspend fun save(meetingId: Long, result: PlacesSearchResponse) = withContext(coroutineDispatchers.VT) {
+    suspend fun save(
+        meetingId: Long, 
+        result: PlacesSearchResponse,
+        scores: Map<Long, Double> = emptyMap()
+    ) = withContext(coroutineDispatchers.VT) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
-        // 1. 기존 모임 결과 지우고 새로 저장
+        // 1. 기존 모임 결과 지우고 새로 저장 (ZSET)
         redisTemplate.delete(meetingKey)
-        val placeIds = result.items.map { it.placeId.toString() }
         
-        if (placeIds.isNotEmpty()) {
-            redisTemplate.opsForList().rightPushAll(meetingKey, *placeIds.toTypedArray())
-            redisTemplate.expire(meetingKey, 7, TimeUnit.DAYS) // 모임 검색 결과 리스트는 적당한 기간 만료
+        if (result.items.isNotEmpty()) {
+            result.items.forEach { item ->
+                val score = scores[item.placeId] ?: 0.0
+                redisTemplate.opsForZSet().add(meetingKey, item.placeId.toString(), score)
+            }
+            redisTemplate.expire(meetingKey, 7, TimeUnit.DAYS)
         }
 
-        // 2. 장소별 상세정보 캐싱 (실시간 데이터인 좋아요 0으로 초기화하여 저장)
+        // 2. 장소별 상세정보 캐싱 (상세 정보 원본만 저장, 좋아요 정보는 조회 시점에 Redis Set에서 결합)
         result.items.forEach { item ->
             val placeKey = "$PLACE_KEY_PREFIX${item.placeId}"
-            val itemToCache = item.copy(likeCount = 0, isLiked = false) // 캐시에는 좋아요 상태를 포함하지 않음
+            // 캐시에는 좋아요 상태를 포함하지 않고 원본 정보만 저장 (나중에 MGET 후 결합)
+            val itemToCache = item.copy(likeCount = 0, isLiked = false)
             val json = objectMapper.writeValueAsString(itemToCache)
-            redisTemplate.opsForValue().set(placeKey, json, 30, TimeUnit.DAYS) // 구글 API 약관: 30일
+            redisTemplate.opsForValue().set(placeKey, json, 30, TimeUnit.DAYS)
         }
     }
 
     /**
-     * 검색 결과 조회 (Redis 기반 MGET 최적화)
+     * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
-    suspend fun find(meetingId: Long): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
+    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
-        val placeIds = redisTemplate.opsForList().range(meetingKey, 0, -1)
+        
+        // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기
+        val placeIds = redisTemplate.opsForZSet().reverseRange(meetingKey, 0, 9)
         
         if (placeIds.isNullOrEmpty()) {
             return@withContext null
         }
 
+        // 2. 장소 상세 정보 (Global Cache) 일괄 조회
         val placeKeys = placeIds.map { "$PLACE_KEY_PREFIX$it" }
         val cachedJsons = redisTemplate.opsForValue().multiGet(placeKeys) ?: return@withContext null
 
         val items = mutableListOf<PlacesSearchResponse.PlaceItem>()
-        val missingPlaceIds = mutableListOf<Long>()
         val missingIndices = mutableListOf<Int>()
+        val missingPlaceIds = mutableListOf<Long>()
 
         for (i in placeIds.indices) {
             val json = cachedJsons[i]
             if (!json.isNullOrBlank()) {
                 items.add(objectMapper.readValue(json, PlacesSearchResponse.PlaceItem::class.java))
             } else {
-                missingPlaceIds.add(placeIds[i].toLong())
+                val dbId = placeIds.elementAt(i).toLong()
+                missingPlaceIds.add(dbId)
                 missingIndices.add(i)
-                // 나중에 채워넣을 플레이스홀더 추가
+                // Placeholder
                 items.add(PlacesSearchResponse.PlaceItem(
                     placeId = -1L, name = "", address = "", rating = null, userRatingsTotal = null,
                     openNow = null, photos = null, link = "", weekdayText = null, topReview = null,
@@ -87,16 +99,15 @@ class MeetingPlaceSearchService(
             }
         }
 
-        // 3. 누락된 캐시 복원 (Cache Miss) - 30일이 지난 데이터거나 서버 재시작으로 지워진 경우
+        // 3. Cache Miss 복구
         if (missingPlaceIds.isNotEmpty()) {
-            val missingEntities = placeQuery.findByIds(missingPlaceIds)
-            val missingEntityMap = missingEntities.associateBy { it.id }
+            val entities = placeQuery.findByIds(missingPlaceIds)
+            val entityMap = entities.associateBy { it.id }
 
-            for ((listIdx, dbId) in missingPlaceIds.withIndex()) {
-                val entity = missingEntityMap[dbId]
+            for ((idxInMissing, dbId) in missingPlaceIds.withIndex()) {
+                val entity = entityMap[dbId]
                 if (entity != null) {
-                    val placeKey = "$PLACE_KEY_PREFIX$dbId"
-                    val recoveredItem = PlacesSearchResponse.PlaceItem(
+                    val recovered = PlacesSearchResponse.PlaceItem(
                         placeId = entity.id!!,
                         name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
                         address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
@@ -112,37 +123,37 @@ class MeetingPlaceSearchService(
                             val reviewRating = entity.topReviewRating
                             val reviewText = entity.topReviewText
                             if (reviewRating != null && reviewText != null) {
-                                PlacesSearchResponse.PlaceItem.Review(
-                                    rating = reviewRating.toInt(),
-                                    text = reviewText
-                                )
+                                PlacesSearchResponse.PlaceItem.Review(rating = reviewRating.toInt(), text = reviewText)
                             } else null
                         },
                         priceRange = null,
                         addressDescriptor = entity.addressDescriptor?.let { desc ->
-                            PlacesSearchResponse.PlaceItem.AddressDescriptor(
-                                description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc)
-                            )
+                            PlacesSearchResponse.PlaceItem.AddressDescriptor(description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
                         }
                     )
-                    
-                    val actualIdx = missingIndices[listIdx]
-                    items[actualIdx] = recoveredItem
-
-                    // 복원한 항목 다시 캐시에 저장 (30일 TTL 갱신)
-                    val json = objectMapper.writeValueAsString(recoveredItem)
-                    redisTemplate.opsForValue().set(placeKey, json, 30, TimeUnit.DAYS)
+                    items[missingIndices[idxInMissing]] = recovered
+                    redisTemplate.opsForValue().set("$PLACE_KEY_PREFIX$dbId", objectMapper.writeValueAsString(recovered), 30, TimeUnit.DAYS)
                 }
             }
         }
-        
-        // 데이터 정합성 실패로 남은 dummy 항목 제거 (안전 장치)
-        val finalItems = items.filter { it.placeId != -1L }
-        
-        if (finalItems.isEmpty()) {
-            return@withContext null
+
+        // 4. 실시간 좋아요 정보 결합 (Redis Set: SCARD, SISMEMBER)
+        // 성능 최적화를 위해 파이프라인이나 리포지토리 확장이 필요할 수 있으나, 여기서는 직접 조회
+        val finalItems = items.filter { it.placeId != -1L }.map { item ->
+            val likeKey = String.format(LIKE_KEY_TEMPLATE, meetingId, item.placeId)
+            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
+            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) ?: false else false
+            
+            item.copy(
+                likeCount = likeCount.toInt(),
+                isLiked = isLiked
+            )
         }
 
+        if (finalItems.isEmpty()) return@withContext null
         PlacesSearchResponse(finalItems)
     }
+
+    fun getLikeKey(meetingId: Long, placeId: Long): String = String.format(LIKE_KEY_TEMPLATE, meetingId, placeId)
+    fun getMeetingKey(meetingId: Long): String = "$MEETING_KEY_PREFIX$meetingId"
 }
