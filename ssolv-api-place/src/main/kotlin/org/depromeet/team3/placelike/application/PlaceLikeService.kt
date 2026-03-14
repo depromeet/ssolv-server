@@ -4,8 +4,8 @@ import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
-import java.util.concurrent.TimeUnit
 
 @Service
 class PlaceLikeService(
@@ -15,33 +15,51 @@ class PlaceLikeService(
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
-    private val likeScoreMultiplier = 50.0 // ExecutePlaceSearchService와 동일한 가치 부여
+    private val likeScoreMultiplier = 50.0
+
+    private val toggleScript = DefaultRedisScript("""
+        local likeKey = KEYS[1]
+        local meetingKey = KEYS[2]
+        local userId = ARGV[1]
+        local placeId = ARGV[2]
+        local bonus = tonumber(ARGV[3])
+
+        local added = redis.call('SADD', likeKey, userId)
+        local isLiked = 0
+        local scoreDelta = 0
+
+        if added == 1 then
+            isLiked = 1
+            scoreDelta = bonus
+        else
+            redis.call('SREM', likeKey, userId)
+            isLiked = 0
+            scoreDelta = -bonus
+        end
+
+        redis.call('ZINCRBY', meetingKey, scoreDelta, placeId)
+        redis.call('EXPIRE', likeKey, 2592000) -- 30 days
+        
+        local count = redis.call('SCARD', likeKey)
+        return {isLiked, count}
+    """.trimIndent(), List::class.java)
 
     suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
-        logger.debug("Toggle Like Request (Redis Only) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
+        logger.debug("Toggle Like Request (Atomic Lua) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
         
         val likeKey = searchService.getLikeKey(meetingId, placeId)
         val meetingKey = searchService.getMeetingKey(meetingId)
         
-        // Redis Set에 유저 추가/삭제 (Atomic)
-        val isNewLike = redisTemplate.opsForSet().add(likeKey, userId.toString()) ?: 0L
-        val isLiked: Boolean
-        
-        if (isNewLike > 0) {
-            // 새로 좋아요를 누름
-            isLiked = true
-            // ZSET 점수 증가
-            redisTemplate.opsForZSet().incrementScore(meetingKey, placeId.toString(), likeScoreMultiplier)
-            redisTemplate.expire(likeKey, 30, TimeUnit.DAYS)
-        } else {
-            // 이미 좋아요가 있음 -> 취소
-            redisTemplate.opsForSet().remove(likeKey, userId.toString())
-            isLiked = false
-            // ZSET 점수 감소
-            redisTemplate.opsForZSet().incrementScore(meetingKey, placeId.toString(), -likeScoreMultiplier)
-        }
+        val result = redisTemplate.execute(
+            toggleScript,
+            listOf(likeKey, meetingKey),
+            userId.toString(),
+            placeId.toString(),
+            likeScoreMultiplier.toString()
+        ) as List<*>
 
-        val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
+        val isLiked = (result[0] as Long) == 1L
+        val likeCount = result[1] as Long
 
         PlaceLikeResult(
             isLiked = isLiked,

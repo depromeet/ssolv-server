@@ -9,9 +9,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
-import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.data.redis.core.ZSetOperations
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.mockito.Mockito.lenient
@@ -23,9 +21,6 @@ class PlaceLikeServiceTest {
     private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var redisTemplate: StringRedisTemplate
     private lateinit var searchService: MeetingPlaceSearchService
-
-    private lateinit var setOps: SetOperations<String, String>
-    private lateinit var zSetOps: ZSetOperations<String, String>
 
     private lateinit var service: PlaceLikeService
 
@@ -40,11 +35,6 @@ class PlaceLikeServiceTest {
             on { getMeetingKey(any()) } doAnswer { "meeting:places:${it.arguments[0]}" }
         }
 
-        setOps = mock()
-        zSetOps = mock()
-        whenever(redisTemplate.opsForSet()).thenReturn(setOps)
-        whenever(redisTemplate.opsForZSet()).thenReturn(zSetOps)
-
         service = PlaceLikeService(
             coroutineDispatchers = coroutineDispatchers,
             redisTemplate = redisTemplate,
@@ -53,16 +43,21 @@ class PlaceLikeServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요 토글 - 신규 좋아요 시 Redis Set 추가 및 ZSET 점수 증가 (DB 동기화 없음)")
-    fun `신규 좋아요 시 Redis SADD 및 ZINCRBY가 호출된다`() = runTest {
+    @DisplayName("좋아요 토글 - 신규 좋아요 시 Lua 스크립트를 호출한다")
+    fun `신규 좋아요 시 Lua 스크립트를 호출한다`() = runTest {
         // given
         val meetingId = 1L
         val userId = 99L
         val placeId = 101L
         
-        // SADD 성공 (신규 추가)
-        whenever(setOps.add(any(), any())).thenReturn(1L)
-        whenever(setOps.size(any())).thenReturn(1L)
+        // Lua return: [isLiked(1), likeCount(1)]
+        whenever(redisTemplate.execute(
+            any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
+            any<List<String>>(),
+            any<String>(),
+            any<String>(),
+            any<String>()
+        )).thenReturn(listOf(1L, 1L))
 
         // when
         val result = service.toggle(meetingId, userId, placeId)
@@ -71,22 +66,31 @@ class PlaceLikeServiceTest {
         assertThat(result.isLiked).isTrue()
         assertThat(result.likeCount).isEqualTo(1)
         
-        verify(setOps).add("meeting:1:place:101:likes", "99")
-        verify(zSetOps).incrementScore("meeting:places:1", "101", 50.0)
+        verify(redisTemplate).execute(
+            any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
+            eq(listOf("meeting:1:place:101:likes", "meeting:places:1")),
+            eq("99"),
+            eq("101"),
+            eq("50.0")
+        )
     }
 
     @Test
-    @DisplayName("좋아요 토글 - 좋아요 취소 시 Redis Set 삭제 및 ZSET 점수 감소 (DB 동기화 없음)")
-    fun `좋아요 취소 시 Redis SREM 및 ZINCRBY(마이너스)가 호출된다`() = runTest {
+    @DisplayName("좋아요 토글 - 좋아요 취소 시 Lua 스크립트 결과가 반영된다")
+    fun `좋아요 취소 시 Lua 스크립트 결과 반영`() = runTest {
         // given
         val meetingId = 1L
         val userId = 99L
         val placeId = 101L
         
-        // SADD 실패 (이미 존재함)
-        whenever(setOps.add(any(), any())).thenReturn(0L)
-        whenever(setOps.remove(any(), any())).thenReturn(1L)
-        whenever(setOps.size(any())).thenReturn(0L)
+        // Lua return: [isLiked(0), likeCount(0)]
+        whenever(redisTemplate.execute(
+            any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
+            any<List<String>>(),
+            any<String>(),
+            any<String>(),
+            any<String>()
+        )).thenReturn(listOf(0L, 0L))
 
         // when
         val result = service.toggle(meetingId, userId, placeId)
@@ -94,8 +98,5 @@ class PlaceLikeServiceTest {
         // then
         assertThat(result.isLiked).isFalse()
         assertThat(result.likeCount).isEqualTo(0)
-        
-        verify(setOps).remove("meeting:1:place:101:likes", "99")
-        verify(zSetOps).incrementScore("meeting:places:1", "101", -50.0)
     }
 }   
