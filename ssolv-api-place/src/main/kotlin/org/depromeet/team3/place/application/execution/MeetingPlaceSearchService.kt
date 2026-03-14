@@ -1,85 +1,159 @@
 package org.depromeet.team3.place.application.execution
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
-import org.depromeet.team3.meeting.MeetingRepository
-import org.depromeet.team3.meeting.exception.MeetingException
-import org.depromeet.team3.meetingplacesearch.MeetingPlaceSearchEntity
-import org.depromeet.team3.meetingplacesearch.MeetingPlaceSearchRepository
+import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
-import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
 
 /**
- * 모임별 장소 검색 결과를 DB에 저장/조회
+ * 모임별 장소 검색 결과를 Redis에 저장/조회
  * 
- * - 검색 결과 전체를 JSON으로 저장
- * - 재요청 시 JSON 역직렬화 후 좋아요만 업데이트
+ * - 검색 결과 중 장소 상세 정보를 개별적으로 캐싱 (place:details:{id}, TTL 30일)
+ * - 모임에는 검색된 장소의 ID만 저장 (meeting:places:{meetingId}, ZSET 형태 혹은 List)
+ * - 재요청 시 Redis에서 10개의 상세 정보를 한번에 가져오고, 누락된 건만 재조회
  */
 @Service
 class MeetingPlaceSearchService(
-    private val repository: MeetingPlaceSearchRepository,
-    private val meetingRepository: MeetingRepository,
+    private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
-    private val transactionTemplate: TransactionTemplate,
+    private val placeQuery: PlaceQuery,
+    private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
+    private val MEETING_KEY_PREFIX = "meeting:places:"
+    private val PLACE_KEY_PREFIX = "place:details:"
+    private val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
+
     /**
-     * 검색 결과 저장
+     * 검색 결과 저장 (Redis 기반 - ZSET 및 개별 상세정보 캐싱)
      */
-    suspend fun save(meetingId: Long, result: PlacesSearchResponse) = withContext(coroutineDispatchers.VT) {
-        transactionTemplate.execute {
-            runBlocking {
-                val meeting = meetingRepository.findById(meetingId)
-                    ?: throw MeetingException(
-                        ErrorCode.MEETING_NOT_FOUND,
-                        mapOf("meetingId" to meetingId),
-                        "Meeting not found: $meetingId"
-                    )
-                
-                val endAt = meeting.endAt
-                    ?: throw MeetingException(
-                        ErrorCode.INVALID_END_TIME,
-                        mapOf("meetingId" to meetingId),
-                        "Meeting endAt is null: $meetingId"
-                    )
-                
-                // expiresAt = endAt + 6시간
-                val expiresAt = endAt.plusHours(6)
-                
-                // 기존 데이터 삭제
-                repository.findByMeetingId(meetingId)?.let { existing ->
-                    repository.delete(existing)
-                }
-                
-                // 새로 저장
-                val entity = MeetingPlaceSearchEntity(
-                    meetingId = meetingId,
-                    searchResultJson = objectMapper.writeValueAsString(result),
-                    expiresAt = expiresAt
-                )
-                repository.save(entity)
+    suspend fun save(
+        meetingId: Long, 
+        result: PlacesSearchResponse,
+        scores: Map<Long, Double> = emptyMap()
+    ) = withContext(coroutineDispatchers.VT) {
+        val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
+        
+        // 1. 기존 모임 결과 지우고 새로 저장 (ZSET)
+        redisTemplate.delete(meetingKey)
+        
+        if (result.items.isNotEmpty()) {
+            result.items.forEach { item ->
+                val score = scores[item.placeId] ?: 0.0
+                redisTemplate.opsForZSet().add(meetingKey, item.placeId.toString(), score)
             }
+            redisTemplate.expire(meetingKey, 7, TimeUnit.DAYS)
+        }
+
+        // 2. 장소별 상세정보 캐싱 (상세 정보 원본만 저장, 좋아요 정보는 조회 시점에 Redis Set에서 결합)
+        result.items.forEach { item ->
+            val placeKey = "$PLACE_KEY_PREFIX${item.placeId}"
+            // 캐시에는 좋아요 상태를 포함하지 않고 원본 정보만 저장 (나중에 MGET 후 결합)
+            val itemToCache = item.copy(likeCount = 0, isLiked = false)
+            val json = objectMapper.writeValueAsString(itemToCache)
+            redisTemplate.opsForValue().set(placeKey, json, 30, TimeUnit.DAYS)
         }
     }
 
     /**
-     * 검색 결과 조회
+     * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
-    suspend fun find(meetingId: Long): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
-        val entity = repository.findByMeetingId(meetingId) ?: return@withContext null
+    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
+        val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
-        // 만료 확인
-        if (entity.expiresAt.isBefore(LocalDateTime.now())) {
+        // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기
+        val placeIds = redisTemplate.opsForZSet().reverseRange(meetingKey, 0, 9)
+        
+        if (placeIds.isNullOrEmpty()) {
             return@withContext null
         }
-        
-        objectMapper.readValue<PlacesSearchResponse>(entity.searchResultJson)
+
+        // 2. 장소 상세 정보 (Global Cache) 일괄 조회
+        val placeKeys = placeIds.map { "$PLACE_KEY_PREFIX$it" }
+        val cachedJsons = redisTemplate.opsForValue().multiGet(placeKeys) ?: return@withContext null
+
+        val items = mutableListOf<PlacesSearchResponse.PlaceItem>()
+        val missingIndices = mutableListOf<Int>()
+        val missingPlaceIds = mutableListOf<Long>()
+
+        for (i in placeIds.indices) {
+            val json = cachedJsons[i]
+            if (!json.isNullOrBlank()) {
+                items.add(objectMapper.readValue(json, PlacesSearchResponse.PlaceItem::class.java))
+            } else {
+                val dbId = placeIds.elementAt(i).toLong()
+                missingPlaceIds.add(dbId)
+                missingIndices.add(i)
+                // Placeholder
+                items.add(PlacesSearchResponse.PlaceItem(
+                    placeId = -1L, name = "", address = "", rating = null, userRatingsTotal = null,
+                    openNow = null, photos = null, link = "", weekdayText = null, topReview = null,
+                    priceRange = null, addressDescriptor = null
+                ))
+            }
+        }
+
+        // 3. Cache Miss 복구
+        if (missingPlaceIds.isNotEmpty()) {
+            val entities = placeQuery.findByIds(missingPlaceIds)
+            val entityMap = entities.associateBy { it.id }
+
+            for ((idxInMissing, dbId) in missingPlaceIds.withIndex()) {
+                val entity = entityMap[dbId]
+                if (entity != null) {
+                    val recovered = PlacesSearchResponse.PlaceItem(
+                        placeId = entity.id!!,
+                        name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
+                        address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
+                        rating = entity.rating,
+                        userRatingsTotal = entity.userRatingsTotal,
+                        openNow = entity.openNow,
+                        photos = entity.photos?.split(",")?.map { photoName ->
+                            "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
+                        },
+                        link = entity.link ?: "",
+                        weekdayText = entity.weekdayText?.split("\n"),
+                        topReview = run {
+                            val reviewRating = entity.topReviewRating
+                            val reviewText = entity.topReviewText
+                            if (reviewRating != null && reviewText != null) {
+                                PlacesSearchResponse.PlaceItem.Review(rating = reviewRating.toInt(), text = reviewText)
+                            } else null
+                        },
+                        priceRange = null,
+                        addressDescriptor = entity.addressDescriptor?.let { desc ->
+                            PlacesSearchResponse.PlaceItem.AddressDescriptor(description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
+                        }
+                    )
+                    items[missingIndices[idxInMissing]] = recovered
+                    redisTemplate.opsForValue().set("$PLACE_KEY_PREFIX$dbId", objectMapper.writeValueAsString(recovered), 30, TimeUnit.DAYS)
+                }
+            }
+        }
+
+        // 4. 실시간 좋아요 정보 결합 (Redis Set: SCARD, SISMEMBER)
+        // 성능 최적화를 위해 파이프라인이나 리포지토리 확장이 필요할 수 있으나, 여기서는 직접 조회
+        val finalItems = items.filter { it.placeId != -1L }.map { item ->
+            val likeKey = String.format(LIKE_KEY_TEMPLATE, meetingId, item.placeId)
+            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
+            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) ?: false else false
+            
+            item.copy(
+                likeCount = likeCount.toInt(),
+                isLiked = isLiked
+            )
+        }
+
+        if (finalItems.isEmpty()) return@withContext null
+        PlacesSearchResponse(finalItems)
     }
+
+    fun getLikeKey(meetingId: Long, placeId: Long): String = String.format(LIKE_KEY_TEMPLATE, meetingId, placeId)
+    fun getMeetingKey(meetingId: Long): String = "$MEETING_KEY_PREFIX$meetingId"
 }

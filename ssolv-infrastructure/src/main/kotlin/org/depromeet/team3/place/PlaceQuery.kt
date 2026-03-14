@@ -79,4 +79,9 @@ class PlaceQuery(
     suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> {
         return placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
     }
+
+    // DB ID 목록으로 Place 엔티티 조회
+    suspend fun findByIds(ids: List<Long>): List<PlaceEntity> {
+        return placeJpaRepository.findAllById(ids)
+    }
 }

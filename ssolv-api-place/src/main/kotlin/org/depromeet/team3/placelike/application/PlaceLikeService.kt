@@ -1,71 +1,70 @@
 package org.depromeet.team3.placelike.application
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.CoroutineDispatchers
-import org.depromeet.team3.meetingplace.MeetingPlaceRepository
-import org.depromeet.team3.meetingplace.exception.MeetingPlaceException
-import org.depromeet.team3.placelike.PlaceLike
-import org.depromeet.team3.placelike.PlaceLikeRepository
-import org.springframework.dao.DataIntegrityViolationException
+import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class PlaceLikeService(
-    private val meetingPlaceRepository: MeetingPlaceRepository,
-    private val placeLikeRepository: PlaceLikeRepository,
-    private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
+    private val coroutineDispatchers: CoroutineDispatchers,
+    private val redisTemplate: StringRedisTemplate,
+    private val searchService: MeetingPlaceSearchService
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
+    private val likeScoreMultiplier = 50.0
+
+    private val toggleScript = DefaultRedisScript("""
+        local likeKey = KEYS[1]
+        local meetingKey = KEYS[2]
+        local userId = ARGV[1]
+        local placeId = ARGV[2]
+        local bonus = tonumber(ARGV[3])
+
+        local added = redis.call('SADD', likeKey, userId)
+        local isLiked = 0
+        local scoreDelta = 0
+
+        if added == 1 then
+            isLiked = 1
+            scoreDelta = bonus
+        else
+            redis.call('SREM', likeKey, userId)
+            isLiked = 0
+            scoreDelta = -bonus
+        end
+
+        redis.call('ZINCRBY', meetingKey, scoreDelta, placeId)
+        redis.call('EXPIRE', likeKey, 2592000) -- 30 days
+        
+        local count = redis.call('SCARD', likeKey)
+        return {isLiked, count}
+    """.trimIndent(), List::class.java)
 
     suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
-        logger.debug("Toggle Like Request - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
-        transactionTemplate.execute {
-            runBlocking {
-                val meetingPlaceId = getMeetingPlaceId(meetingId, placeId)
-                val isLiked = toggleLikeStatus(meetingPlaceId, userId)
-                val likeCount = placeLikeRepository.countByMeetingPlaceId(meetingPlaceId).toInt()
-                logger.debug("Toggle result - isLiked: {}, likeCount: {}", isLiked, likeCount)
+        logger.debug("Toggle Like Request (Atomic Lua) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
+        
+        val likeKey = searchService.getLikeKey(meetingId, placeId)
+        val meetingKey = searchService.getMeetingKey(meetingId)
+        
+        val result = redisTemplate.execute(
+            toggleScript,
+            listOf(likeKey, meetingKey),
+            userId.toString(),
+            placeId.toString(),
+            likeScoreMultiplier.toString()
+        ) as List<*>
 
-                PlaceLikeResult(
-                    isLiked = isLiked,
-                    likeCount = likeCount
-                )
-            }
-        }!!
-    }
+        val isLiked = (result[0] as Number).toLong() == 1L
+        val likeCount = (result[1] as Number).toLong()
 
-    private suspend fun getMeetingPlaceId(meetingId: Long, placeId: Long): Long {
-        return meetingPlaceRepository.findIdByMeetingIdAndPlaceId(meetingId, placeId)
-            ?: throw MeetingPlaceException(
-                errorCode = ErrorCode.MEETING_PLACE_NOT_FOUND,
-                detail = mapOf("meetingId" to meetingId, "placeId" to placeId)
-            )
-    }
-
-    private suspend fun toggleLikeStatus(meetingPlaceId: Long, userId: Long): Boolean {
-        val existing = placeLikeRepository.findByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
-        return if (existing != null) {
-            placeLikeRepository.deleteByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
-            false
-        } else {
-            try {
-                placeLikeRepository.save(
-                    PlaceLike(
-                        meetingPlaceId = meetingPlaceId,
-                        userId = userId
-                    )
-                )
-                true
-            } catch (e: DataIntegrityViolationException) {
-                placeLikeRepository.deleteByMeetingPlaceIdAndUserId(meetingPlaceId, userId)
-                false
-            }
-        }
+        PlaceLikeResult(
+            isLiked = isLiked,
+            likeCount = likeCount.toInt()
+        )
     }
 
     data class PlaceLikeResult(
