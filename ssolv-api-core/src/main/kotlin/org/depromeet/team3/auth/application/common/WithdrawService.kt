@@ -50,8 +50,10 @@ class WithdrawService(
             validateHostedMeetings(userId)
 
             // 2. 로컬 데이터 소프트 딜리트
-            entity.email = "withdrawn_${System.currentTimeMillis()}_${entity.email}"
-            entity.socialId = "withdrawn_${System.currentTimeMillis()}_${entity.socialId}"
+            val currentTime = System.currentTimeMillis()
+            entity.nickname = "withdrawn_${currentTime}_${entity.nickname}"
+            entity.email = "withdrawn_${currentTime}_${entity.email}"
+            entity.socialId = "withdrawn_${currentTime}_${entity.socialId}"
             entity.deletedAt = LocalDateTime.now()
             userJpaRepository.save(entity)
 

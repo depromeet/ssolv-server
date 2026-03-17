@@ -38,7 +38,15 @@ class CreateAppleUserService(
             val userEntity: UserEntity = if (existingBySocial != null) {
                 existingBySocial
             } else {
-                // 2. 이메일 중복 확인
+                // 2. 닉네임 중복 확인
+                userJpaRepository.findByNickname(nickname)?.let {
+                    throw AuthException(
+                        errorCode = ErrorCode.DUPLICATE_NICKNAME,
+                        detail = mapOf("nickname" to nickname)
+                    )
+                }
+
+                // 3. 이메일 중복 확인
                 if (email != null) {
                     userJpaRepository.findByEmail(email)?.let {
                         throw AuthException(

@@ -75,3 +75,5 @@ ssolv-batch/src/test/kotlin/org/depromeet/team3/batch/benchmark/
 
 # Test infrastructure
 docker-compose.test-dev.yml
+# Benchmark
+ssolv-api-place/src/main/kotlin/org/depromeet/team3/place/controller/BenchmarkController.kt

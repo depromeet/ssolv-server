@@ -12,7 +12,8 @@ import java.time.LocalDateTime
 @Table(
     name = "tb_users",
     uniqueConstraints = [
-        UniqueConstraint(name = "uk_user_social", columnNames = ["provider", "social_id"])
+        UniqueConstraint(name = "uk_user_social", columnNames = ["provider", "social_id"]),
+        UniqueConstraint(name = "uk_user_nickname", columnNames = ["nickname"])
     ]
 )
 class UserEntity(
@@ -36,7 +37,7 @@ class UserEntity(
     @Column(name = "refresh_token")
     var refreshToken: String? = null,
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     var nickname: String = "",
 
     @Column(name = "notification_enabled", nullable = false)
