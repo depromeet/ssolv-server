@@ -71,6 +71,11 @@ class PlaceLikeServiceTest {
             eq("101"),
             eq("50.0")
         )
+
+        verify(redisTemplate).convertAndSend(
+            eq("meeting:updates:1"),
+            eq("101")
+        )
     }
 
     @Test

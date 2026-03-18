@@ -61,6 +61,12 @@ class PlaceLikeService(
         val isLiked = (result[0] as Number).toLong() == 1L
         val likeCount = (result[1] as Number).toLong()
 
+        // 랭킹 변동 알림 발행 (Pub/Sub)
+        // 채널명: meeting:updates:{meetingId}
+        // 메시지: 업데이트된 장소 ID
+        val channel = "meeting:updates:$meetingId"
+        redisTemplate.convertAndSend(channel, placeId.toString())
+
         PlaceLikeResult(
             isLiked = isLiked,
             likeCount = likeCount.toInt()
