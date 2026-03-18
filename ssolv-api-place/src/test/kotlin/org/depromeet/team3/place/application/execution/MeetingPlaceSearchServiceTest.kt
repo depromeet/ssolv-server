@@ -39,6 +39,7 @@ class MeetingPlaceSearchServiceTest {
     private lateinit var zSetOps: ZSetOperations<String, String>
     private lateinit var valueOps: ValueOperations<String, String>
     private lateinit var setOps: SetOperations<String, String>
+    private lateinit var meetingQuery: org.depromeet.team3.meeting.MeetingQuery
 
     private lateinit var service: MeetingPlaceSearchService
 
@@ -52,6 +53,7 @@ class MeetingPlaceSearchServiceTest {
         }
         coroutineDispatchers = mock()
         lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        meetingQuery = mock()
 
         zSetOps = mock()
         valueOps = mock()
@@ -66,7 +68,8 @@ class MeetingPlaceSearchServiceTest {
             objectMapper = objectMapper,
             placeQuery = placeQuery,
             googlePlacesApiProperties = googlePlacesApiProperties,
-            coroutineDispatchers = coroutineDispatchers
+            coroutineDispatchers = coroutineDispatchers,
+            meetingQuery = meetingQuery
         )
     }
 

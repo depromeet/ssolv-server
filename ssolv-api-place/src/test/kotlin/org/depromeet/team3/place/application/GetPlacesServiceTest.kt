@@ -1,6 +1,7 @@
 package org.depromeet.team3.place.application
 
-import kotlinx.coroutines.runBlocking
+import io.mockk.*
+import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.place.application.facade.GetPlacesService
 import org.depromeet.team3.place.application.plan.CreatePlaceSearchPlanService
@@ -11,23 +12,19 @@ import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.Mock
-import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.*
+import io.mockk.junit5.MockKExtension
 
-@ExtendWith(MockitoExtension::class)
+@ExtendWith(MockKExtension::class)
 class GetPlacesServiceTest {
 
-    @Mock
     private lateinit var createPlaceSearchPlanService: CreatePlaceSearchPlanService
-
-    @Mock
     private lateinit var executePlaceSearchService: ExecutePlaceSearchService
-    
     private lateinit var getPlacesService: GetPlacesService
 
     @BeforeEach
     fun setUp() {
+        createPlaceSearchPlanService = mockk(relaxed = true)
+        executePlaceSearchService = mockk(relaxed = true)
         getPlacesService = GetPlacesService(
             createPlaceSearchPlanService = createPlaceSearchPlanService,
             executePlaceSearchService = executePlaceSearchService
@@ -35,29 +32,28 @@ class GetPlacesServiceTest {
     }
 
     @Test
-    fun `자동 검색 시 계획 수립 후 실행 서비스 호출`() {
-        runBlocking {
-            // given
-            val request = PlacesSearchRequest(meetingId = 1L)
-            val plan = PlaceSearchPlan.Automatic(
-                keywords = emptyList(),
-                stationCoordinates = null,
-                fallbackKeyword = "잠실 맛집"
-            )
-            val expectedResponse = PlacesSearchResponse(emptyList())
+    fun `should call execute service after plan is created in automatic search`() = runTest {
+        // given
+        val request = PlacesSearchRequest(meetingId = 1L)
+        val plan = PlaceSearchPlan.Automatic(
+            keywords = emptyList(),
+            stationCoordinates = null,
+            fallbackKeyword = "Jamsil"
+        )
+        val expectedResponse = PlacesSearchResponse(emptyList())
 
-            whenever(createPlaceSearchPlanService.resolve(request))
-                .thenReturn(plan)
-            whenever(executePlaceSearchService.search(request, plan))
-                .thenReturn(expectedResponse)
+        coEvery { createPlaceSearchPlanService.resolve(any()) } returns plan
+        coEvery { executePlaceSearchService.search(any(), any(), any()) } returns expectedResponse
 
-            // when
-            val response = getPlacesService.textSearch(request)
+        // when
+        val response = getPlacesService.textSearch(request)
 
-            // then
-            assertThat(response).isEqualTo(expectedResponse)
-            verify(createPlaceSearchPlanService).resolve(request)
-            verify(executePlaceSearchService).search(request, plan)
+        // then
+        assertThat(response).isEqualTo(expectedResponse)
+        
+        coVerify {
+            createPlaceSearchPlanService.resolve(request)
+            executePlaceSearchService.search(eq(request), eq(plan), any())
         }
     }
 }

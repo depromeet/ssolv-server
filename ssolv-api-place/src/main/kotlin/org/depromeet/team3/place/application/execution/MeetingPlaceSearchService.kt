@@ -4,10 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,12 +27,14 @@ class MeetingPlaceSearchService(
     private val objectMapper: ObjectMapper,
     private val placeQuery: PlaceQuery,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
-    private val coroutineDispatchers: CoroutineDispatchers
+    private val coroutineDispatchers: CoroutineDispatchers,
+    private val meetingQuery: MeetingQuery
 ) {
 
     private val MEETING_KEY_PREFIX = "meeting:places:"
     private val PLACE_KEY_PREFIX = "place:details:"
     private val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
+    private val DEFAULT_TTL = 604800L // 7 days fallback
 
     /**
      * 검색 결과 저장 (Redis 기반 - ZSET 및 개별 상세정보 캐싱)
@@ -44,11 +50,14 @@ class MeetingPlaceSearchService(
         redisTemplate.delete(meetingKey)
         
         if (result.items.isNotEmpty()) {
+            val ttlSeconds = calculateMeetingTTL(meetingId)
             result.items.forEach { item ->
                 val score = scores[item.placeId] ?: 0.0
                 redisTemplate.opsForZSet().add(meetingKey, item.placeId.toString(), score)
             }
-            redisTemplate.expire(meetingKey, 7, TimeUnit.DAYS)
+            if (ttlSeconds > 0) {
+                redisTemplate.expire(meetingKey, ttlSeconds, TimeUnit.SECONDS)
+            }
         }
 
         // 2. 장소별 상세정보 캐싱 (상세 정보 원본만 저장, 좋아요 정보는 조회 시점에 Redis Set에서 결합)
@@ -61,13 +70,27 @@ class MeetingPlaceSearchService(
         }
     }
 
+    private suspend fun calculateMeetingTTL(meetingId: Long): Long {
+        val meeting = meetingQuery.findById(meetingId)
+        val endAt = meeting?.endAt ?: return DEFAULT_TTL
+        
+        val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
+        val duration = Duration.between(now, endAt)
+        
+        return if (duration.isNegative || duration.isZero) {
+            3600L // 1 hour fallback
+        } else {
+            duration.seconds
+        }
+    }
+
     /**
      * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
     suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
-        // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기
+        // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기...
         val placeIds = redisTemplate.opsForZSet().reverseRange(meetingKey, 0, 9)
         
         if (placeIds.isNullOrEmpty()) {

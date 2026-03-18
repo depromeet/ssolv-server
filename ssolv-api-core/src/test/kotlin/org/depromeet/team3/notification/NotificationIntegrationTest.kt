@@ -15,6 +15,7 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.meeting.application.MeetingExpirationListener
+import org.depromeet.team3.placelike.application.PlaceLikeSseService
 import org.depromeet.team3.station.StationJpaRepository
 import org.depromeet.team3.survey.SurveyJpaRepository
 import org.depromeet.team3.survey.application.CreateSurveyService
@@ -51,6 +52,9 @@ class NotificationIntegrationTest {
     @MockkBean
     private lateinit var meetingExpirationListener: MeetingExpirationListener
 
+    @MockkBean
+    private lateinit var placeLikeSseService: PlaceLikeSseService
+
     @Autowired
     private lateinit var meetingJpaRepository: MeetingJpaRepository
 
@@ -78,7 +82,7 @@ class NotificationIntegrationTest {
         // 1. 초기 데이터 설정 (7명 모임)
         val participantsCount = 7
         val users = (1..participantsCount).map { i ->
-            userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "user-$i", email = "user$i@test.com"))
+            userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "user-$i", email = "user$i@test.com", nickname = "user-$i"))
         }
         
         // 모든 유저의 디바이스 토큰 등록
@@ -198,7 +202,7 @@ class NotificationIntegrationTest {
         // setup
         
         // 유저 정보는 DB에 있어야 하므로 저장
-        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "fail-user", email = "fail@test.com"))
+        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "fail-user", email = "fail@test.com", nickname = "fail-user"))
         deviceTokenJpaRepository.save(org.depromeet.team3.notification.infrastructure.DeviceTokenEntity(
             userId = user.id!!, fcmToken = "fail-token", platform = org.depromeet.team3.notification.domain.DevicePlatform.IOS
         ))
@@ -237,7 +241,7 @@ class NotificationIntegrationTest {
     @DisplayName("토큰이 없는 유저의 경우 알림 발송은 스킵되지만 메시지는 정상 처리(ACK)되어야 한다")
     fun `토큰 부재 시 알림 스킵 및 정상 ACK 처리 검증`() = runBlocking {
         // setup: 토큰을 등록하지 않은 유저 생성
-        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "no-token-user", email = "notoken@test.com"))
+        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "no-token-user", email = "notoken@test.com", nickname = "no-token-user"))
         val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
         val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(id = null, hostUser = user, station = station))
 
