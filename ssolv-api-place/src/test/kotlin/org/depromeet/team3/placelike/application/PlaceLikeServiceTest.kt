@@ -100,4 +100,32 @@ class PlaceLikeServiceTest {
         assertThat(result.isLiked).isFalse()
         assertThat(result.likeCount).isEqualTo(0)
     }
+
+    @Test
+    @DisplayName("좋아요 토글 - Pub/Sub 알림 발행 실패 시에도 좋아요 토글 결과는 정상 반환된다")
+    fun `Pub Sub 알림 발행 실패 시에도 좋아요 토글 결과는 정상 반환된다`() = runTest {
+        // given
+        val meetingId = 1L
+        val userId = 99L
+        val placeId = 101L
+        
+        whenever(redisTemplate.execute(
+            any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
+            any<List<String>>(),
+            any(), any(), any()
+        )).thenReturn(listOf(1L, 1L))
+
+        // Pub/Sub 발행 시 예외 발생 시뮬레이션
+        whenever(redisTemplate.convertAndSend(any(), any()))
+            .thenThrow(RuntimeException("Redis Connection Error"))
+
+        // when
+        val result = service.toggle(meetingId, userId, placeId)
+
+        // then: 예외가 밖으로 전파되지 않고 정상 결과 반환
+        assertThat(result.isLiked).isTrue()
+        assertThat(result.likeCount).isEqualTo(1)
+        
+        verify(redisTemplate).convertAndSend(any(), any())
+    }
 }   

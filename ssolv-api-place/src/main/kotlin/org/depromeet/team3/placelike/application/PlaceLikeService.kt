@@ -38,7 +38,7 @@ class PlaceLikeService(
         end
 
         redis.call('ZINCRBY', meetingKey, scoreDelta, placeId)
-        redis.call('EXPIRE', likeKey, 2592000) -- 30 days
+        redis.call('EXPIRE', likeKey, 604800) -- 7 days (match meeting lifespan)
         
         local count = redis.call('SCARD', likeKey)
         return {isLiked, count}
@@ -65,7 +65,11 @@ class PlaceLikeService(
         // 채널명: meeting:updates:{meetingId}
         // 메시지: 업데이트된 장소 ID
         val channel = "meeting:updates:$meetingId"
-        redisTemplate.convertAndSend(channel, placeId.toString())
+        runCatching {
+            redisTemplate.convertAndSend(channel, placeId.toString())
+        }.onFailure { ex ->
+            logger.warn("Failed to publish place update - meetingId: {}, placeId: {}", meetingId, placeId, ex)
+        }
 
         PlaceLikeResult(
             isLiked = isLiked,

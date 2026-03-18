@@ -1,6 +1,7 @@
 package org.depromeet.team3.placelike.application
 
 import org.slf4j.LoggerFactory
+import org.springframework.data.redis.connection.MessageListener
 import org.springframework.data.redis.listener.ChannelTopic
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.stereotype.Service
@@ -13,49 +14,60 @@ class PlaceLikeSseService(
     private val redisMessageListenerContainer: RedisMessageListenerContainer
 ) {
     private val logger = LoggerFactory.getLogger(PlaceLikeSseService::class.java)
+    
+    // meetingId -> active SseEmitters
     private val emitters = ConcurrentHashMap<Long, MutableList<SseEmitter>>()
+    
+    // meetingId -> MessageListener (to enable removal later)
+    private val activeListeners = ConcurrentHashMap<Long, MessageListener>()
 
     fun subscribe(meetingId: Long): SseEmitter {
-        val emitter = SseEmitter(60 * 1000L * 5)    // 5 minutes timeout
+        val emitter = SseEmitter(60 * 1000L * 5) // 5 minutes timeout
         val meetingEmitters = emitters.computeIfAbsent(meetingId) { CopyOnWriteArrayList() }
         meetingEmitters.add(emitter)
 
-        emitter.onCompletion { meetingEmitters.remove(emitter) }
-        emitter.onTimeout { 
-            emitter.complete()
-            meetingEmitters.remove(emitter) 
-        }
-        emitter.onError { 
-            emitter.complete()
-            meetingEmitters.remove(emitter) 
-        }
+        emitter.onCompletion { cleanup(meetingId, emitter) }
+        emitter.onTimeout { cleanup(meetingId, emitter) }
+        emitter.onError { cleanup(meetingId, emitter) }
 
         // 초기 연결 시 더미 데이터 전송 (연결 끊김 방지)
         try {
             emitter.send(SseEmitter.event().name("connect").data("connected"))
         } catch (e: Exception) {
-            meetingEmitters.remove(emitter)
+            cleanup(meetingId, emitter)
         }
 
-        // Redis 리스너 등록 (이미 등록되어 있다면 생략하게 디자인 하거나, 공통 리스너 사용)
         ensureRedisListener(meetingId)
 
         return emitter
     }
 
-    private val activeTopics = ConcurrentHashMap.newKeySet<Long>()
-
     private fun ensureRedisListener(meetingId: Long) {
-        if (activeTopics.add(meetingId)) {
+        activeListeners.computeIfAbsent(meetingId) {
+            val listener = MessageListener { message, _ ->
+                val placeId = String(message.body)
+                broadcast(meetingId, placeId)
+            }
             val topic = ChannelTopic("meeting:updates:$meetingId")
-            redisMessageListenerContainer.addMessageListener(
-                { message, _ ->
-                    val placeId = String(message.body)
-                    broadcast(meetingId, placeId)
-                },
-                topic
-            )
+            redisMessageListenerContainer.addMessageListener(listener, topic)
             logger.debug("Subscribed to Redis topic for meeting: {}", meetingId)
+            listener
+        }
+    }
+
+    private fun cleanup(meetingId: Long, emitter: SseEmitter) {
+        val meetingEmitters = emitters[meetingId] ?: return
+        meetingEmitters.remove(emitter)
+        
+        if (meetingEmitters.isEmpty()) {
+            emitters.remove(meetingId)
+            
+            // 더 이상 구독자가 없으면 Redis 리스너 해제
+            activeListeners.remove(meetingId)?.let { listener ->
+                val topic = ChannelTopic("meeting:updates:$meetingId")
+                redisMessageListenerContainer.removeMessageListener(listener, topic)
+                logger.debug("Unsubscribed from Redis topic for meeting: {}", meetingId)
+            }
         }
     }
 
@@ -75,7 +87,7 @@ class PlaceLikeSseService(
         }
 
         if (deadEmitters.isNotEmpty()) {
-            meetingEmitters.removeAll(deadEmitters)
+            deadEmitters.forEach { cleanup(meetingId, it) }
         }
     }
 }
