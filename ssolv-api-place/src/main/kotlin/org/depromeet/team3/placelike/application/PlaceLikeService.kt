@@ -62,8 +62,11 @@ class PlaceLikeService(
         val likeKey = searchService.getLikeKey(meetingId, placeId)
         val meetingKey = searchService.getMeetingKey(meetingId)
         
-        // Dynamic TTL calculation based on meeting endAt
-        val ttlSeconds = calculateMeetingTTL(meetingId)
+        // 기존 TTL 우선 재사용, 만료되었거나 없을 때만 DB fallback
+        var ttlSeconds = redisTemplate.getExpire(meetingKey)
+        if (ttlSeconds <= 0L) {
+            ttlSeconds = calculateMeetingTTL(meetingId)
+        }
         
         val result = redisTemplate.execute(
             toggleScript,
