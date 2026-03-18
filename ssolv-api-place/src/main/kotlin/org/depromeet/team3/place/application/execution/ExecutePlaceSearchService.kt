@@ -70,95 +70,98 @@ class ExecutePlaceSearchService(
     suspend fun search(
         request: PlacesSearchRequest,
         plan: PlaceSearchPlan,
-        dispatcher: CoroutineDispatcher = coroutineDispatchers.VT
-    ): PlacesSearchResponse = withContext(MDCContext() + dispatcher) {
-        supervisorScope {
-            val storedResult = if (plan is PlaceSearchPlan.Automatic && request.meetingId != null) {
-                searchService.find(request.meetingId, request.userId)
-            } else null
+        dispatcher: CoroutineDispatcher? = null
+    ): PlacesSearchResponse {
+        val actualDispatcher = dispatcher ?: coroutineDispatchers.VT
+        return withContext(MDCContext() + actualDispatcher) {
+            supervisorScope {
+                val storedResult = if (plan is PlaceSearchPlan.Automatic && request.meetingId != null) {
+                    searchService.find(request.meetingId, request.userId)
+                } else null
 
-            if (storedResult != null && request.meetingId != null) {
-                return@supervisorScope storedResult
+                if (storedResult != null && request.meetingId != null) {
+                    return@supervisorScope storedResult
+                }
+
+                val automaticPlan = plan as? PlaceSearchPlan.Automatic
+                    ?: throw IllegalArgumentException("PlaceSearchPlan.Automatic만 지원합니다.")
+
+                val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
+
+                val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
+                val placesToProcess = candidatePlaces
+                    .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
+                    .take(totalFetchSize + photoFallbackBuffer)
+
+                val savedEntities = withContext(actualDispatcher) {
+                    placeQuery.savePlacesFromTextSearch(placesToProcess)
+                }
+
+                if (savedEntities.isEmpty()) return@supervisorScope PlacesSearchResponse(emptyList())
+
+                val googlePlaceIds = savedEntities.mapNotNull { it.googlePlaceId }
+                val placeIdMap = getPlaceStringIdToDbIdMap(googlePlaceIds, actualDispatcher)
+                val placeWeightByDbId = keywordResult.placeWeights.mapNotNull { (googleId, weight) ->
+                    placeIdMap[googleId]?.let { it to weight }
+                }.toMap()
+
+                val likesMap = if (request.meetingId != null) {
+                    buildLikesMapFromRedis(request.meetingId, savedEntities, request.userId)
+                } else emptyMap()
+
+                val items = savedEntities.mapNotNull { entity ->
+                    runCatching {
+                        val placeDbId = entity.id ?: return@mapNotNull null
+                        val likeInfo = likesMap[placeDbId] ?: PlaceLikeInfo(0, false)
+
+                        PlacesSearchResponse.PlaceItem(
+                            placeId = placeDbId,
+                            name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
+                            address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
+                            rating = entity.rating,
+                            userRatingsTotal = entity.userRatingsTotal,
+                            openNow = entity.openNow,
+                            photos = entity.photos?.split(",")?.map { photoName ->
+                                "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
+                            },
+                            link = entity.link ?: "",
+                            weekdayText = entity.weekdayText?.split("\n"),
+                            topReview = entity.topReviewRating?.let { rating ->
+                                entity.topReviewText?.let { text ->
+                                    PlacesSearchResponse.PlaceItem.Review(rating.toInt(), text)
+                                }
+                            },
+                            priceRange = null,
+                            addressDescriptor = entity.addressDescriptor?.let { desc ->
+                                PlacesSearchResponse.PlaceItem.AddressDescriptor(org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
+                            },
+                            likeCount = likeInfo.likeCount,
+                            isLiked = likeInfo.isLiked
+                        )
+                    }.getOrNull()
+                }
+
+                val scoreByPlaceId = items.associate { item ->
+                    val weight = placeWeightByDbId[item.placeId] ?: 0.0
+                    val weightScore = weight * weightScoreMultiplier
+                    val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
+                    item.placeId to (weightScore + likeScore)
+                }
+
+                val sortedItems = items.sortedWith(
+                    compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
+                        .thenByDescending { it.likeCount }
+                )
+
+                val finalItems = sortedItems.take(totalFetchSize)
+                val response = PlacesSearchResponse(finalItems)
+
+                if (request.meetingId != null && finalItems.isNotEmpty()) {
+                    searchService.save(request.meetingId, response, scoreByPlaceId)
+                }
+
+                response
             }
-
-            val automaticPlan = plan as? PlaceSearchPlan.Automatic
-                ?: throw IllegalArgumentException("PlaceSearchPlan.Automatic만 지원합니다.")
-
-            val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, dispatcher)
-
-            val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
-            val placesToProcess = candidatePlaces
-                .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
-                .take(totalFetchSize + photoFallbackBuffer)
-
-            val savedEntities = withContext(dispatcher) {
-                placeQuery.savePlacesFromTextSearch(placesToProcess)
-            }
-
-            if (savedEntities.isEmpty()) return@supervisorScope PlacesSearchResponse(emptyList())
-
-            val googlePlaceIds = savedEntities.mapNotNull { it.googlePlaceId }
-            val placeIdMap = getPlaceStringIdToDbIdMap(googlePlaceIds, dispatcher)
-            val placeWeightByDbId = keywordResult.placeWeights.mapNotNull { (googleId, weight) ->
-                placeIdMap[googleId]?.let { it to weight }
-            }.toMap()
-
-            val likesMap = if (request.meetingId != null) {
-                buildLikesMapFromRedis(request.meetingId, savedEntities, request.userId)
-            } else emptyMap()
-
-            val items = savedEntities.mapNotNull { entity ->
-                runCatching {
-                    val placeDbId = entity.id ?: return@mapNotNull null
-                    val likeInfo = likesMap[placeDbId] ?: PlaceLikeInfo(0, false)
-
-                    PlacesSearchResponse.PlaceItem(
-                        placeId = placeDbId,
-                        name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
-                        address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
-                        rating = entity.rating,
-                        userRatingsTotal = entity.userRatingsTotal,
-                        openNow = entity.openNow,
-                        photos = entity.photos?.split(",")?.map { photoName ->
-                            "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
-                        },
-                        link = entity.link ?: "",
-                        weekdayText = entity.weekdayText?.split("\n"),
-                        topReview = entity.topReviewRating?.let { rating ->
-                            entity.topReviewText?.let { text ->
-                                PlacesSearchResponse.PlaceItem.Review(rating.toInt(), text)
-                            }
-                        },
-                        priceRange = null,
-                        addressDescriptor = entity.addressDescriptor?.let { desc ->
-                            PlacesSearchResponse.PlaceItem.AddressDescriptor(org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
-                        },
-                        likeCount = likeInfo.likeCount,
-                        isLiked = likeInfo.isLiked
-                    )
-                }.getOrNull()
-            }
-
-            val scoreByPlaceId = items.associate { item ->
-                val weight = placeWeightByDbId[item.placeId] ?: 0.0
-                val weightScore = weight * weightScoreMultiplier
-                val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
-                item.placeId to (weightScore + likeScore)
-            }
-
-            val sortedItems = items.sortedWith(
-                compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
-                    .thenByDescending { it.likeCount }
-            )
-
-            val finalItems = sortedItems.take(totalFetchSize)
-            val response = PlacesSearchResponse(finalItems)
-
-            if (request.meetingId != null && finalItems.isNotEmpty()) {
-                searchService.save(request.meetingId, response, scoreByPlaceId)
-            }
-
-            response
         }
     }
 

@@ -21,6 +21,7 @@ class PlaceLikeServiceTest {
     private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var redisTemplate: StringRedisTemplate
     private lateinit var searchService: MeetingPlaceSearchService
+    private lateinit var meetingQuery: org.depromeet.team3.meeting.MeetingQuery
 
     private lateinit var service: PlaceLikeService
 
@@ -34,11 +35,13 @@ class PlaceLikeServiceTest {
             on { getLikeKey(any(), any()) } doAnswer { "meeting:${it.arguments[0]}:place:${it.arguments[1]}:likes" }
             on { getMeetingKey(any()) } doAnswer { "meeting:places:${it.arguments[0]}" }
         }
+        meetingQuery = mock()
 
         service = PlaceLikeService(
             coroutineDispatchers = coroutineDispatchers,
             redisTemplate = redisTemplate,
-            searchService = searchService
+            searchService = searchService,
+            meetingQuery = meetingQuery
         )
     }
 
@@ -54,7 +57,7 @@ class PlaceLikeServiceTest {
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any()
+            any(), any(), any(), any()
         )).thenReturn(listOf(1L, 1L))
 
         // when
@@ -69,7 +72,8 @@ class PlaceLikeServiceTest {
             eq(listOf("meeting:1:place:101:likes", "meeting:places:1")),
             eq("99"),
             eq("101"),
-            eq("50.0")
+            eq("50.0"),
+            any() // TTL
         )
 
         verify(redisTemplate).convertAndSend(
@@ -90,7 +94,7 @@ class PlaceLikeServiceTest {
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any()
+            any(), any(), any(), any()
         )).thenReturn(listOf(0L, 0L))
 
         // when
@@ -112,7 +116,7 @@ class PlaceLikeServiceTest {
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any()
+            any(), any(), any(), any()
         )).thenReturn(listOf(1L, 1L))
 
         // Pub/Sub 발행 시 예외 발생 시뮬레이션

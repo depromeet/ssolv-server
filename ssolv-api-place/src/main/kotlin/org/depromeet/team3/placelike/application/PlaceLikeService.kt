@@ -3,19 +3,25 @@ package org.depromeet.team3.placelike.application
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
+import org.depromeet.team3.meeting.MeetingQuery
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Service
 class PlaceLikeService(
     private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
-    private val searchService: MeetingPlaceSearchService
+    private val searchService: MeetingPlaceSearchService,
+    private val meetingQuery: MeetingQuery
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
     private val likeScoreMultiplier = 50.0
+    private val DEFAULT_TTL = 604800L // 7 days fallback
 
     private val toggleScript = DefaultRedisScript("""
         local likeKey = KEYS[1]
@@ -23,6 +29,7 @@ class PlaceLikeService(
         local userId = ARGV[1]
         local placeId = ARGV[2]
         local bonus = tonumber(ARGV[3])
+        local ttl = tonumber(ARGV[4])
 
         local added = redis.call('SADD', likeKey, userId)
         local isLiked = 0
@@ -38,7 +45,10 @@ class PlaceLikeService(
         end
 
         redis.call('ZINCRBY', meetingKey, scoreDelta, placeId)
-        redis.call('EXPIRE', likeKey, 604800) -- 7 days (match meeting lifespan)
+        if ttl > 0 then
+            redis.call('EXPIRE', likeKey, ttl)
+            redis.call('EXPIRE', meetingKey, ttl)
+        end
         
         local count = redis.call('SCARD', likeKey)
         return {isLiked, count}
@@ -50,12 +60,16 @@ class PlaceLikeService(
         val likeKey = searchService.getLikeKey(meetingId, placeId)
         val meetingKey = searchService.getMeetingKey(meetingId)
         
+        // Dynamic TTL calculation based on meeting endAt
+        val ttlSeconds = calculateMeetingTTL(meetingId)
+        
         val result = redisTemplate.execute(
             toggleScript,
             listOf(likeKey, meetingKey),
             userId.toString(),
             placeId.toString(),
-            likeScoreMultiplier.toString()
+            likeScoreMultiplier.toString(),
+            ttlSeconds.toString()
         ) as List<*>
 
         val isLiked = (result[0] as Number).toLong() == 1L
@@ -75,6 +89,20 @@ class PlaceLikeService(
             isLiked = isLiked,
             likeCount = likeCount.toInt()
         )
+    }
+
+    private suspend fun calculateMeetingTTL(meetingId: Long): Long {
+        val meeting = meetingQuery.findById(meetingId)
+        val endAt = meeting?.endAt ?: return DEFAULT_TTL
+        
+        val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
+        val duration = Duration.between(now, endAt)
+        
+        return if (duration.isNegative || duration.isZero) {
+            3600L // 1 hour if already expired but somehow still active
+        } else {
+            duration.seconds
+        }
     }
 
     data class PlaceLikeResult(
