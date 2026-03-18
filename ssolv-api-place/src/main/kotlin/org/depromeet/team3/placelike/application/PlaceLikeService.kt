@@ -1,5 +1,6 @@
 package org.depromeet.team3.placelike.application
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
@@ -16,7 +17,8 @@ class PlaceLikeService(
     private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
     private val searchService: MeetingPlaceSearchService,
-    private val meetingQuery: MeetingQuery
+    private val meetingQuery: MeetingQuery,
+    private val objectMapper: ObjectMapper
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
@@ -80,7 +82,8 @@ class PlaceLikeService(
         // 메시지: 업데이트된 장소 ID
         val channel = "meeting:updates:$meetingId"
         runCatching {
-            redisTemplate.convertAndSend(channel, placeId.toString())
+            val eventPayload = mapOf("placeId" to placeId, "likeCount" to likeCount)
+            redisTemplate.convertAndSend(channel, objectMapper.writeValueAsString(eventPayload))
         }.onFailure { ex ->
             logger.warn("Failed to publish place update - meetingId: {}, placeId: {}", meetingId, placeId, ex)
         }

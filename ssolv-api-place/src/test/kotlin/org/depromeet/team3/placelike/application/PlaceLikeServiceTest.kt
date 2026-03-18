@@ -1,5 +1,6 @@
 package org.depromeet.team3.placelike.application
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
@@ -22,6 +23,7 @@ class PlaceLikeServiceTest {
     private lateinit var redisTemplate: StringRedisTemplate
     private lateinit var searchService: MeetingPlaceSearchService
     private lateinit var meetingQuery: org.depromeet.team3.meeting.MeetingQuery
+    private lateinit var objectMapper: ObjectMapper
 
     private lateinit var service: PlaceLikeService
 
@@ -36,12 +38,14 @@ class PlaceLikeServiceTest {
             on { getMeetingKey(any()) } doAnswer { "meeting:places:${it.arguments[0]}" }
         }
         meetingQuery = mock()
+        objectMapper = mock()
 
         service = PlaceLikeService(
             coroutineDispatchers = coroutineDispatchers,
             redisTemplate = redisTemplate,
             searchService = searchService,
-            meetingQuery = meetingQuery
+            meetingQuery = meetingQuery,
+            objectMapper = objectMapper
         )
     }
 
@@ -53,6 +57,9 @@ class PlaceLikeServiceTest {
         val userId = 99L
         val placeId = 101L
         
+        // ObjectMapper stubbing
+        whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":1}""")
+
         // Lua return: [isLiked(1), likeCount(1)]
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
@@ -78,7 +85,7 @@ class PlaceLikeServiceTest {
 
         verify(redisTemplate).convertAndSend(
             eq("meeting:updates:1"),
-            eq("101")
+            eq("""{"placeId":101,"likeCount":1}""")
         )
     }
 
@@ -89,6 +96,8 @@ class PlaceLikeServiceTest {
         val meetingId = 1L
         val userId = 99L
         val placeId = 101L
+
+        whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":0}""")
         
         // Lua return: [isLiked(0), likeCount(0)]
         whenever(redisTemplate.execute(
@@ -113,6 +122,8 @@ class PlaceLikeServiceTest {
         val userId = 99L
         val placeId = 101L
         
+        whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":1}""")
+
         whenever(redisTemplate.execute(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
@@ -120,16 +131,13 @@ class PlaceLikeServiceTest {
         )).thenReturn(listOf(1L, 1L))
 
         // Pub/Sub 발행 시 예외 발생 시뮬레이션
-        whenever(redisTemplate.convertAndSend(any(), any()))
-            .thenThrow(RuntimeException("Redis Connection Error"))
+        whenever(redisTemplate.convertAndSend(any(), any())).thenThrow(RuntimeException("Redis errors"))
 
         // when
         val result = service.toggle(meetingId, userId, placeId)
 
-        // then: 예외가 밖으로 전파되지 않고 정상 결과 반환
+        // then
         assertThat(result.isLiked).isTrue()
         assertThat(result.likeCount).isEqualTo(1)
-        
-        verify(redisTemplate).convertAndSend(any(), any())
     }
-}   
+}

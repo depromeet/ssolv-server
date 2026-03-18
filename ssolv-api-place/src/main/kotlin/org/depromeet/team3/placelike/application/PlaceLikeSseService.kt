@@ -45,8 +45,8 @@ class PlaceLikeSseService(
     private fun ensureRedisListener(meetingId: Long) {
         activeListeners.computeIfAbsent(meetingId) {
             val listener = MessageListener { message, _ ->
-                val placeId = String(message.body)
-                broadcast(meetingId, placeId)
+                val payload = String(message.body)
+                broadcast(meetingId, payload)
             }
             val topic = ChannelTopic("meeting:updates:$meetingId")
             redisMessageListenerContainer.addMessageListener(listener, topic)
@@ -71,7 +71,7 @@ class PlaceLikeSseService(
         }
     }
 
-    private fun broadcast(meetingId: Long, placeId: String) {
+    private fun broadcast(meetingId: Long, payload: String) {
         val meetingEmitters = emitters[meetingId] ?: return
         val deadEmitters = mutableListOf<SseEmitter>()
 
@@ -79,7 +79,7 @@ class PlaceLikeSseService(
             try {
                 emitter.send(SseEmitter.event()
                     .name("placeUpdate")
-                    .data(placeId)
+                    .data(payload)
                     .id(System.currentTimeMillis().toString()))
             } catch (e: Exception) {
                 deadEmitters.add(emitter)
