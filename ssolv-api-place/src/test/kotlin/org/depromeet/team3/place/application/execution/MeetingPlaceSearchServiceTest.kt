@@ -63,6 +63,15 @@ class MeetingPlaceSearchServiceTest {
         whenever(redisTemplate.opsForValue()).thenReturn(valueOps)
         whenever(redisTemplate.opsForSet()).thenReturn(setOps)
 
+        // Redis Pipeline 모킹: executePipelined 결과를 테스트의 given 절에서 설정한 Mock SetOperations 결과로 시뮬레이션
+        whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>())).thenAnswer { invocation ->
+            val callback = invocation.arguments[0] as org.springframework.data.redis.core.RedisCallback<*>
+            // 테스트 데이터를 직접 반환할 수 없으므로, 테스트 코드에서 given 절을 수정하여 Pipeline 결과를 시뮬레이션하도록 유도하거나
+            // 여기서는 실제 로직이 예상하는 리스트 구조를 반환하도록 설정해야 함
+            // 기본적으로 빈 리스트를 반환하고, 개별 테스트에서 덮어쓰기
+            emptyList<Any>()
+        }
+
         service = MeetingPlaceSearchService(
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
@@ -94,10 +103,9 @@ class MeetingPlaceSearchServiceTest {
         whenever(objectMapper.readValue(json2, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item2)
 
         // 좋아요 정보 모킹 (101: 5개 대기, 205: 유저가 좋아요 누름)
-        whenever(setOps.size("meeting:1:place:101:likes")).thenReturn(5L)
-        whenever(setOps.isMember("meeting:1:place:101:likes", "99")).thenReturn(false)
-        whenever(setOps.size("meeting:1:place:205:likes")).thenReturn(1L)
-        whenever(setOps.isMember("meeting:1:place:205:likes", "99")).thenReturn(true)
+        // Pipeline 결과 시뮬레이션: (SCARD 101, SISMEMBER 101, SCARD 205, SISMEMBER 205)
+        whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>()))
+            .thenReturn(listOf(5L, false, 1L, true))
 
         // when
         val result = service.find(meetingId, userId)
@@ -137,6 +145,10 @@ class MeetingPlaceSearchServiceTest {
         val missingEntity = PlaceEntity(id = 205L, googlePlaceId = "g205", name = "마라탕", address = "강남", rating = 4.8, userRatingsTotal = 20)
         whenever(placeQuery.findByIds(listOf(205L))).thenReturn(listOf(missingEntity))
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":205,"name":"마라탕"}""")
+
+        // 좋아요 정보 모킹 (Pipeline 결과 시뮬레이션: SCARD 101, SCARD 205)
+        whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>()))
+            .thenReturn(listOf(0L, 0L))
 
         // when
         val result = service.find(meetingId)

@@ -1,14 +1,20 @@
 package org.depromeet.team3.place.application.execution
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.slf4j.MDCContext
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
@@ -36,6 +42,8 @@ class ExecutePlaceSearchService(
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
+    private val globalApiSemaphore: Semaphore,
+    private val meterRegistry: MeterRegistry,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -44,6 +52,7 @@ class ExecutePlaceSearchService(
     private val keywordFetchSize = 20
     private val weightScoreMultiplier = 100.0
     private val likeScoreMultiplier = 50.0
+    private val googleApiTimeoutMs = 3000L // 개별 Google API 호출 타임아웃 (3초)
 
     suspend fun execute(meetingId: Long): PlacesSearchResponse {
         val plan = createSurveyKeywordService.generateKeywordPlan(meetingId)
@@ -166,10 +175,24 @@ class ExecutePlaceSearchService(
     }
 
     private suspend fun buildLikesMapFromRedis(meetingId: Long, places: List<PlaceEntity>, userId: Long?): Map<Long, PlaceLikeInfo> {
-        return places.mapNotNull { it.id }.associateWith { placeId ->
-            val likeKey = searchService.getLikeKey(meetingId, placeId)
-            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
-            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) == true else false
+        val placeIds = places.mapNotNull { it.id }
+        if (placeIds.isEmpty()) return emptyMap()
+
+        val pipelineResults = redisTemplate.executePipelined { connection ->
+            placeIds.forEach { placeId ->
+                val likeKey = searchService.getLikeKey(meetingId, placeId).toByteArray()
+                connection.setCommands().sCard(likeKey)
+                if (userId != null) {
+                    connection.setCommands().sIsMember(likeKey, userId.toString().toByteArray())
+                }
+            }
+            null
+        }
+
+        var resIdx = 0
+        return placeIds.associateWith {
+            val likeCount = (pipelineResults[resIdx++] as? Long) ?: 0L
+            val isLiked = if (userId != null) (pipelineResults[resIdx++] as? Boolean) ?: false else false
             PlaceLikeInfo(likeCount.toInt(), isLiked)
         }
     }
@@ -178,18 +201,24 @@ class ExecutePlaceSearchService(
         plan: PlaceSearchPlan.Automatic,
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
-    ): KeywordSearchResult = coroutineScope {
+    ): KeywordSearchResult = supervisorScope {
+        val requestSemaphore = Semaphore(4) // 하나의 요청(모임방)당 동시 Google API 호출을 4개로 제한
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
             async(parentContext + dispatcher) {
                 ensureActive()
                 runCatching {
-                    candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher)
+                    candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                }.onFailure { e ->
+                    // 부모 코루틴 취소(구조화된 동시성)는 삼키지 않고 재전파
+                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                    logger.warn("키워드 [${candidate.keyword}] 검색 중 오류 발생: ${e.message}")
                 }.getOrNull()
             }
         }
 
         val results = deferredResponses.awaitAll().filterNotNull()
+
         val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
 
         val selectedPlaces = mutableListOf<PlacesTextSearchResponse.Place>()
@@ -198,7 +227,6 @@ class ExecutePlaceSearchService(
         val fallbackCandidates = mutableListOf<PlacesTextSearchResponse.Place>()
         val fallbackIds = mutableSetOf<String>()
         val appliedKeywords = mutableSetOf<String>()
-        val fallbackResponses = mutableListOf<Pair<CreateSurveyKeywordService.KeywordCandidate, List<PlacesTextSearchResponse.Place>>>()
 
         results.forEach { appliedKeywords.add(it.first.keyword) }
 
@@ -221,11 +249,15 @@ class ExecutePlaceSearchService(
                 }
             }
             
-            // Fallback keyword logic simplified for brevity but kept functional
+            // Fallback keyword: primary 키워드와 동일하게 예외를 격리하여 전체 검색 실패 방지
             if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
-                val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword!!, plan.stationCoordinates, dispatcher)
-                val fbPlaces = filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
-                fbPlaces.forEach { place ->
+                runCatching {
+                    val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                    filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
+                }.onFailure { e ->
+                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                    logger.warn("Fallback 키워드 [${candidate.fallbackKeyword}] 검색 중 오류 발생: ${e.message}")
+                }.getOrNull()?.forEach { place ->
                     if (usedPlaceIds.contains(place.id)) return@forEach
                     if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
                         selectedPlaces.add(place)
@@ -235,6 +267,12 @@ class ExecutePlaceSearchService(
                     }
                 }
             }
+        }
+
+        // 비즈니스 규칙: API 호출은 성공했지만 필터 결과가 모두 비어있는 경우도 실패 처리
+        if (selectedPlaces.isEmpty() && fallbackCandidates.isEmpty()) {
+            logger.error("모든 키워드 검색 결과가 비어 있습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
+            throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
         }
 
         val finalPlaces = selectedPlaces.sortedWith(
@@ -268,12 +306,64 @@ class ExecutePlaceSearchService(
         return allocations
     }
 
-    private suspend fun fetchPlacesFromGoogle(query: String, stationCoordinates: MeetingQuery.StationCoordinates?, dispatcher: CoroutineDispatcher): PlacesTextSearchResponse {
+    private suspend fun fetchPlacesFromGoogle(
+        query: String,
+        stationCoordinates: MeetingQuery.StationCoordinates?,
+        dispatcher: CoroutineDispatcher,
+        requestSemaphore: Semaphore
+    ): PlacesTextSearchResponse {
         val sanitizedQuery = CreateSurveyKeywordService.normalizeKeyword(query)
         if (sanitizedQuery.isBlank()) throw PlaceSearchException(ErrorCode.PLACE_INVALID_QUERY)
-        return withContext(dispatcher) {
-            placeQuery.textSearch(sanitizedQuery, keywordFetchSize, stationCoordinates?.latitude, stationCoordinates?.longitude, 3000.0)
+
+        /**
+         * 2-tier Semaphore 중첩 적용
+         *
+         * [외부] globalApiSemaphore(15): 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
+         *        모임방이 몇 개 동시에 처리되든, 서버 전체에서 Google API 호출은 항상 15개 이하
+         *
+         * [내부] requestSemaphore(4): 단일 모임방 내 fan-out 제한.
+         *        한 모임방의 키워드가 아무리 많아도, 해당 모임방은 한 번에 4개까지만 호출
+         *
+         * 중첩 순서: 전역(외부) → 모임별(내부)
+         * 이유: 전역 슬롯을 먼저 확보한 뒤 모임별 슬롯을 확보해야
+         *       데드락 없이 항상 일관된 방향으로 락이 획득됨
+         */
+        return globalApiSemaphore.withPermit {
+            requestSemaphore.withPermit {
+                withContext(dispatcher) {
+                    try {
+                        val response = withTimeout(googleApiTimeoutMs) {
+                            placeQuery.textSearch(
+                                sanitizedQuery,
+                                keywordFetchSize,
+                                stationCoordinates?.latitude,
+                                stationCoordinates?.longitude,
+                                3000.0
+                            )
+                        }
+                        recordMetric("success")
+                        response
+                    } catch (e: TimeoutCancellationException) {
+                        recordMetric("timeout")
+                        logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
+                        throw e
+                    } catch (e: PlaceSearchException) {
+                        val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
+                        recordMetric(reason)
+                        logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
+                        throw e
+                    } catch (e: Exception) {
+                        recordMetric("unknown_error")
+                        logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
+                        throw e
+                    }
+                }
+            }
         }
+    }
+
+    private fun recordMetric(result: String) {
+        meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
     }
 
     private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>, dispatcher: CoroutineDispatcher): Map<String, Long> {
