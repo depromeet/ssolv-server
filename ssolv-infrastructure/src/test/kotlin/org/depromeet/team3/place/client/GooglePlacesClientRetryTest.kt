@@ -1,5 +1,5 @@
 package org.depromeet.team3.place.client
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.mockito.Mockito.lenient
@@ -27,13 +26,11 @@ class GooglePlacesClientRetryTest {
 
     private lateinit var restClient: RestClient
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var googlePlacesClient: GooglePlacesClient
 
     @BeforeEach
     fun setUp() {
         restClient = mock()
-        coroutineDispatchers = mock()
         
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
@@ -50,7 +47,7 @@ class GooglePlacesClientRetryTest {
     @Test
     fun `재시도 성공 - 500 에러 후 재시도하여 성공`() {
         runTest {
-            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "맛집"
             val mockResponse = PlacesTextSearchResponse(emptyList())
             
@@ -78,7 +75,7 @@ class GooglePlacesClientRetryTest {
     @Test
     fun `재시도 실패 - 최대 재시도 횟수 초과`() {
         runTest {
-            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "맛집"
             val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
             val requestBodySpec = mock<RestClient.RequestBodySpec>()

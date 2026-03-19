@@ -1,5 +1,5 @@
 package org.depromeet.team3.place.client
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.web.client.RestClient
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.mockito.Mockito.lenient
@@ -25,13 +24,11 @@ class GooglePlacesClientTest {
 
     private lateinit var restClient: RestClient
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var googlePlacesClient: GooglePlacesClient
 
     @BeforeEach
     fun setUp() {
         restClient = mock()
-        coroutineDispatchers = mock()
         
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
@@ -48,7 +45,7 @@ class GooglePlacesClientTest {
     @Test
     fun `텍스트 검색 성공`() {
         runTest {
-            lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher(testScheduler))
+            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "강남역 맛집"
             val mockResponse = PlacesTextSearchResponse(
                 places = listOf(
