@@ -160,20 +160,31 @@ class MeetingPlaceSearchService(
             }
         }
 
-        // 4. 실시간 좋아요 정보 결합 (Redis Set: SCARD, SISMEMBER)
-        // 성능 최적화를 위해 파이프라인이나 리포지토리 확장이 필요할 수 있으나, 여기서는 직접 조회
-        val finalItems = items.filter { it.placeId != -1L }.map { item ->
-            val likeKey = String.format(LIKE_KEY_TEMPLATE, meetingId, item.placeId)
-            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
-            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) ?: false else false
+        // 4. 실시간 좋아요 정보 결합 (Redis Pipeline 사용: N번의 RTT -> 1번의 RTT)
+        val finalItemsToProcess = items.filter { it.placeId != -1L }
+        if (finalItemsToProcess.isEmpty()) return@withContext null
+
+        val pipelineResults = redisTemplate.executePipelined { connection ->
+            finalItemsToProcess.forEach { item ->
+                val likeKey = String.format(LIKE_KEY_TEMPLATE, meetingId, item.placeId).toByteArray()
+                connection.setCommands().sCard(likeKey) // 좋아요 수 조회
+                if (userId != null) {
+                    connection.setCommands().sIsMember(likeKey, userId.toString().toByteArray()) // 내 좋아요 여부 조회
+                }
+            }
+            null
+        }
+
+        var resIdx = 0
+        val finalItems = finalItemsToProcess.map { item ->
+            val likeCount = (pipelineResults[resIdx++] as? Long) ?: 0L
+            val isLiked = if (userId != null) (pipelineResults[resIdx++] as? Boolean) ?: false else false
             
             item.copy(
                 likeCount = likeCount.toInt(),
                 isLiked = isLiked
             )
         }
-
-        if (finalItems.isEmpty()) return@withContext null
         PlacesSearchResponse(finalItems)
     }
 

@@ -181,10 +181,24 @@ class ExecutePlaceSearchService(
     }
 
     private suspend fun buildLikesMapFromRedis(meetingId: Long, places: List<PlaceEntity>, userId: Long?): Map<Long, PlaceLikeInfo> {
-        return places.mapNotNull { it.id }.associateWith { placeId ->
-            val likeKey = searchService.getLikeKey(meetingId, placeId)
-            val likeCount = redisTemplate.opsForSet().size(likeKey) ?: 0L
-            val isLiked = if (userId != null) redisTemplate.opsForSet().isMember(likeKey, userId.toString()) == true else false
+        val placeIds = places.mapNotNull { it.id }
+        if (placeIds.isEmpty()) return emptyMap()
+
+        val pipelineResults = redisTemplate.executePipelined { connection ->
+            placeIds.forEach { placeId ->
+                val likeKey = searchService.getLikeKey(meetingId, placeId).toByteArray()
+                connection.setCommands().sCard(likeKey)
+                if (userId != null) {
+                    connection.setCommands().sIsMember(likeKey, userId.toString().toByteArray())
+                }
+            }
+            null
+        }
+
+        var resIdx = 0
+        return placeIds.associateWith {
+            val likeCount = (pipelineResults[resIdx++] as? Long) ?: 0L
+            val isLiked = if (userId != null) (pipelineResults[resIdx++] as? Boolean) ?: false else false
             PlaceLikeInfo(likeCount.toInt(), isLiked)
         }
     }
