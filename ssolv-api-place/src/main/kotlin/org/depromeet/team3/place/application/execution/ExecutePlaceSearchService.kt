@@ -7,7 +7,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.slf4j.MDCContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
@@ -44,6 +48,19 @@ class ExecutePlaceSearchService(
     private val keywordFetchSize = 20
     private val weightScoreMultiplier = 100.0
     private val likeScoreMultiplier = 50.0
+    private val googleApiTimeoutMs = 3000L // 개별 Google API 호출 타임아웃 (3초)
+
+    /**
+     * [전역 Semaphore] 서버 전체의 Google Places API 동시 호출 수 상한 제어
+     *
+     * Google Places API Rate Limit: 20~50 QPS (초당 최대 호출 수)
+     * 적정 동시 호출 수 = QPS 하한(20) × 평균 응답시간(0.6s) ≈ 12
+     * → 여유분 포함하여 15로 설정
+     *
+     * 역할: 모임방이 다수 동시에 처리되는 상황에서도 서버 전체 QPS가
+     *       Google Rate Limit을 넘지 않도록 서버 레벨에서 보호
+     */
+    private val globalApiSemaphore = Semaphore(15)
 
     suspend fun execute(meetingId: Long): PlacesSearchResponse {
         val plan = createSurveyKeywordService.generateKeywordPlan(meetingId)
@@ -179,12 +196,13 @@ class ExecutePlaceSearchService(
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
     ): KeywordSearchResult = coroutineScope {
+        val requestSemaphore = Semaphore(4) // 하나의 요청(모임방)당 동시 Google API 호출을 4개로 제한
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
             async(parentContext + dispatcher) {
                 ensureActive()
                 runCatching {
-                    candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher)
+                    candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
                 }.getOrNull()
             }
         }
@@ -223,7 +241,7 @@ class ExecutePlaceSearchService(
             
             // Fallback keyword logic simplified for brevity but kept functional
             if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
-                val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword!!, plan.stationCoordinates, dispatcher)
+                val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword!!, plan.stationCoordinates, dispatcher, requestSemaphore)
                 val fbPlaces = filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
                 fbPlaces.forEach { place ->
                     if (usedPlaceIds.contains(place.id)) return@forEach
@@ -268,11 +286,42 @@ class ExecutePlaceSearchService(
         return allocations
     }
 
-    private suspend fun fetchPlacesFromGoogle(query: String, stationCoordinates: MeetingQuery.StationCoordinates?, dispatcher: CoroutineDispatcher): PlacesTextSearchResponse {
+    private suspend fun fetchPlacesFromGoogle(
+        query: String,
+        stationCoordinates: MeetingQuery.StationCoordinates?,
+        dispatcher: CoroutineDispatcher,
+        requestSemaphore: Semaphore
+    ): PlacesTextSearchResponse {
         val sanitizedQuery = CreateSurveyKeywordService.normalizeKeyword(query)
         if (sanitizedQuery.isBlank()) throw PlaceSearchException(ErrorCode.PLACE_INVALID_QUERY)
-        return withContext(dispatcher) {
-            placeQuery.textSearch(sanitizedQuery, keywordFetchSize, stationCoordinates?.latitude, stationCoordinates?.longitude, 3000.0)
+
+        /**
+         * 2-tier Semaphore 중첩 적용
+         *
+         * [외부] globalApiSemaphore(15): 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
+         *        모임방이 몇 개 동시에 처리되든, 서버 전체에서 Google API 호출은 항상 15개 이하
+         *
+         * [내부] requestSemaphore(4): 단일 모임방 내 fan-out 제한.
+         *        한 모임방의 키워드가 아무리 많아도, 해당 모임방은 한 번에 4개까지만 호출
+         *
+         * 중첩 순서: 전역(외부) → 모임별(내부)
+         * 이유: 전역 슬롯을 먼저 확보한 뒤 모임별 슬롯을 확보해야
+         *       데드락 없이 항상 일관된 방향으로 락이 획득됨
+         */
+        return globalApiSemaphore.withPermit {
+            requestSemaphore.withPermit {
+                withContext(dispatcher) {
+                    withTimeout(googleApiTimeoutMs) {
+                        placeQuery.textSearch(
+                            sanitizedQuery,
+                            keywordFetchSize,
+                            stationCoordinates?.latitude,
+                            stationCoordinates?.longitude,
+                            3000.0
+                        )
+                    }
+                }
+            }
         }
     }
 
