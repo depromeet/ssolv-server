@@ -16,9 +16,12 @@ import org.springframework.web.reactive.function.client.awaitBody
 import org.springframework.web.reactive.function.client.awaitBodilessEntity
 import com.fasterxml.jackson.databind.ObjectMapper
 
+import org.springframework.beans.factory.annotation.Qualifier
+
 @Component
 class KakaoOAuthClient(
     private val kakaoProperties: KakaoProperties,
+    @Qualifier("commonWebClient")
     private val webClient: WebClient,
     private val objectMapper: ObjectMapper,
 ) {

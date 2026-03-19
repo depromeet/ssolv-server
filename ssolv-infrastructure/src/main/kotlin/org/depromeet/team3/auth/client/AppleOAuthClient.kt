@@ -24,10 +24,13 @@ import java.security.spec.RSAPublicKeySpec
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+import org.springframework.beans.factory.annotation.Qualifier
+
 @Component
 class AppleOAuthClient(
     private val objectMapper: ObjectMapper,
     private val appleProperties: AppleProperties,
+    @Qualifier("commonWebClient")
     private val webClient: WebClient,
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthClient::class.java)

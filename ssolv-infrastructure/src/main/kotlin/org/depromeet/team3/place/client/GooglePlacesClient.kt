@@ -15,9 +15,12 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
 import kotlin.random.Random
 
+import org.springframework.beans.factory.annotation.Qualifier
+
 @Component
 @ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class GooglePlacesClient(
+    @Qualifier("googlePlacesWebClient")
     private val googlePlacesWebClient: WebClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
 ) {

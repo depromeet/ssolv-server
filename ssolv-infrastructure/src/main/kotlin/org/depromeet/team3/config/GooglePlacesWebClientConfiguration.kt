@@ -14,7 +14,7 @@ class GooglePlacesWebClientConfiguration(
     private val googlePlacesApiProperties: GooglePlacesApiProperties
 ) {
 
-    @Bean
+    @Bean(name = ["googlePlacesWebClient"])
     fun googlePlacesWebClient(builder: WebClient.Builder): WebClient {
         val httpClient = HttpClient.create()
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
