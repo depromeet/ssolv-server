@@ -44,7 +44,6 @@ class UpdateTokenServiceTest {
     
     @BeforeEach
     fun setUp() {
-        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
             callback.doInTransaction(org.mockito.kotlin.mock())
@@ -53,8 +52,7 @@ class UpdateTokenServiceTest {
             userQueryRepository,
             userCommandRepository,
             jwtTokenProvider,
-            transactionTemplate,
-            coroutineDispatchers
+            transactionTemplate
         )
     }
 

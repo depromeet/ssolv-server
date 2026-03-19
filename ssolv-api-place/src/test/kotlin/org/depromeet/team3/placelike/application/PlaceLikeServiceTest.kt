@@ -38,7 +38,6 @@ class PlaceLikeServiceTest {
         objectMapper = mock()
 
         service = PlaceLikeService(
-            coroutineDispatchers = coroutineDispatchers,
             redisTemplate = redisTemplate,
             searchService = searchService,
             meetingQuery = meetingQuery,

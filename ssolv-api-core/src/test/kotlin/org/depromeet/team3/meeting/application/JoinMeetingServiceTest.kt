@@ -44,7 +44,6 @@ class JoinMeetingServiceTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         transactionTemplate = mock()
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
@@ -54,7 +53,6 @@ class JoinMeetingServiceTest {
             meetingRepository,
             meetingAttendeeRepository,
             transactionTemplate,
-            coroutineDispatchers,
             userRepository
         )
     }

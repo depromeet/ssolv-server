@@ -30,7 +30,6 @@ class DeleteSurveyCategoryServiceTest {
 
     @BeforeEach
     fun setUp() {
-        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         transactionTemplate = mock()
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
@@ -38,8 +37,7 @@ class DeleteSurveyCategoryServiceTest {
         }
         deleteSurveyCategoryService = DeleteSurveyCategoryService(
             surveyCategoryJpaRepository,
-            transactionTemplate,
-            coroutineDispatchers
+            transactionTemplate
         )
     }
 

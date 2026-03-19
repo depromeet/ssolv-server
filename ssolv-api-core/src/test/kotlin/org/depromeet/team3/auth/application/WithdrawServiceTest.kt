@@ -38,9 +38,6 @@ class WithdrawServiceTest {
 
     @BeforeEach
     fun setUp() {
-        val coroutineDispatchers = object : CoroutineDispatchers() {
-            override val VT = Dispatchers.Unconfined
-        }
         transactionTemplate = mock()
         // transactionTemplate 결과 리턴 보장 (NPE 방지)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->

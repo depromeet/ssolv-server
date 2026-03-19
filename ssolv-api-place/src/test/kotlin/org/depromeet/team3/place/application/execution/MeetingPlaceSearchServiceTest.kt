@@ -74,7 +74,6 @@ class MeetingPlaceSearchServiceTest {
             objectMapper = objectMapper,
             placeQuery = placeQuery,
             googlePlacesApiProperties = googlePlacesApiProperties,
-            coroutineDispatchers = coroutineDispatchers,
             meetingQuery = meetingQuery
         )
     }

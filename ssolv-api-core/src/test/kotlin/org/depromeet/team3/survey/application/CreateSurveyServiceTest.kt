@@ -54,10 +54,6 @@ class CreateSurveyServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // CoroutineDispatchers: Mock 대신 실명 객체 사용 (NPE 방지)
-        val coroutineDispatchers = object : CoroutineDispatchers() {
-            override val VT = Dispatchers.Unconfined
-        }
         transactionTemplate = mock()
         // transactionTemplate.execute 모킹 (doInTransaction 리턴값 보장)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->

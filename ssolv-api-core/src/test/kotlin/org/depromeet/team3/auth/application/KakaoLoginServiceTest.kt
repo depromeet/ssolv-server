@@ -37,16 +37,13 @@ class KakaoLoginServiceTest {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeEach
     fun setUp() {
-        whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher())
-        
         val kakaoProperties = KakaoProperties().apply {
             redirectUri = "http://localhost:8080/login/oauth2/code/kakao"
         }
         kakaoLoginService = KakaoLoginService(
             kakaoOAuthClient, 
             createKakaoUserService,
-            kakaoProperties,
-            coroutineDispatchers
+            kakaoProperties
         )
 
         kakaoProfile = TestDataFactory.createKakaoProfile()

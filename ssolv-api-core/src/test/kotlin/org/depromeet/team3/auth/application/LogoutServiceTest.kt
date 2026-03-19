@@ -30,10 +30,6 @@ class LogoutServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // Dispatchers.Unconfined를 사용하는 실제 객체 생성 (NPE 방지)
-        val coroutineDispatchers = object : CoroutineDispatchers() {
-            override val VT = Dispatchers.Unconfined
-        }
         transactionTemplate = mock()
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
