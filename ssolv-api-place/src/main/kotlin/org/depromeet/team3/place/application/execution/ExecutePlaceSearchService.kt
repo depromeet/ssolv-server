@@ -26,6 +26,9 @@ import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
+import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
@@ -38,6 +41,8 @@ class ExecutePlaceSearchService(
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
+    private val globalApiSemaphore: Semaphore,
+    private val meterRegistry: MeterRegistry,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -47,18 +52,6 @@ class ExecutePlaceSearchService(
     private val weightScoreMultiplier = 100.0
     private val likeScoreMultiplier = 50.0
     private val googleApiTimeoutMs = 3000L // 개별 Google API 호출 타임아웃 (3초)
-
-    /**
-     * [전역 Semaphore] 서버 전체의 Google Places API 동시 호출 수 상한 제어
-     *
-     * Google Places API Rate Limit: 20~50 QPS (초당 최대 호출 수)
-     * 적정 동시 호출 수 = QPS 하한(20) × 평균 응답시간(0.6s) ≈ 12
-     * → 여유분 포함하여 15로 설정
-     *
-     * 역할: 모임방이 다수 동시에 처리되는 상황에서도 서버 전체 QPS가
-     *       Google Rate Limit을 넘지 않도록 서버 레벨에서 보호
-     */
-    private val globalApiSemaphore = Semaphore(15)
 
     suspend fun execute(meetingId: Long): PlacesSearchResponse {
         val plan = createSurveyKeywordService.generateKeywordPlan(meetingId)
@@ -332,18 +325,39 @@ class ExecutePlaceSearchService(
         return globalApiSemaphore.withPermit {
             requestSemaphore.withPermit {
                 withContext(dispatcher) {
-                    withTimeout(googleApiTimeoutMs) {
-                        placeQuery.textSearch(
-                            sanitizedQuery,
-                            keywordFetchSize,
-                            stationCoordinates?.latitude,
-                            stationCoordinates?.longitude,
-                            3000.0
-                        )
+                    try {
+                        val response = withTimeout(googleApiTimeoutMs) {
+                            placeQuery.textSearch(
+                                sanitizedQuery,
+                                keywordFetchSize,
+                                stationCoordinates?.latitude,
+                                stationCoordinates?.longitude,
+                                3000.0
+                            )
+                        }
+                        recordMetric("success")
+                        response
+                    } catch (e: TimeoutCancellationException) {
+                        recordMetric("timeout")
+                        logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
+                        throw e
+                    } catch (e: PlaceSearchException) {
+                        val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
+                        recordMetric(reason)
+                        logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
+                        throw e
+                    } catch (e: Exception) {
+                        recordMetric("unknown_error")
+                        logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
+                        throw e
                     }
                 }
             }
         }
+    }
+
+    private fun recordMetric(result: String) {
+        meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
     }
 
     private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>, dispatcher: CoroutineDispatcher): Map<String, Long> {
