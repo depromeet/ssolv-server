@@ -3,7 +3,6 @@ package org.depromeet.team3.place.application.execution
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.supervisorScope
@@ -11,7 +10,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.slf4j.MDCContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
@@ -195,7 +193,7 @@ class ExecutePlaceSearchService(
         plan: PlaceSearchPlan.Automatic,
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
-    ): KeywordSearchResult = coroutineScope {
+    ): KeywordSearchResult = supervisorScope {
         val requestSemaphore = Semaphore(4) // 하나의 요청(모임방)당 동시 Google API 호출을 4개로 제한
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
@@ -203,11 +201,20 @@ class ExecutePlaceSearchService(
                 ensureActive()
                 runCatching {
                     candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                }.onFailure { e ->
+                    logger.warn("키워드 [${candidate.keyword}] 검색 중 오류 발생: ${e.message}")
                 }.getOrNull()
             }
         }
 
         val results = deferredResponses.awaitAll().filterNotNull()
+        
+        // 비즈니스 규칙: 10개 키워드 시도 중 최소 1건 이상 결과가 확보되어야 함
+        if (results.isEmpty()) {
+            logger.error("모든 키워드 검색에 실패하여 유효 결과를 확보하지 못했습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
+            throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
+        }
+
         val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
 
         val selectedPlaces = mutableListOf<PlacesTextSearchResponse.Place>()
