@@ -18,6 +18,11 @@ prometheus.scrape "nginx_exporter" {
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
+prometheus.scrape "redis_exporter" {
+  targets    = [{"__address__" = "redis-exporter:9121"}]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
 prometheus.remote_write "grafana_cloud" {
   endpoint {
     url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
