@@ -1,6 +1,8 @@
 package org.depromeet.team3.place.application.execution
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
@@ -11,6 +13,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.slf4j.MDCContext
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
@@ -26,9 +30,6 @@ import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Tag
-import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
@@ -209,18 +210,14 @@ class ExecutePlaceSearchService(
                 runCatching {
                     candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
                 }.onFailure { e ->
+                    // 부모 코루틴 취소(구조화된 동시성)는 삼키지 않고 재전파
+                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
                     logger.warn("키워드 [${candidate.keyword}] 검색 중 오류 발생: ${e.message}")
                 }.getOrNull()
             }
         }
 
         val results = deferredResponses.awaitAll().filterNotNull()
-        
-        // 비즈니스 규칙: 10개 키워드 시도 중 최소 1건 이상 결과가 확보되어야 함
-        if (results.isEmpty()) {
-            logger.error("모든 키워드 검색에 실패하여 유효 결과를 확보하지 못했습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
-            throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
-        }
 
         val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
 
@@ -230,7 +227,6 @@ class ExecutePlaceSearchService(
         val fallbackCandidates = mutableListOf<PlacesTextSearchResponse.Place>()
         val fallbackIds = mutableSetOf<String>()
         val appliedKeywords = mutableSetOf<String>()
-        val fallbackResponses = mutableListOf<Pair<CreateSurveyKeywordService.KeywordCandidate, List<PlacesTextSearchResponse.Place>>>()
 
         results.forEach { appliedKeywords.add(it.first.keyword) }
 
@@ -253,11 +249,15 @@ class ExecutePlaceSearchService(
                 }
             }
             
-            // Fallback keyword logic simplified for brevity but kept functional
+            // Fallback keyword: primary 키워드와 동일하게 예외를 격리하여 전체 검색 실패 방지
             if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
-                val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword!!, plan.stationCoordinates, dispatcher, requestSemaphore)
-                val fbPlaces = filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
-                fbPlaces.forEach { place ->
+                runCatching {
+                    val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                    filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
+                }.onFailure { e ->
+                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                    logger.warn("Fallback 키워드 [${candidate.fallbackKeyword}] 검색 중 오류 발생: ${e.message}")
+                }.getOrNull()?.forEach { place ->
                     if (usedPlaceIds.contains(place.id)) return@forEach
                     if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
                         selectedPlaces.add(place)
@@ -267,6 +267,12 @@ class ExecutePlaceSearchService(
                     }
                 }
             }
+        }
+
+        // 비즈니스 규칙: API 호출은 성공했지만 필터 결과가 모두 비어있는 경우도 실패 처리
+        if (selectedPlaces.isEmpty() && fallbackCandidates.isEmpty()) {
+            logger.error("모든 키워드 검색 결과가 비어 있습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
+            throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
         }
 
         val finalPlaces = selectedPlaces.sortedWith(
