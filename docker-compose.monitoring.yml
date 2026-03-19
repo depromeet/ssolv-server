@@ -53,6 +53,17 @@ services:
       - ssolv_prod_network # nginx-app 접속용
       - ssolv_monitoring_network # alloy 접속용
 
+  # Redis Exporter - Redis 메트릭
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis:6379
+    networks:
+      - ssolv_prod_network # redis 접속용
+      - ssolv_monitoring_network # alloy 접속용
+
 networks:
   ssolv_prod_network:
     external: true
