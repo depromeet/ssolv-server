@@ -1,8 +1,7 @@
 package org.depromeet.team3.meetingattendee.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
@@ -13,7 +12,6 @@ import org.springframework.transaction.support.TransactionTemplate
 class UpdateAttendeeService(
     private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     suspend operator fun invoke(
@@ -21,7 +19,7 @@ class UpdateAttendeeService(
         meetingId: Long,
         attendeeNickname: String,
         color: String?
-    ): Unit = withContext(coroutineDispatchers.VT) {
+    ): Unit = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             val entity = meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
                 ?: throw MeetingAttendeeException(

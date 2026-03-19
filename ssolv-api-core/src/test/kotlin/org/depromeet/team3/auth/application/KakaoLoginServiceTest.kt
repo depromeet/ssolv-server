@@ -1,5 +1,5 @@
 package org.depromeet.team3.auth.application
-
+import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.properties.KakaoProperties
@@ -15,7 +15,6 @@ import org.mockito.kotlin.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.auth.application.login.CreateKakaoUserService
 import org.depromeet.team3.auth.application.login.KakaoLoginService
 
@@ -29,7 +28,6 @@ class KakaoLoginServiceTest {
     private lateinit var createKakaoUserService: CreateKakaoUserService
 
     @Mock
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
 
     private lateinit var kakaoLoginService: KakaoLoginService
 
@@ -39,7 +37,7 @@ class KakaoLoginServiceTest {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeEach
     fun setUp() {
-        whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher())
         
         val kakaoProperties = KakaoProperties().apply {
             redirectUri = "http://localhost:8080/login/oauth2/code/kakao"

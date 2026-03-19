@@ -3,7 +3,6 @@ package org.depromeet.team3.survey.application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.application.MeetingExpirationSchedulerService
@@ -71,7 +70,7 @@ class CreateSurveyServiceTest {
         
         createSurveyService = CreateSurveyService(
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
-            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers,
+            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate,
             stringRedisTemplate, meetingExpirationSchedulerService
         )
     }

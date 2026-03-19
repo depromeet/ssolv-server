@@ -8,7 +8,6 @@ import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.util.TestDataFactory
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.security.jwt.JwtTokenProvider
@@ -40,13 +39,12 @@ class UpdateTokenServiceTest {
     private lateinit var transactionTemplate: TransactionTemplate
 
     @Mock
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
 
     private lateinit var updateTokenService: UpdateTokenService
     
     @BeforeEach
     fun setUp() {
-        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
             callback.doInTransaction(org.mockito.kotlin.mock())

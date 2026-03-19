@@ -1,8 +1,7 @@
 package org.depromeet.team3.meeting.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.dto.response.MeetingDetailResponse
@@ -33,14 +32,13 @@ class GetMeetingDetailService(
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
     private val inviteTokenService: InviteTokenService,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     suspend operator fun invoke(
         meetingId: Long,
         userId: Long,
         allowClosed: Boolean = false
-    ): MeetingDetailResponse = withContext(coroutineDispatchers.VT) {
+    ): MeetingDetailResponse = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             // 모임 조회 및 endAt 기반 자동 종료 처리 (blocking)
             val meetingEntity = meetingJpaRepository.findByIdOrNull(meetingId)

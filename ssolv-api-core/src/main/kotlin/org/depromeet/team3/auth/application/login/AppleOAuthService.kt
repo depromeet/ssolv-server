@@ -1,5 +1,5 @@
 package org.depromeet.team3.auth.application.login
-
+import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.depromeet.team3.auth.client.AppleOAuthClient
 import org.depromeet.team3.auth.command.AppleLoginCommand
@@ -8,7 +8,6 @@ import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.model.AppleResponse
 import org.depromeet.team3.auth.properties.AppleProperties
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -22,11 +21,10 @@ class AppleOAuthService(
     private val createAppleUserService: CreateAppleUserService,
     private val appleProperties: AppleProperties,
     private val objectMapper: ObjectMapper,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthService::class.java)
 
-    suspend fun login(command: AppleLoginCommand): LoginResponse = withContext(coroutineDispatchers.VT) {
+    suspend fun login(command: AppleLoginCommand): LoginResponse = withContext(Dispatchers.IO) {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 

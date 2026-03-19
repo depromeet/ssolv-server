@@ -1,7 +1,6 @@
 package org.depromeet.team3.meeting.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.MeetingInfoResponse
 import org.depromeet.team3.meeting.dto.response.MeetingsResponse
@@ -17,10 +16,9 @@ class GetMeetingService(
     private val stationRepository: StationRepository,
     private val getSurveyListService: GetSurveyListService,
     private val inviteTokenService: InviteTokenService,
-    private val coroutineDispatchers: CoroutineDispatchers,
 ) {
 
-    suspend operator fun invoke(userId: Long): List<MeetingsResponse> = withContext(coroutineDispatchers.VT) {
+    suspend operator fun invoke(userId: Long): List<MeetingsResponse> = withContext(Dispatchers.IO) {
         // 1. 호스트로 등록된 모임 조회
         val hostMeetings = meetingRepository.findMeetingsByUserId(userId)
 

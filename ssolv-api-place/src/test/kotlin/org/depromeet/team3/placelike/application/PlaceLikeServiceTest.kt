@@ -1,5 +1,5 @@
 package org.depromeet.team3.placelike.application
-
+import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.mockito.Mockito.lenient
 
@@ -19,7 +18,6 @@ import org.mockito.Mockito.lenient
 @ExtendWith(MockitoExtension::class)
 class PlaceLikeServiceTest {
 
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var redisTemplate: StringRedisTemplate
     private lateinit var searchService: MeetingPlaceSearchService
     private lateinit var meetingQuery: org.depromeet.team3.meeting.MeetingQuery
@@ -29,8 +27,7 @@ class PlaceLikeServiceTest {
 
     @BeforeEach
     fun setup() {
-        coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
+        lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher())
         
         redisTemplate = mock()
         searchService = mock {

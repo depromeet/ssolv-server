@@ -7,7 +7,6 @@ import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.application.common.LogoutService
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -40,7 +39,7 @@ class LogoutServiceTest {
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
             callback.doInTransaction(mock())
         }
-        logoutService = LogoutService(userJpaRepository, transactionTemplate, coroutineDispatchers)
+        logoutService = LogoutService(userJpaRepository, transactionTemplate)
     }
 
     @Test

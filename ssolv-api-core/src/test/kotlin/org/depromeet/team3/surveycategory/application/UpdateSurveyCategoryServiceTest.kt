@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.surveycategory.SurveyCategoryEntity
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
@@ -28,13 +27,11 @@ class UpdateSurveyCategoryServiceTest {
     private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
 
     private lateinit var transactionTemplate: TransactionTemplate
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var updateSurveyCategoryService: UpdateSurveyCategoryService
 
     @BeforeEach
     fun setUp() {
-        coroutineDispatchers = mock()
-        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         transactionTemplate = mock()
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)

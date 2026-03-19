@@ -1,5 +1,5 @@
 package org.depromeet.team3.auth.application.login
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
@@ -8,7 +8,6 @@ import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -19,7 +18,6 @@ class CreateKakaoUserService(
     private val userJpaRepository: UserRepository,
     private val jwtTokenProvider: JwtTokenProvider,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     suspend fun saveUserAndGenerateTokens(
@@ -27,7 +25,7 @@ class CreateKakaoUserService(
         nickname: String,
         profileImage: String?,
         socialId: String
-    ): LoginResponse = withContext(coroutineDispatchers.VT) {
+    ): LoginResponse = withContext(Dispatchers.IO) {
         val userEmail = email ?: "kakao_${socialId}@kakao.com"
 
         transactionTemplate.execute {

@@ -4,7 +4,6 @@ import org.depromeet.team3.common.constants.RedisStreamConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component
 class MeetingNotificationConsumer(
     private val sendMeetingResultNotificationService: SendMeetingResultNotificationService,
     private val stringRedisTemplate: StringRedisTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) : StreamListener<String, MapRecord<String, String, String>> {
     
     private val logger = LoggerFactory.getLogger(MeetingNotificationConsumer::class.java)
@@ -27,7 +25,7 @@ class MeetingNotificationConsumer(
 
         if (meetingId != null && userId != null) {
             logger.debug("식당 확정 알림 요청 수신 (meetingId: {}, userId: {}, messageId: {})", meetingId, userId, message.id)
-            scope.launch(coroutineDispatchers.VT) {
+            scope.launch(Dispatchers.IO) {
                 try {
                     sendMeetingResultNotificationService.send(meetingId, userId)
                     // 처리 성공 시 XACK (Pending 해제)

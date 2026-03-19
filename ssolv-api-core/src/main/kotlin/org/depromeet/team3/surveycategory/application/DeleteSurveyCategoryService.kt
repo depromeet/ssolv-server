@@ -1,8 +1,7 @@
 package org.depromeet.team3.surveycategory.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.exception.SurveyCategoryException
 import org.springframework.stereotype.Service
@@ -12,10 +11,9 @@ import org.springframework.transaction.support.TransactionTemplate
 class DeleteSurveyCategoryService(
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    suspend operator fun invoke(id: Long): Unit = withContext(coroutineDispatchers.VT) {
+    suspend operator fun invoke(id: Long): Unit = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             // 1. 삭제할 카테고리 조회
             val entity = surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)

@@ -1,11 +1,10 @@
 package org.depromeet.team3.auth.application.common
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -18,9 +17,8 @@ import org.springframework.transaction.support.TransactionTemplate
 class LogoutService(
     private val userJpaRepository: UserRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
-    suspend fun logout(userId: Long): Unit = withContext(coroutineDispatchers.VT) {
+    suspend fun logout(userId: Long): Unit = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             val entity = userJpaRepository.findByIdOrNull(userId)
                 ?: throw AuthException(ErrorCode.USER_NOT_FOUND)

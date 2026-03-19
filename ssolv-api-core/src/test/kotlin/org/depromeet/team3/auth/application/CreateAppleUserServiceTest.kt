@@ -6,7 +6,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.application.login.CreateAppleUserService
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.junit.jupiter.api.BeforeEach
@@ -24,20 +23,18 @@ class CreateAppleUserServiceTest {
     @Mock private lateinit var jwtTokenProvider: JwtTokenProvider
 
     private lateinit var transactionTemplate: TransactionTemplate
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
     private lateinit var createAppleUserService: CreateAppleUserService
 
     @BeforeEach
     fun setUp() {
-        coroutineDispatchers = mock()
-        whenever(coroutineDispatchers.VT).thenReturn(Dispatchers.Unconfined)
+        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         transactionTemplate = mock()
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
             val callback = invocation.getArgument<org.springframework.transaction.support.TransactionCallback<Any>>(0)
             callback.doInTransaction(org.mockito.kotlin.mock())
         }
         createAppleUserService = CreateAppleUserService(
-            userJpaRepository, jwtTokenProvider, transactionTemplate, coroutineDispatchers
+            userJpaRepository, jwtTokenProvider, transactionTemplate
         )
     }
 

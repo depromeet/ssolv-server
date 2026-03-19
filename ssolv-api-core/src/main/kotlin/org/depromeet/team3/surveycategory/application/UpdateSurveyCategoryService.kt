@@ -1,8 +1,7 @@
 package org.depromeet.team3.surveycategory.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveycategory.dto.request.UpdateSurveyCategoryRequest
@@ -14,11 +13,10 @@ import org.springframework.transaction.support.TransactionTemplate
 class UpdateSurveyCategoryService(
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     suspend operator fun invoke(id: Long, request: UpdateSurveyCategoryRequest): Unit =
-        withContext(coroutineDispatchers.VT) {
+        withContext(Dispatchers.IO) {
             transactionTemplate.execute {
                 // 1. 기존 카테고리 조회 (삭제된 것 제외)
                 val existingEntity = surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)
