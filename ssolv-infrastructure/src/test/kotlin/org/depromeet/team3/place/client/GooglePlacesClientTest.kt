@@ -45,7 +45,6 @@ class GooglePlacesClientTest {
     fun `텍스트 검색 성공`() {
         /*
         runTest {
-            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "강남역 맛집"
             val mockResponse = PlacesTextSearchResponse(
                 places = listOf(

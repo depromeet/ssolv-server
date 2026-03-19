@@ -13,6 +13,8 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.any
 import java.time.LocalDateTime
 
 class InviteTokenServiceTest {
@@ -29,7 +31,6 @@ class InviteTokenServiceTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        whenever(Dispatchers.IO).thenReturn(Dispatchers.Unconfined)
         inviteTokenService = InviteTokenService(meetingRepository, meetingAttendeeRepository)
     }
 
@@ -47,7 +48,7 @@ class InviteTokenServiceTest {
             endAt = LocalDateTime.now().plusHours(2)
         )
 
-        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
+        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
 
         // When
         val result = inviteTokenService.generateInviteToken(meetingId)
@@ -63,7 +64,7 @@ class InviteTokenServiceTest {
         // Given
         val meetingId = 999L
 
-        whenever(meetingRepository.findById(meetingId)).thenReturn(null)
+        whenever(meetingRepository.findById(meetingId)).doAnswer { null }
 
         // When & Then
         assertThrows<IllegalArgumentException> {
@@ -85,7 +86,7 @@ class InviteTokenServiceTest {
             endAt = LocalDateTime.now().minusHours(1)
         )
 
-        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
+        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
 
         // When & Then
         assertThrows<IllegalStateException> {
@@ -108,7 +109,7 @@ class InviteTokenServiceTest {
         )
 
         val userId = 42L
-        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
+        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
         whenever(meetingAttendeeRepository.existsByMeetingIdAndUserId(meetingId, userId)).thenReturn(false)
 
         val tokenUrl = inviteTokenService.generateInviteToken(meetingId)
@@ -138,7 +139,7 @@ class InviteTokenServiceTest {
         // Given
         val meetingId = 999L
 
-        whenever(meetingRepository.findById(meetingId)).thenReturn(null)
+        whenever(meetingRepository.findById(meetingId)).doAnswer { null }
 
         assertThrows<IllegalArgumentException> {
             inviteTokenService.generateInviteToken(meetingId)

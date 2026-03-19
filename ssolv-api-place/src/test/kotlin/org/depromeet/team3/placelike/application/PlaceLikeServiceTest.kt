@@ -27,7 +27,6 @@ class PlaceLikeServiceTest {
 
     @BeforeEach
     fun setup() {
-        lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher())
         
         redisTemplate = mock()
         searchService = mock {
@@ -36,6 +35,8 @@ class PlaceLikeServiceTest {
         }
         meetingQuery = mock()
         objectMapper = mock()
+
+        lenient().whenever(redisTemplate.getExpire(any<String>())).thenReturn(0L)
 
         service = PlaceLikeService(
             redisTemplate = redisTemplate,
@@ -55,12 +56,15 @@ class PlaceLikeServiceTest {
         
         // ObjectMapper stubbing
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":1}""")
+        
+        // getExpire stubbing
+        whenever(redisTemplate.getExpire(any<String>())).thenReturn(0L)
 
         // Lua return: [isLiked(1), likeCount(1)]
-        whenever(redisTemplate.execute(
+        whenever(redisTemplate.execute<List<*>>(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any(), any()
+            anyVararg<Any>()
         )).thenReturn(listOf(1L, 1L))
 
         // when
@@ -96,10 +100,10 @@ class PlaceLikeServiceTest {
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":0}""")
         
         // Lua return: [isLiked(0), likeCount(0)]
-        whenever(redisTemplate.execute(
+        whenever(redisTemplate.execute<List<*>>(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any(), any()
+            anyVararg<Any>()
         )).thenReturn(listOf(0L, 0L))
 
         // when
@@ -120,10 +124,10 @@ class PlaceLikeServiceTest {
         
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":101,"likeCount":1}""")
 
-        whenever(redisTemplate.execute(
+        whenever(redisTemplate.execute<List<*>>(
             any<org.springframework.data.redis.core.script.RedisScript<List<*>>>(),
             any<List<String>>(),
-            any(), any(), any(), any()
+            anyVararg<Any>()
         )).thenReturn(listOf(1L, 1L))
 
         // Pub/Sub 발행 시 예외 발생 시뮬레이션

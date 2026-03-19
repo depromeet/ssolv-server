@@ -49,7 +49,6 @@ class MeetingPlaceSearchServiceTest {
         googlePlacesApiProperties = mock {
             on { apiKey } doReturn "test-api-key"
         }
-        lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher())
         meetingQuery = mock()
 
         zSetOps = mock()

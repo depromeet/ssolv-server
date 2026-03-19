@@ -47,7 +47,6 @@ class GooglePlacesClientRetryTest {
     fun `재시도 성공 - 500 에러 후 재시도하여 성공`() {
         /*
         runTest {
-            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "맛집"
             val mockResponse = PlacesTextSearchResponse(emptyList())
             
@@ -78,7 +77,6 @@ class GooglePlacesClientRetryTest {
     fun `재시도 실패 - 최대 재시도 횟수 초과`() {
         /*
         runTest {
-            lenient().whenever(Dispatchers.IO).thenReturn(UnconfinedTestDispatcher(testScheduler))
             val query = "맛집"
             val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
             val requestBodySpec = mock<RestClient.RequestBodySpec>()
