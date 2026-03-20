@@ -1,12 +1,13 @@
 package org.depromeet.team3.surveycategory
 
+import org.springframework.stereotype.Repository
+import com.linecorp.kotlinjdsl.support.spring.data.jpa.repository.KotlinJdslJpqlExecutor
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import org.springframework.stereotype.Repository
 
 @Repository
-interface SurveyCategoryJpaRepository : JpaRepository<SurveyCategoryEntity, Long> {
+interface SurveyCategoryJpaRepository : JpaRepository<SurveyCategoryEntity, Long>, KotlinJdslJpqlExecutor {
 
     fun findByIsDeletedFalse(): List<SurveyCategoryEntity>
 
@@ -14,11 +15,6 @@ interface SurveyCategoryJpaRepository : JpaRepository<SurveyCategoryEntity, Long
 
     fun findByIdAndIsDeletedFalse(id: Long): SurveyCategoryEntity?
 
-    fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(
-        sortOrder: Int,
-        parentId: Long?,
-        excludeId: Long?
-    ): Boolean
 
     fun countByParentIdAndIsDeletedFalse(parentId: Long): Long
 
