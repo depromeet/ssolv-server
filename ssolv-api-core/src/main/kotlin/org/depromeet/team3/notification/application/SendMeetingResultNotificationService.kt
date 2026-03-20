@@ -1,5 +1,5 @@
 package org.depromeet.team3.notification.application
-
+import kotlinx.coroutines.Dispatchers
 
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.application.InviteTokenService
@@ -8,7 +8,6 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.notification.domain.DeviceTokenQueryRepository
 import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.station.StationRepository
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import kotlinx.coroutines.withContext
@@ -31,7 +30,6 @@ class SendMeetingResultNotificationService(
     private val stationRepository: StationRepository,
     private val inviteTokenService: InviteTokenService,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = org.slf4j.LoggerFactory.getLogger(SendMeetingResultNotificationService::class.java)
@@ -41,7 +39,7 @@ class SendMeetingResultNotificationService(
         private val IDEMPOTENCY_TTL = java.time.Duration.ofHours(1)
     }
 
-    suspend fun send(meetingId: Long, userId: Long) = withContext(coroutineDispatchers.VT) {
+    suspend fun send(meetingId: Long, userId: Long) = withContext(Dispatchers.IO) {
         // 0. 멱등성 체크 (중복 발송 방지)
         val idempotencyKey = "$IDEMPOTENCY_KEY_PREFIX:$meetingId:$userId"
         val isNew = stringRedisTemplate.opsForValue()

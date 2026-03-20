@@ -1,9 +1,8 @@
 package org.depromeet.team3.place.application.execution
-
+import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
@@ -27,7 +26,6 @@ class MeetingPlaceSearchService(
     private val objectMapper: ObjectMapper,
     private val placeQuery: PlaceQuery,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val meetingQuery: MeetingQuery
 ) {
 
@@ -43,7 +41,7 @@ class MeetingPlaceSearchService(
         meetingId: Long, 
         result: PlacesSearchResponse,
         scores: Map<Long, Double> = emptyMap()
-    ) = withContext(coroutineDispatchers.VT) {
+    ) = withContext(Dispatchers.IO) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
         // 1. 기존 모임 결과 지우고 새로 저장 (ZSET)
@@ -87,7 +85,7 @@ class MeetingPlaceSearchService(
     /**
      * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
-    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(coroutineDispatchers.VT) {
+    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(Dispatchers.IO) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
         // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기...

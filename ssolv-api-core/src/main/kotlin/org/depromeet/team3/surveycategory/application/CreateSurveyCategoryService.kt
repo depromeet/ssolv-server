@@ -1,8 +1,7 @@
 package org.depromeet.team3.surveycategory.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.surveycategory.SurveyCategoryEntity
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.dto.request.CreateSurveyCategoryRequest
@@ -15,11 +14,10 @@ import org.springframework.transaction.support.TransactionTemplate
 class CreateSurveyCategoryService(
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     suspend operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse =
-        withContext(coroutineDispatchers.VT) {
+        withContext(Dispatchers.IO) {
             transactionTemplate.execute {
                 // sortOrder 중복 검증 (JPA 메서드 직접 호출, blocking)
                 val sortOrderExists = if (request.parentId == null) {

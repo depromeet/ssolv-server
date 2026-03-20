@@ -3,7 +3,6 @@ package org.depromeet.team3.survey.application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.application.MeetingExpirationSchedulerService
@@ -55,10 +54,6 @@ class CreateSurveyServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // CoroutineDispatchers: Mock 대신 실명 객체 사용 (NPE 방지)
-        val coroutineDispatchers = object : CoroutineDispatchers() {
-            override val VT = Dispatchers.Unconfined
-        }
         transactionTemplate = mock()
         // transactionTemplate.execute 모킹 (doInTransaction 리턴값 보장)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
@@ -71,7 +66,7 @@ class CreateSurveyServiceTest {
         
         createSurveyService = CreateSurveyService(
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
-            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate, coroutineDispatchers,
+            meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate,
             stringRedisTemplate, meetingExpirationSchedulerService
         )
     }

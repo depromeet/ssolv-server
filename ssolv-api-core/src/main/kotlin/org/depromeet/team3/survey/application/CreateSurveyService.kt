@@ -1,8 +1,7 @@
 package org.depromeet.team3.survey.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.application.MeetingExpirationSchedulerService
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
@@ -32,13 +31,12 @@ class CreateSurveyService(
     private val meetingJpaRepository: MeetingJpaRepository,
     private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val stringRedisTemplate: StringRedisTemplate,
     private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService
 ) {
 
     suspend fun invoke(meetingId: Long, userId: Long, request: SurveyCreateRequest): SurveyCreateResponse =
-        withContext(coroutineDispatchers.VT) {
+        withContext(Dispatchers.IO) {
             transactionTemplate.execute {
                 // 모임 존재 확인
                 val meetingEntity = meetingJpaRepository.findById(meetingId).orElseThrow {

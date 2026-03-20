@@ -1,11 +1,10 @@
 package org.depromeet.team3.meeting.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.ContextConstants.API_VERSION_V1
 import org.depromeet.team3.common.ContextConstants.BASE_DOMAIN
 import org.depromeet.team3.common.ContextConstants.HTTPS_PROTOCOL
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.ValidateInviteTokenResponse
@@ -21,14 +20,13 @@ import java.time.ZoneOffset
 class InviteTokenService(
     private val meetingRepository: MeetingRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
     private companion object {
         const val SEPARATOR = ":"
     }
 
-    suspend fun generateInviteToken(meetingId: Long): String = withContext(coroutineDispatchers.VT) {
+    suspend fun generateInviteToken(meetingId: Long): String = withContext(Dispatchers.IO) {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw IllegalArgumentException("Not Found meeting ID: $meetingId")
 
@@ -48,7 +46,7 @@ class InviteTokenService(
         return DataEncoder.encodeWithSeparator(SEPARATOR, meeting.id.toString(), endAtTimestamp.toString())
     }
 
-    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withContext(coroutineDispatchers.VT) {
+    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withContext(Dispatchers.IO) {
         val (meetingId, expiryTimestamp) = parseTokenData(token)
 
         if (System.currentTimeMillis() > expiryTimestamp) {

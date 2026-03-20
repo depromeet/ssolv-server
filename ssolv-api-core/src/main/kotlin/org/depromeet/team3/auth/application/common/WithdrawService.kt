@@ -1,5 +1,5 @@
 package org.depromeet.team3.auth.application.common
-
+import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
@@ -18,7 +18,6 @@ import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 
 /**
  * 회원 탈퇴 Service
@@ -31,7 +30,6 @@ class WithdrawService(
     private val meetingJpaRepository: MeetingJpaRepository,
     private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val log = LoggerFactory.getLogger(WithdrawService::class.java)
 
@@ -41,7 +39,7 @@ class WithdrawService(
      * 2. 로컬 데이터 삭제
      * 3. 소셜 플랫폼 연동 해제 (트랜잭션 커밋 후 비동기)
      */
-    suspend fun withdraw(userId: Long): Unit = withContext(coroutineDispatchers.VT) {
+    suspend fun withdraw(userId: Long): Unit = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             val entity = userJpaRepository.findByIdOrNull(userId)
                 ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
@@ -65,7 +63,7 @@ class WithdrawService(
                 try {
                     TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                         override fun afterCommit() {
-                            CoroutineScope(coroutineDispatchers.VT).launch {
+                            CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     unlinkSocial(provider, socialId)
                                 } catch (e: Exception) {

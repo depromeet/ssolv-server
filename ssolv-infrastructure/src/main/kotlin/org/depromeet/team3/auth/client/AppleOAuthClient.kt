@@ -7,18 +7,15 @@ import org.depromeet.team3.auth.model.AppleResponse
 import org.depromeet.team3.auth.properties.AppleProperties
 import org.depromeet.team3.common.exception.ErrorCode
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
-import org.springframework.web.client.HttpClientErrorException
-import org.springframework.web.client.RestTemplate
-import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
+import org.springframework.web.reactive.function.BodyInserters
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.awaitBody
 import java.math.BigInteger
-import java.security.Key
 import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.PublicKey
@@ -27,16 +24,16 @@ import java.security.spec.RSAPublicKeySpec
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+import org.springframework.beans.factory.annotation.Qualifier
+
 @Component
 class AppleOAuthClient(
     private val objectMapper: ObjectMapper,
     private val appleProperties: AppleProperties,
-    private val restTemplate: RestTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
+    @Qualifier("commonWebClient")
+    private val webClient: WebClient,
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthClient::class.java)
-    
-    // 공개키 캐시 (간단한 동기화 처리)
     private val publicKeyCache = ConcurrentHashMap<String, PublicKey>()
 
     private fun getAllowedRedirectUris(): Set<String> {
@@ -48,31 +45,21 @@ class AppleOAuthClient(
             "https://www.ssolv.site/auth/callback",
             "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
         )
-        
         val configUris = appleProperties.redirectUris.toSet()
         val singleUri = setOfNotNull(appleProperties.redirectUri.takeIf { it.isNotBlank() })
-        
         return hardcodedUris + configUris + singleUri
     }
 
-    /**
-     * 인가 코드를 이용해 애플 서버로부터 OAuth 토큰 반환 받음
-     */
-    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken = withContext(coroutineDispatchers.VT) {
-        val trimmedRedirectUri = redirectUri.trim()
+    private val apiTimeoutMillis = 5_000L
 
+    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken {
+        val trimmedRedirectUri = redirectUri.trim()
         if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
             log.error("허용되지 않은 redirect_uri: {}", trimmedRedirectUri)
-            log.error("허용된 URI 목록: {}", getAllowedRedirectUris())
             throw AuthException(ErrorCode.APPLE_INVALID_REDIRECT_URI)
         }
 
         val clientSecret = generateClientSecret()
-
-        val headers = HttpHeaders().apply {
-            add("Content-type", "application/x-www-form-urlencoded")
-        }
-
         val params: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "authorization_code")
             add("client_id", appleProperties.clientId)
@@ -81,40 +68,52 @@ class AppleOAuthClient(
             add("redirect_uri", trimmedRedirectUri)
         }
 
-        log.debug("애플 토큰 요청 - redirect_uri: {}, client_id: {}", trimmedRedirectUri, appleProperties.clientId)
-
-        try {
-            val response = restTemplate.exchange(
-                appleProperties.tokenUri,
-                HttpMethod.POST,
-                HttpEntity(params, headers),
-                String::class.java
-            )
-
-            objectMapper.readValue(response.body, AppleResponse.OAuthToken::class.java)
-
-        } catch (e: HttpClientErrorException) {
-            log.error("애플 API 에러 ({}): {}", e.statusCode, e.responseBodyAsString)
-            when (e.statusCode.value()) {
-                400 -> throw AuthException(ErrorCode.APPLE_INVALID_GRANT)
-                401 -> throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
-                else -> throw AuthException(ErrorCode.APPLE_API_ERROR)
+        return try {
+            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
+                webClient.post()
+                    .uri(appleProperties.tokenUri)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData(params))
+                    .retrieve()
+                    .onStatus({ status -> status.isError }) { response ->
+                        response.bodyToMono(String::class.java).map { body ->
+                            log.error("애플 토큰 요청 에러 ({}): {}", response.statusCode(), body)
+                            when (response.statusCode().value()) {
+                                400 -> AuthException(ErrorCode.APPLE_INVALID_GRANT)
+                                401 -> AuthException(ErrorCode.APPLE_AUTH_FAILED)
+                                else -> AuthException(ErrorCode.APPLE_API_ERROR)
+                            }
+                        }
+                    }
+                    .awaitBody<AppleResponse.OAuthToken>()
             }
         } catch (e: Exception) {
+            if (e is AuthException) throw e
+            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                log.error("애플 토큰 요청 타임아웃: {}", e.message)
+                throw AuthException(ErrorCode.APPLE_API_ERROR)
+            }
             log.error("애플 API 호출 중 예외 발생: {}", e.message)
             throw AuthException(ErrorCode.APPLE_API_ERROR)
         }
     }
 
-    /**
-     * ID 토큰 서명 및 클레임 검증 후 사용자 정보 추출
-     */
-    suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload = withContext(coroutineDispatchers.VT) {
+    suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload {
         try {
+            // jjwt 파서의 KeyLocator는 suspend를 지원하지 않으므로 미리 kid를 추출합니다.
+            val headerPart = idToken.split(".")[0]
+            val headerJson = String(Base64.getUrlDecoder().decode(headerPart))
+            val headerMap = objectMapper.readValue(headerJson, Map::class.java)
+            val kid = headerMap["kid"] as? String ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
+
+            if (!publicKeyCache.containsKey(kid)) {
+                refreshPublicKeys()
+            }
+
             val claims = Jwts.parser()
                 .keyLocator { header ->
-                    val kid = header["kid"] as? String ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
-                    getOrFetchPublicKey(kid)
+                    val k = header["kid"] as? String ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
+                    publicKeyCache[k] ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
                 }
                 .requireIssuer("https://appleid.apple.com")
                 .requireAudience(appleProperties.clientId)
@@ -122,7 +121,7 @@ class AppleOAuthClient(
                 .parseSignedClaims(idToken)
                 .payload
 
-            AppleResponse.IdTokenPayload(
+            return AppleResponse.IdTokenPayload(
                 iss = claims.issuer,
                 aud = claims.audience.first(), 
                 exp = claims.expiration.time / 1000,
@@ -134,26 +133,38 @@ class AppleOAuthClient(
                 nonce_supported = claims["nonce_supported"] as? Boolean
             )
         } catch (e: Exception) {
-            log.error("애플 ID 토큰 검증 실패: {}", e.message)
+            when (e) {
+                is AuthException -> throw e
+                is io.jsonwebtoken.ExpiredJwtException -> log.error("애플 ID 토큰 만료: {}", e.message)
+                is io.jsonwebtoken.security.SignatureException -> log.error("애플 ID 토큰 서명 유효하지 않음: {}", e.message)
+                is io.jsonwebtoken.IncorrectClaimException -> log.error("애플 ID 토큰 클레임 불일치(iss/aud): {}", e.message)
+                else -> log.error("애플 ID 토큰 검증 중 알 수 없는 예외 발생: {}", e.message)
+            }
             throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
         }
     }
 
-    private fun getOrFetchPublicKey(kid: String): Key {
-        return publicKeyCache[kid] ?: run {
-            refreshPublicKeys()
-            publicKeyCache[kid] ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
-        }
-    }
-
-    private fun refreshPublicKeys() {
+    private suspend fun refreshPublicKeys() {
         try {
-            val response = restTemplate.getForObject("https://appleid.apple.com/auth/keys", AppleResponse.PublicKeys::class.java)
-            response?.keys?.forEach { key ->
-                val publicKey = generatePublicKey(key.n, key.e)
-                publicKeyCache[key.kid] = publicKey
+            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
+                val response = webClient.get()
+                    .uri("https://appleid.apple.com/auth/keys")
+                    .retrieve()
+                    .onStatus({ status -> status.isError }) { response ->
+                        response.bodyToMono(String::class.java).map { body ->
+                            log.error("애플 공개키 조회 API 오류 ({}): {}", response.statusCode(), body)
+                            AuthException(ErrorCode.APPLE_API_ERROR)
+                        }
+                    }
+                    .awaitBody<AppleResponse.PublicKeys>()
+                
+                response.keys.forEach { key ->
+                    val publicKey = generatePublicKey(key.n, key.e)
+                    publicKeyCache[key.kid] = publicKey
+                }
             }
         } catch (e: Exception) {
+            if (e is AuthException) throw e
             log.error("애플 공개키 조회 실패: {}", e.message)
             throw AuthException(ErrorCode.APPLE_API_ERROR)
         }
@@ -162,37 +173,24 @@ class AppleOAuthClient(
     private fun generatePublicKey(n: String, e: String): PublicKey {
         val nBytes = Base64.getUrlDecoder().decode(n)
         val eBytes = Base64.getUrlDecoder().decode(e)
-        
         val nBI = BigInteger(1, nBytes)
         val eBI = BigInteger(1, eBytes)
-        
         val spec = RSAPublicKeySpec(nBI, eBI)
-        val factory = KeyFactory.getInstance("RSA")
-        return factory.generatePublic(spec)
+        return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
-    /**
-     * 애플 OAuth용 Client Secret 생성 (JWT)
-     */
     private fun generateClientSecret(): String {
         return try {
             val now = Date()
-            val expirationDate = Date(now.time + 3600000 * 6) // 6시간 유효
-
             Jwts.builder()
-                .header()
-                .keyId(appleProperties.keyId)
-                .and()
+                .header().keyId(appleProperties.keyId).and()
                 .issuer(appleProperties.teamId)
                 .issuedAt(now)
-                .expiration(expirationDate)
-                .audience()
-                .add("https://appleid.apple.com")
-                .and()
+                .expiration(Date(now.time + 3600000 * 6))
+                .audience().add("https://appleid.apple.com").and()
                 .subject(appleProperties.clientId)
                 .signWith(getPrivateKey(), Jwts.SIG.ES256)
                 .compact()
-
         } catch (e: Exception) {
             log.error("애플 Client Secret 생성 실패: {}", e.message)
             throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
@@ -204,7 +202,6 @@ class AppleOAuthClient(
             .replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
             .replace("\\s".toRegex(), "")
-
         val keyBytes = Base64.getDecoder().decode(privateKeyContent)
         val keySpec = PKCS8EncodedKeySpec(keyBytes)
         return KeyFactory.getInstance("EC").generatePrivate(keySpec)

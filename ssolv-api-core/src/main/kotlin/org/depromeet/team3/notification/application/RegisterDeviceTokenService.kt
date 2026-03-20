@@ -1,5 +1,5 @@
 package org.depromeet.team3.notification.application
-
+import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.exception.UserException
 import org.depromeet.team3.common.exception.ErrorCode
@@ -8,7 +8,6 @@ import org.depromeet.team3.notification.domain.DeviceToken
 import org.depromeet.team3.notification.domain.DeviceTokenCommandRepository
 import org.depromeet.team3.notification.domain.DeviceTokenQueryRepository
 import org.depromeet.team3.notification.dto.RegisterDeviceTokenRequest
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
@@ -21,9 +20,8 @@ class RegisterDeviceTokenService(
     private val deviceTokenCommandRepository: DeviceTokenCommandRepository,
     private val userQueryRepository: UserQueryRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
-    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withContext(coroutineDispatchers.VT) {
+    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             runBlocking {
                 if (userQueryRepository.findById(userId) == null) {

@@ -1,12 +1,11 @@
 package org.depromeet.team3.auth.application.login
-
+import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Service
 
@@ -18,10 +17,9 @@ class KakaoLoginService(
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val createKakaoUserService: CreateKakaoUserService,
     private val kakaoProperties: KakaoProperties,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    suspend fun login(command: KakaoLoginCommand): LoginResponse = withContext(coroutineDispatchers.VT) {
+    suspend fun login(command: KakaoLoginCommand): LoginResponse = withContext(Dispatchers.IO) {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 

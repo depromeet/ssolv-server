@@ -1,8 +1,7 @@
 package org.depromeet.team3.survey.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendee
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
@@ -21,11 +20,10 @@ class GetSurveyListService(
     private val surveyResultRepository: SurveyResultRepository,
     private val meetingJpaRepository: MeetingJpaRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
     private val logger = LoggerFactory.getLogger(GetSurveyListService::class.java)
 
-    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withContext(coroutineDispatchers.VT) {
+    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withContext(Dispatchers.IO) {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)) {
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
@@ -100,7 +98,7 @@ class GetSurveyListService(
         )
     }
 
-    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withContext(coroutineDispatchers.VT) {
+    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withContext(Dispatchers.IO) {
         // 모든 참가자를 한 번에 조회 (N+1 문제 해결)
         val attendeeList = meetingAttendeeRepository.findByMeetingId(meetingId)
         val attendeeMap = attendeeList.associateBy { it.userId }

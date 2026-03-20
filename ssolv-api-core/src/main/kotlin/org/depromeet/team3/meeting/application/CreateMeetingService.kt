@@ -1,9 +1,8 @@
 package org.depromeet.team3.meeting.application
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.dto.request.CreateMeetingRequest
@@ -29,13 +28,12 @@ class CreateMeetingService(
     private val stationJpaRepository: StationJpaRepository,
     private val userJpaRepository: UserRepository,
     private val inviteTokenService: InviteTokenService,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService,
     private val transactionTemplate: TransactionTemplate
 ) {
 
     suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse =
-        withContext(coroutineDispatchers.VT) {
+        withContext(Dispatchers.IO) {
             val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
             if (request.endAt != null && request.endAt.isBefore(now)) {
                 throw MeetingException(

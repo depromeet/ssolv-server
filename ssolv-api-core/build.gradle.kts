@@ -11,6 +11,7 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework:spring-jdbc:6.2.3")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")

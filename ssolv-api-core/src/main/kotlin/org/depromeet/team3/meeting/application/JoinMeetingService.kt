@@ -1,5 +1,5 @@
 package org.depromeet.team3.meeting.application
-
+import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.exception.InvalidInviteTokenException
@@ -10,7 +10,6 @@ import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.depromeet.team3.util.DataEncoder
 import org.depromeet.team3.auth.UserRepository
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import kotlinx.coroutines.withContext
@@ -21,14 +20,13 @@ class JoinMeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val userRepository: UserRepository
 ) {
 
     suspend operator fun invoke(
         userId: Long,
         token: String,
-    ): Unit = withContext(coroutineDispatchers.VT) {
+    ): Unit = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             val meetingId = parseTokenId(token)
             runBlocking { validateMeeting(meetingId, userId) }

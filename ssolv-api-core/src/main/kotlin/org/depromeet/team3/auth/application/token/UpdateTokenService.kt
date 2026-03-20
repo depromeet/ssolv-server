@@ -1,5 +1,5 @@
 package org.depromeet.team3.auth.application.token
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserCommandRepository
@@ -8,7 +8,6 @@ import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -23,10 +22,9 @@ class UpdateTokenService(
     private val userCommandRepository: UserCommandRepository,
     private val jwtTokenProvider: JwtTokenProvider,
     private val transactionTemplate: TransactionTemplate,
-    private val coroutineDispatchers: CoroutineDispatchers
 ) {
 
-    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withContext(coroutineDispatchers.VT) {
+    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withContext(Dispatchers.IO) {
         transactionTemplate.execute {
             val refreshToken = command.refreshToken
             

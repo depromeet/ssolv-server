@@ -1,8 +1,7 @@
 package org.depromeet.team3.placelike.application
-
+import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.withContext
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
 import org.depromeet.team3.meeting.MeetingQuery
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -14,7 +13,6 @@ import java.time.ZoneId
 
 @Service
 class PlaceLikeService(
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
     private val searchService: MeetingPlaceSearchService,
     private val meetingQuery: MeetingQuery,
@@ -56,7 +54,7 @@ class PlaceLikeService(
         return {isLiked, count}
     """.trimIndent(), List::class.java)
 
-    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(coroutineDispatchers.VT) {
+    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(Dispatchers.IO) {
         logger.debug("Toggle Like Request (Atomic Lua) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
         
         val likeKey = searchService.getLikeKey(meetingId, placeId)

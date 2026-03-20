@@ -1,5 +1,5 @@
 package org.depromeet.team3.place.application.execution
-
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.TimeoutCancellationException
@@ -16,7 +16,6 @@ import kotlinx.coroutines.slf4j.MDCContext
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.PlaceEntity
@@ -40,7 +39,6 @@ class ExecutePlaceSearchService(
     private val searchService: MeetingPlaceSearchService,
     private val createSurveyKeywordService: CreateSurveyKeywordService,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
-    private val coroutineDispatchers: CoroutineDispatchers,
     private val redisTemplate: StringRedisTemplate,
     private val globalApiSemaphore: Semaphore,
     private val meterRegistry: MeterRegistry,
@@ -81,7 +79,7 @@ class ExecutePlaceSearchService(
         plan: PlaceSearchPlan,
         dispatcher: CoroutineDispatcher? = null
     ): PlacesSearchResponse {
-        val actualDispatcher = dispatcher ?: coroutineDispatchers.VT
+        val actualDispatcher = dispatcher ?: Dispatchers.IO
         return withContext(MDCContext() + actualDispatcher) {
             supervisorScope {
                 val storedResult = if (plan is PlaceSearchPlan.Automatic && request.meetingId != null) {

@@ -9,7 +9,6 @@ import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.common.util.TestEntityFactory
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
@@ -39,9 +38,6 @@ class WithdrawServiceTest {
 
     @BeforeEach
     fun setUp() {
-        val coroutineDispatchers = object : CoroutineDispatchers() {
-            override val VT = Dispatchers.Unconfined
-        }
         transactionTemplate = mock()
         // transactionTemplate 결과 리턴 보장 (NPE 방지)
         whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
@@ -51,7 +47,7 @@ class WithdrawServiceTest {
         withdrawService = WithdrawService(
             userJpaRepository, kakaoOAuthClient,
             meetingJpaRepository, meetingAttendeeJpaRepository,
-            transactionTemplate, coroutineDispatchers
+            transactionTemplate
         )
     }
 

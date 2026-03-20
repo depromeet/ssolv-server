@@ -1,11 +1,10 @@
 package org.depromeet.team3.place.application.execution
-
+import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.common.util.CoroutineDispatchers
 import org.depromeet.team3.place.PlaceEntity
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
@@ -34,7 +33,6 @@ class MeetingPlaceSearchServiceTest {
     private lateinit var objectMapper: ObjectMapper
     private lateinit var placeQuery: PlaceQuery
     private lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
-    private lateinit var coroutineDispatchers: CoroutineDispatchers
 
     private lateinit var zSetOps: ZSetOperations<String, String>
     private lateinit var valueOps: ValueOperations<String, String>
@@ -51,8 +49,6 @@ class MeetingPlaceSearchServiceTest {
         googlePlacesApiProperties = mock {
             on { apiKey } doReturn "test-api-key"
         }
-        coroutineDispatchers = mock()
-        lenient().whenever(coroutineDispatchers.VT).thenReturn(UnconfinedTestDispatcher())
         meetingQuery = mock()
 
         zSetOps = mock()
@@ -77,7 +73,6 @@ class MeetingPlaceSearchServiceTest {
             objectMapper = objectMapper,
             placeQuery = placeQuery,
             googlePlacesApiProperties = googlePlacesApiProperties,
-            coroutineDispatchers = coroutineDispatchers,
             meetingQuery = meetingQuery
         )
     }
