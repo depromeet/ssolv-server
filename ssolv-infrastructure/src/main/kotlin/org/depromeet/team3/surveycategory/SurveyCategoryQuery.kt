@@ -1,15 +1,13 @@
 package org.depromeet.team3.surveycategory
 
-import com.querydsl.jpa.impl.JPAQueryFactory
+import com.linecorp.kotlinjdsl.dsl.jpql.*
 import org.depromeet.team3.mapper.SurveyCategoryMapper
 import org.springframework.stereotype.Repository
-import org.depromeet.team3.surveycategory.QSurveyCategoryEntity
 
 @Repository
 class SurveyCategoryQuery (
     private val surveyCategoryMapper: SurveyCategoryMapper,
     private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository,
-    private val queryFactory: JPAQueryFactory,
 ) : SurveyCategoryRepository {
 
     override suspend fun save(surveyCategory: SurveyCategory): SurveyCategory {
@@ -43,57 +41,49 @@ class SurveyCategoryQuery (
     }
     
     override suspend fun existsByNameAndParentIdAndIsDeletedFalse(name: String, parentId: Long?, excludeId: Long?): Boolean {
-        val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
-        
-        val firstMatch = queryFactory.selectFrom(qSurveyCategory)
-            .where(
-                qSurveyCategory.name.eq(name)
-                    .and(qSurveyCategory.isDeleted.eq(false))
-                    .and(
-                        if (parentId == null) {
-                            qSurveyCategory.parent.isNull
-                        } else {
-                            qSurveyCategory.parent.id.eq(parentId)
-                        }
-                    )
-                    .and(
-                        if (excludeId == null) {
-                            qSurveyCategory.id.isNotNull
-                        } else {
-                            qSurveyCategory.id.ne(excludeId)
-                        }
-                    )
+        val results = surveyCategoryJpaRepository.findAll {
+            select(
+                entity(SurveyCategoryEntity::class)
+            ).from(
+                entity(SurveyCategoryEntity::class)
+            ).where(
+                and(
+                    path(SurveyCategoryEntity::name).eq(name),
+                    path(SurveyCategoryEntity::isDeleted).eq(false),
+                    if (parentId == null) {
+                        path(SurveyCategoryEntity::parent).isNull()
+                    } else {
+                        path(SurveyCategoryEntity::parent).path(SurveyCategoryEntity::id).eq(parentId)
+                    },
+                    excludeId?.let { path(SurveyCategoryEntity::id).ne(it) }
+                )
             )
-            .fetchFirst()
+        }
         
-        return firstMatch != null
+        return results.filterNotNull().isNotEmpty()
     }
     
     override suspend fun existsBySortOrderAndParentIdAndIsDeletedFalseAndIdNot(sortOrder: Int, parentId: Long?, excludeId: Long?): Boolean {
-        val qSurveyCategory = QSurveyCategoryEntity.surveyCategoryEntity
-        
-        val firstMatch = queryFactory.selectFrom(qSurveyCategory)
-            .where(
-                qSurveyCategory.sortOrder.eq(sortOrder)
-                    .and(qSurveyCategory.isDeleted.eq(false))
-                    .and(
-                        if (parentId == null) {
-                            qSurveyCategory.parent.isNull
-                        } else {
-                            qSurveyCategory.parent.id.eq(parentId)
-                        }
-                    )
-                    .and(
-                        if (excludeId == null) {
-                            qSurveyCategory.id.isNotNull
-                        } else {
-                            qSurveyCategory.id.ne(excludeId)
-                        }
-                    )
+        val results = surveyCategoryJpaRepository.findAll {
+            select(
+                entity(SurveyCategoryEntity::class)
+            ).from(
+                entity(SurveyCategoryEntity::class)
+            ).where(
+                and(
+                    path(SurveyCategoryEntity::sortOrder).eq(sortOrder),
+                    path(SurveyCategoryEntity::isDeleted).eq(false),
+                    if (parentId == null) {
+                        path(SurveyCategoryEntity::parent).isNull()
+                    } else {
+                        path(SurveyCategoryEntity::parent).path(SurveyCategoryEntity::id).eq(parentId)
+                    },
+                    excludeId?.let { path(SurveyCategoryEntity::id).ne(it) }
+                )
             )
-            .fetchFirst()
+        }
         
-        return firstMatch != null
+        return results.filterNotNull().isNotEmpty()
     }
     
     override suspend fun countChildrenByParentIdAndIsDeletedFalse(parentId: Long): Long {
