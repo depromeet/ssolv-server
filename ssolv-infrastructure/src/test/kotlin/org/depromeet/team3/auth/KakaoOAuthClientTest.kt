@@ -34,8 +34,7 @@ class KakaoOAuthClientTest {
         kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
         kakaoOAuthClient = KakaoOAuthClient(
             kakaoProperties = kakaoProperties,
-            webClient = mock(),
-            objectMapper = ObjectMapper()
+            httpClient = mock()
         )
     }
 

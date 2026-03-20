@@ -35,7 +35,7 @@ class GooglePlacesClientTest {
         )
         
         googlePlacesClient = GooglePlacesClient(
-            googlePlacesWebClient = webClient,
+            httpClient = mock(),
             googlePlacesApiProperties = googlePlacesApiProperties
         )
     }

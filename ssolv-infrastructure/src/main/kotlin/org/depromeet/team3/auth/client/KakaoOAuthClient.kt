@@ -5,25 +5,20 @@ import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.model.KakaoResponse
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.http.*
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import org.springframework.stereotype.Component
-import org.springframework.util.LinkedMultiValueMap
-import org.springframework.util.MultiValueMap
-import org.springframework.web.reactive.function.BodyInserters
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBody
-import org.springframework.web.reactive.function.client.awaitBodilessEntity
-import com.fasterxml.jackson.databind.ObjectMapper
-
-import org.springframework.beans.factory.annotation.Qualifier
 
 @Component
 class KakaoOAuthClient(
     private val kakaoProperties: KakaoProperties,
-    @Qualifier("commonWebClient")
-    private val webClient: WebClient,
-    private val objectMapper: ObjectMapper,
+    private val httpClient: HttpClient,
 ) {
     private val log = LoggerFactory.getLogger(KakaoOAuthClient::class.java)
 
@@ -53,35 +48,29 @@ class KakaoOAuthClient(
             throw AuthException(ErrorCode.KAKAO_INVALID_REDIRECT_URI)
         }
 
-        val params: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
-            add("grant_type", "authorization_code")
-            add("client_id", kakaoProperties.clientId)
-            add("redirect_uri", trimmedRedirectUri)
-            add("code", accessCode)
-        }
-
         return try {
-            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
-                webClient.post()
-                    .uri(kakaoProperties.tokenUri)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(BodyInserters.fromFormData(params))
-                    .retrieve()
-                    .onStatus({ status -> status.isError }) { response ->
-                        response.bodyToMono(String::class.java).map { body ->
-                            log.error("카카오 토큰 요청 에러 ({}): {}", response.statusCode(), body)
-                            when (response.statusCode().value()) {
-                                400, 401 -> AuthException(ErrorCode.KAKAO_INVALID_GRANT)
-                                429 -> AuthException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)
-                                else -> AuthException(ErrorCode.KAKAO_API_ERROR)
-                            }
-                        }
+            withTimeout(apiTimeoutMillis) {
+                httpClient.submitForm(
+                    url = kakaoProperties.tokenUri,
+                    formParameters = parameters {
+                        append("grant_type", "authorization_code")
+                        append("client_id", kakaoProperties.clientId)
+                        append("redirect_uri", trimmedRedirectUri)
+                        append("code", accessCode)
                     }
-                    .awaitBody<KakaoResponse.OAuthToken>()
+                ).body<KakaoResponse.OAuthToken>()
             }
         } catch (e: Exception) {
-            if (e is AuthException) throw e
-            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+            if (e is ResponseException) {
+                val body = e.response.body<String>()
+                log.error("카카오 토큰 요청 에러 ({}): {}", e.response.status, body)
+                when (e.response.status.value) {
+                    400, 401 -> throw AuthException(ErrorCode.KAKAO_INVALID_GRANT)
+                    429 -> throw AuthException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)
+                    else -> throw AuthException(ErrorCode.KAKAO_API_ERROR)
+                }
+            }
+            if (e is TimeoutCancellationException) {
                 log.error("카카오 토큰 요청 타임아웃: {}", e.message)
                 throw AuthException(ErrorCode.KAKAO_API_ERROR)
             }
@@ -94,25 +83,21 @@ class KakaoOAuthClient(
         val accessToken = oAuthToken?.access_token ?: throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
 
         return try {
-            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
-                webClient.get()
-                    .uri(kakaoProperties.userInfoUri)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                    .retrieve()
-                    .onStatus({ status -> status.isError }) { response ->
-                        response.bodyToMono(String::class.java).map { body ->
-                            log.error("카카오 프로필 요청 에러 ({}): {}", response.statusCode(), body)
-                            when (response.statusCode().value()) {
-                                401 -> AuthException(ErrorCode.KAKAO_AUTH_FAILED)
-                                else -> AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
-                            }
-                        }
-                    }
-                    .awaitBody<KakaoResponse.KakaoProfile>()
+            withTimeout(apiTimeoutMillis) {
+                httpClient.get(kakaoProperties.userInfoUri) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }.body<KakaoResponse.KakaoProfile>()
             }
         } catch (e: Exception) {
-            if (e is AuthException) throw e
-            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+            if (e is ResponseException) {
+                val body = e.response.body<String>()
+                log.error("카카오 프로필 요청 에러 ({}): {}", e.response.status, body)
+                when (e.response.status.value) {
+                    401 -> throw AuthException(ErrorCode.KAKAO_AUTH_FAILED)
+                    else -> throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
+                }
+            }
+            if (e is TimeoutCancellationException) {
                 log.error("카카오 프로필 요청 타임아웃: {}", e.message)
                 throw AuthException(ErrorCode.KAKAO_PROFILE_REQUEST_FAILED)
             }
@@ -122,20 +107,17 @@ class KakaoOAuthClient(
     }
 
     suspend fun unlink(socialId: String) {
-        val params: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
-            add("target_id_type", "user_id")
-            add("target_id", socialId)
-        }
-
         try {
-            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
-                webClient.post()
-                    .uri("https://kapi.kakao.com/v1/user/unlink")
-                    .header(HttpHeaders.AUTHORIZATION, "KakaoAK ${kakaoProperties.adminKey}")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(BodyInserters.fromFormData(params))
-                    .retrieve()
-                    .awaitBodilessEntity()
+            withTimeout(apiTimeoutMillis) {
+                httpClient.submitForm(
+                    url = "https://kapi.kakao.com/v1/user/unlink",
+                    formParameters = parameters {
+                        append("target_id_type", "user_id")
+                        append("target_id", socialId)
+                    }
+                ) {
+                    header(HttpHeaders.Authorization, "KakaoAK ${kakaoProperties.adminKey}")
+                }
             }
             log.info("카카오 연결 끊기 성공 - socialId: {}", socialId)
         } catch (e: Exception) {

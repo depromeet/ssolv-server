@@ -37,7 +37,7 @@ class GooglePlacesClientRetryTest {
         )
         
         googlePlacesClient = GooglePlacesClient(
-            googlePlacesWebClient = webClient,
+            httpClient = mock(),
             googlePlacesApiProperties = googlePlacesApiProperties
         )
     }

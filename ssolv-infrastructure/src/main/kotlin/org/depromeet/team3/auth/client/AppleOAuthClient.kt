@@ -7,14 +7,13 @@ import org.depromeet.team3.auth.model.AppleResponse
 import org.depromeet.team3.auth.properties.AppleProperties
 import org.depromeet.team3.common.exception.ErrorCode
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
-import org.springframework.util.LinkedMultiValueMap
-import org.springframework.util.MultiValueMap
-import org.springframework.web.reactive.function.BodyInserters
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBody
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.http.*
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.PrivateKey
@@ -23,15 +22,14 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-
-import org.springframework.beans.factory.annotation.Qualifier
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 @Component
 class AppleOAuthClient(
     private val objectMapper: ObjectMapper,
     private val appleProperties: AppleProperties,
-    @Qualifier("commonWebClient")
-    private val webClient: WebClient,
+    private val httpClient: HttpClient,
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthClient::class.java)
     private val publicKeyCache = ConcurrentHashMap<String, PublicKey>()
@@ -60,36 +58,31 @@ class AppleOAuthClient(
         }
 
         val clientSecret = generateClientSecret()
-        val params: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
-            add("grant_type", "authorization_code")
-            add("client_id", appleProperties.clientId)
-            add("client_secret", clientSecret)
-            add("code", accessCode)
-            add("redirect_uri", trimmedRedirectUri)
-        }
 
         return try {
-            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
-                webClient.post()
-                    .uri(appleProperties.tokenUri)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(BodyInserters.fromFormData(params))
-                    .retrieve()
-                    .onStatus({ status -> status.isError }) { response ->
-                        response.bodyToMono(String::class.java).map { body ->
-                            log.error("애플 토큰 요청 에러 ({}): {}", response.statusCode(), body)
-                            when (response.statusCode().value()) {
-                                400 -> AuthException(ErrorCode.APPLE_INVALID_GRANT)
-                                401 -> AuthException(ErrorCode.APPLE_AUTH_FAILED)
-                                else -> AuthException(ErrorCode.APPLE_API_ERROR)
-                            }
-                        }
+            withTimeout(apiTimeoutMillis) {
+                httpClient.submitForm(
+                    url = appleProperties.tokenUri,
+                    formParameters = parameters {
+                        append("grant_type", "authorization_code")
+                        append("client_id", appleProperties.clientId)
+                        append("client_secret", clientSecret)
+                        append("code", accessCode)
+                        append("redirect_uri", trimmedRedirectUri)
                     }
-                    .awaitBody<AppleResponse.OAuthToken>()
+                ).body<AppleResponse.OAuthToken>()
             }
         } catch (e: Exception) {
-            if (e is AuthException) throw e
-            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+            if (e is ResponseException) {
+                val body = e.response.body<String>()
+                log.error("애플 토큰 요청 에러 ({}): {}", e.response.status, body)
+                when (e.response.status.value) {
+                    400 -> throw AuthException(ErrorCode.APPLE_INVALID_GRANT)
+                    401 -> throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
+                    else -> throw AuthException(ErrorCode.APPLE_API_ERROR)
+                }
+            }
+            if (e is TimeoutCancellationException) {
                 log.error("애플 토큰 요청 타임아웃: {}", e.message)
                 throw AuthException(ErrorCode.APPLE_API_ERROR)
             }
@@ -100,7 +93,6 @@ class AppleOAuthClient(
 
     suspend fun parseIdToken(idToken: String): AppleResponse.IdTokenPayload {
         try {
-            // jjwt 파서의 KeyLocator는 suspend를 지원하지 않으므로 미리 kid를 추출합니다.
             val headerPart = idToken.split(".")[0]
             val headerJson = String(Base64.getUrlDecoder().decode(headerPart))
             val headerMap = objectMapper.readValue(headerJson, Map::class.java)
@@ -146,17 +138,9 @@ class AppleOAuthClient(
 
     private suspend fun refreshPublicKeys() {
         try {
-            kotlinx.coroutines.withTimeout(apiTimeoutMillis) {
-                val response = webClient.get()
-                    .uri("https://appleid.apple.com/auth/keys")
-                    .retrieve()
-                    .onStatus({ status -> status.isError }) { response ->
-                        response.bodyToMono(String::class.java).map { body ->
-                            log.error("애플 공개키 조회 API 오류 ({}): {}", response.statusCode(), body)
-                            AuthException(ErrorCode.APPLE_API_ERROR)
-                        }
-                    }
-                    .awaitBody<AppleResponse.PublicKeys>()
+            withTimeout(apiTimeoutMillis) {
+                val response = httpClient.get("https://appleid.apple.com/auth/keys")
+                    .body<AppleResponse.PublicKeys>()
                 
                 response.keys.forEach { key ->
                     val publicKey = generatePublicKey(key.n, key.e)
@@ -164,7 +148,11 @@ class AppleOAuthClient(
                 }
             }
         } catch (e: Exception) {
-            if (e is AuthException) throw e
+            if (e is ResponseException) {
+                val body = e.response.body<String>()
+                log.error("애플 공개키 조회 API 오류 ({}): {}", e.response.status, body)
+                throw AuthException(ErrorCode.APPLE_API_ERROR)
+            }
             log.error("애플 공개키 조회 실패: {}", e.message)
             throw AuthException(ErrorCode.APPLE_API_ERROR)
         }

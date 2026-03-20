@@ -43,10 +43,14 @@ dependencies {
     kapt("jakarta.annotation:jakarta.annotation-api")
     kapt("jakarta.persistence:jakarta.persistence-api")
 
-    // HTTP Client
-    implementation("org.apache.httpcomponents.client5:httpclient5:5.3.1")
-    implementation("org.apache.httpcomponents.core5:httpcore5:5.2.4")
-    
+    // Ktor Client
+    val ktorVersion = "2.3.12"
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-jackson:$ktorVersion")
+    implementation("io.ktor:ktor-client-logging:$ktorVersion")
+
     // Kotlin Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
 

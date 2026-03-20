@@ -9,19 +9,19 @@ import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.place.model.PlacesTextSearchRequest
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBody
 import kotlin.random.Random
-
-import org.springframework.beans.factory.annotation.Qualifier
 
 @Component
 @ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
 class GooglePlacesClient(
-    @Qualifier("googlePlacesWebClient")
-    private val googlePlacesWebClient: WebClient,
+    private val httpClient: HttpClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
 ) {
 
@@ -52,11 +52,12 @@ class GooglePlacesClient(
                 
                 // 재시도 여부 결정: 5xx 에러, 429 에러, 또는 네트워크 관련 예외일 때만 재시도
                 val isRetryable = when (e) {
-                    is org.springframework.web.reactive.function.client.WebClientResponseException -> {
-                        e.statusCode.is5xxServerError || e.statusCode.value() == 429
+                    is ResponseException -> {
+                        e.response.status.value >= 500 || e.response.status.value == 429
                     }
                     is java.io.IOException -> true
                     is kotlinx.coroutines.TimeoutCancellationException -> true
+                    is HttpRequestTimeoutException -> true
                     else -> false
                 }
 
@@ -82,7 +83,7 @@ class GooglePlacesClient(
     }
 
     /**
-     * 텍스트 검색 (WebClient 버전)
+     * 텍스트 검색 (Ktor 버전)
      */
     suspend fun textSearch(
         query: String, 
@@ -115,22 +116,12 @@ class GooglePlacesClient(
                         locationBias = locationBias
                     )
 
-                    googlePlacesWebClient.post()
-                        .uri("/v1/places:searchText")
-                        .header("X-Goog-Api-Key", googlePlacesApiProperties.apiKey)
-                        .header("X-Goog-FieldMask", buildTextSearchFieldMask())
-                        .bodyValue(request)
-                        .retrieve()
-                        .onStatus({ status -> status.isError }) { response ->
-                            response.bodyToMono(String::class.java).map { body ->
-                                logger.error { "Google Places API 오류 (${response.statusCode()}): $body" }
-                                PlaceSearchException(
-                                    ErrorCode.PLACE_API_ERROR,
-                                    detail = mapOf("statusCode" to response.statusCode().value(), "body" to body)
-                                )
-                            }
-                        }
-                        .awaitBody<PlacesTextSearchResponse>()
+                    httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
+                        header("X-Goog-Api-Key", googlePlacesApiProperties.apiKey)
+                        header("X-Goog-FieldMask", buildTextSearchFieldMask())
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.body<PlacesTextSearchResponse>()
                 }
             } catch (e: TimeoutCancellationException) {
                 logger.error(e) { "Google Places API 텍스트 검색 타임아웃: query=$query" }
@@ -139,6 +130,14 @@ class GooglePlacesClient(
                     detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)")
                 )
             } catch (e: Exception) {
+                if (e is ResponseException) {
+                    val body = e.response.body<String>()
+                    logger.error { "Google Places API 오류 (${e.response.status}): $body" }
+                    throw PlaceSearchException(
+                        ErrorCode.PLACE_API_ERROR,
+                        detail = mapOf("statusCode" to e.response.status.value, "body" to body)
+                    )
+                }
                 if (e is PlaceSearchException) throw e
                 throw e
             }
