@@ -26,10 +26,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     
     implementation("org.springframework.boot:spring-boot-starter-web")
-    api("com.linecorp.kotlin-jdsl:jpql-dsl:3.5.5")
-    api("com.linecorp.kotlin-jdsl:jpql-render:3.5.5")
-    api("com.linecorp.kotlin-jdsl:hibernate-support:3.5.5")
-    api("com.linecorp.kotlin-jdsl:spring-data-jpa-support:3.5.5")
+    api("com.linecorp.kotlin-jdsl:jpql-dsl:3.8.0")
+    api("com.linecorp.kotlin-jdsl:jpql-render:3.8.0")
+    api("com.linecorp.kotlin-jdsl:hibernate-support:3.8.0")
+    api("com.linecorp.kotlin-jdsl:spring-data-jpa-support:3.8.0")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     // Spring Boot 관리 버전 사용
