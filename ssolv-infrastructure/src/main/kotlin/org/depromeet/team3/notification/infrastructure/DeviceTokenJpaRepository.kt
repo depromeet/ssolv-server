@@ -1,11 +1,13 @@
 package org.depromeet.team3.notification.infrastructure
 
+import org.depromeet.team3.notification.domain.DevicePlatform
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
 interface DeviceTokenJpaRepository : JpaRepository<DeviceTokenEntity, Long> {
     fun findByUserId(userId: Long): List<DeviceTokenEntity>
     fun findByFcmToken(fcmToken: String): DeviceTokenEntity?
+    fun findByUserIdAndPlatform(userId: Long, platform: DevicePlatform): DeviceTokenEntity?
     fun deleteByFcmToken(fcmToken: String)
     fun deleteByUserIdAndFcmToken(userId: Long, fcmToken: String)
     fun deleteAllByUserId(userId: Long)
