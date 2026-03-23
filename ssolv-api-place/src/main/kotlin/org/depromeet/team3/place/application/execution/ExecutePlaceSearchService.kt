@@ -26,6 +26,7 @@ import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
+import org.depromeet.team3.benchmark.BenchmarkApiOverride
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
@@ -82,9 +83,8 @@ class ExecutePlaceSearchService(
         val actualDispatcher = dispatcher ?: Dispatchers.IO
         return withContext(MDCContext() + actualDispatcher) {
             supervisorScope {
-                val storedResult = if (plan is PlaceSearchPlan.Automatic && request.meetingId != null) {
-                    searchService.find(request.meetingId, request.userId)
-                } else null
+                val storedResult = if (BenchmarkApiOverride.bypassCache || request.meetingId == null) null 
+                                   else searchService.find(request.meetingId, request.userId)
 
                 if (storedResult != null && request.meetingId != null) {
                     return@supervisorScope storedResult
@@ -94,6 +94,15 @@ class ExecutePlaceSearchService(
                     ?: throw IllegalArgumentException("PlaceSearchPlan.Automatic만 지원합니다.")
 
                 val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
+
+                // [벤치마크용] 순수 부하 측정을 위해 meetingId가 0L인 경우 DB/Redis를 건너뛰고 가공해서 즉시 반환
+                if (request.meetingId == 0L) {
+                    return@supervisorScope BenchmarkApiOverride.generateMockSearchResponse(
+                        keywordResult.places,
+                        keywordResult.fallbackPlaces,
+                        totalFetchSize
+                    )
+                }
 
                 val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
                 val placesToProcess = candidatePlaces
@@ -200,7 +209,7 @@ class ExecutePlaceSearchService(
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
     ): KeywordSearchResult = supervisorScope {
-        val requestSemaphore = Semaphore(4) // 하나의 요청(모임방)당 동시 Google API 호출을 4개로 제한
+        val requestSemaphore = Semaphore(BenchmarkApiOverride.requestSemaphoreSize)
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
             async(parentContext + dispatcher) {

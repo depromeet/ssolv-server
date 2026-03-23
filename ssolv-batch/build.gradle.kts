@@ -24,6 +24,14 @@ tasks {
         enabled = true
         archiveClassifier.set("plain")
     }
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events("passed", "skipped", "failed", "standardOut", "standardError")
+            showStackTraces = true
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+    }
     bootJar {
         enabled = false
     }

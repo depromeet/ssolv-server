@@ -56,11 +56,29 @@ subprojects {
         }
     }
 
+    val mockitoAgent = configurations.create("mockitoAgent")
+    dependencies {
+        mockitoAgent("net.bytebuddy:byte-buddy-agent") { isTransitive = false }
+    }
+
+    // 벤치마크용 디렉토리가 존재하면 소스셋에 포함 (깃 추적 제외된 벤치마크 코드 연동)
+    configure<JavaPluginExtension> {
+        val benchmarkInfra = file("${rootProject.projectDir}/benchmark/infrastructure")
+        if (project.name == "ssolv-infrastructure" && benchmarkInfra.exists()) {
+            sourceSets.getByName("main").java.srcDir(benchmarkInfra)
+        }
+
+        val benchmarkApi = file("${rootProject.projectDir}/benchmark/api")
+        if (project.name == "ssolv-api-place" && benchmarkApi.exists()) {
+            sourceSets.getByName("main").java.srcDir(benchmarkApi)
+        }
+    }
+
     tasks.withType<Test> {
         useJUnitPlatform()
         
         // Java 21+에서 Mockito 및 Java Agent 관련 경고 제거
-        jvmArgs("-XX:+EnableDynamicAgentLoading")
+        jvmArgs("-XX:+EnableDynamicAgentLoading", "-javaagent:${mockitoAgent.singleFile}")
 
         // 테스트 리포트 설정
         reports {

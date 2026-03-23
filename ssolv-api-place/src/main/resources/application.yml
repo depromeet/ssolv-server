@@ -35,6 +35,10 @@ api:
 
 # WAS 헬스 체크 및 모니터링 관련
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   endpoints:
     web:
       exposure:
