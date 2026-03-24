@@ -16,7 +16,6 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
-import org.depromeet.team3.benchmark.BenchmarkInfrastructureOverride
 import kotlin.random.Random
 
 @Component
@@ -36,9 +35,6 @@ class GooglePlacesClient(
     private val initialDelayMillis = 100L 
     private val maxDelayMillis = 2000L
     private val jitterMaxMillis = 100L
-
-    private val isMockMode = BenchmarkInfrastructureOverride.isMockMode 
-
 
     private suspend fun <T> retryWithExponentialBackoff(
         operation: String,
@@ -96,9 +92,7 @@ class GooglePlacesClient(
         longitude: Double? = null,
         radius: Double = 3000.0
     ): PlacesTextSearchResponse {
-        if (isMockMode) {
-            return BenchmarkInfrastructureOverride.mockTextSearch(query, maxResults, apiTimeoutMillis, ::retryWithExponentialBackoff)
-        }
+
         
         return retryWithExponentialBackoff(
             operation = "텍스트 검색",

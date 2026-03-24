@@ -25,11 +25,14 @@ import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
+import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.depromeet.team3.benchmark.BenchmarkApiOverride
+
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
+import java.time.Duration
+import kotlinx.coroutines.delay
 
 /**
  * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
@@ -43,6 +46,7 @@ class ExecutePlaceSearchService(
     private val redisTemplate: StringRedisTemplate,
     private val globalApiSemaphore: Semaphore,
     private val meterRegistry: MeterRegistry,
+    private val lockService: DistributedLockService,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -83,102 +87,122 @@ class ExecutePlaceSearchService(
         val actualDispatcher = dispatcher ?: Dispatchers.IO
         return withContext(MDCContext() + actualDispatcher) {
             supervisorScope {
-                val storedResult = if (BenchmarkApiOverride.bypassCache || request.meetingId == null) null 
-                                   else searchService.find(request.meetingId, request.userId)
+                val meetingId = request.meetingId ?: throw IllegalArgumentException("Meeting ID is required")
 
-                if (storedResult != null && request.meetingId != null) {
+                val storedResult = searchService.find(meetingId, request.userId)
+
+                if (storedResult != null) {
                     return@supervisorScope storedResult
                 }
 
                 val automaticPlan = plan as? PlaceSearchPlan.Automatic
                     ?: throw IllegalArgumentException("PlaceSearchPlan.Automatic만 지원합니다.")
 
+                // 캐시가 없으면 락을 이용해 구글 API 호출 통제 (Cache Stampede 방어)
+                val lockKey = "place_search_lock:$meetingId"
+                repeat(5) { attempt ->
+                    val result = lockService.withLock(lockKey, Duration.ofSeconds(10)) {
+                        // 락 획득 후 캐시 다시 확인 (Double-Check)
+                        searchService.find(meetingId, null)?.let { return@withLock it }
+
+                        // 캐시가 여전히 없으면 직접 실행 및 결과 저장
+                        val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
+                        doProcessSearchResults(meetingId, keywordResult, actualDispatcher)
+                    }
+
+                    if (result != null) return@supervisorScope result
+
+                    // 락 획득 실패 시: 다른 노드/스레드가 작업 중이므로 잠시 대기 후 캐시 확인
+                    delay(1000)
+                    searchService.find(meetingId, null)?.let { return@supervisorScope it }
+                }
+
+                // 최후의 수단: 5초 대기 후에도 락이나 캐시 결과가 없으면 직접 실행 수행 (Fallback)
                 val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
-
-                // [벤치마크용] 순수 부하 측정을 위해 meetingId가 0L인 경우 DB/Redis를 건너뛰고 가공해서 즉시 반환
-                if (request.meetingId == 0L) {
-                    return@supervisorScope BenchmarkApiOverride.generateMockSearchResponse(
-                        keywordResult.places,
-                        keywordResult.fallbackPlaces,
-                        totalFetchSize
-                    )
-                }
-
-                val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
-                val placesToProcess = candidatePlaces
-                    .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
-                    .take(totalFetchSize + photoFallbackBuffer)
-
-                val savedEntities = withContext(actualDispatcher) {
-                    placeQuery.savePlacesFromTextSearch(placesToProcess)
-                }
-
-                if (savedEntities.isEmpty()) return@supervisorScope PlacesSearchResponse(emptyList())
-
-                val googlePlaceIds = savedEntities.mapNotNull { it.googlePlaceId }
-                val placeIdMap = getPlaceStringIdToDbIdMap(googlePlaceIds, actualDispatcher)
-                val placeWeightByDbId = keywordResult.placeWeights.mapNotNull { (googleId, weight) ->
-                    placeIdMap[googleId]?.let { it to weight }
-                }.toMap()
-
-                val likesMap = if (request.meetingId != null) {
-                    buildLikesMapFromRedis(request.meetingId, savedEntities, request.userId)
-                } else emptyMap()
-
-                val items = savedEntities.mapNotNull { entity ->
-                    runCatching {
-                        val placeDbId = entity.id ?: return@mapNotNull null
-                        val likeInfo = likesMap[placeDbId] ?: PlaceLikeInfo(0, false)
-
-                        PlacesSearchResponse.PlaceItem(
-                            placeId = placeDbId,
-                            name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
-                            address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
-                            rating = entity.rating,
-                            userRatingsTotal = entity.userRatingsTotal,
-                            openNow = entity.openNow,
-                            photos = entity.photos?.split(",")?.map { photoName ->
-                                "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
-                            },
-                            link = entity.link ?: "",
-                            weekdayText = entity.weekdayText?.split("\n"),
-                            topReview = entity.topReviewRating?.let { rating ->
-                                entity.topReviewText?.let { text ->
-                                    PlacesSearchResponse.PlaceItem.Review(rating.toInt(), text)
-                                }
-                            },
-                            priceRange = null,
-                            addressDescriptor = entity.addressDescriptor?.let { desc ->
-                                PlacesSearchResponse.PlaceItem.AddressDescriptor(org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
-                            },
-                            likeCount = likeInfo.likeCount,
-                            isLiked = likeInfo.isLiked
-                        )
-                    }.getOrNull()
-                }
-
-                val scoreByPlaceId = items.associate { item ->
-                    val weight = placeWeightByDbId[item.placeId] ?: 0.0
-                    val weightScore = weight * weightScoreMultiplier
-                    val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
-                    item.placeId to (weightScore + likeScore)
-                }
-
-                val sortedItems = items.sortedWith(
-                    compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
-                        .thenByDescending { it.likeCount }
-                )
-
-                val finalItems = sortedItems.take(totalFetchSize)
-                val response = PlacesSearchResponse(finalItems)
-
-                if (request.meetingId != null && finalItems.isNotEmpty()) {
-                    searchService.save(request.meetingId, response, scoreByPlaceId)
-                }
-
-                response
+                return@supervisorScope doProcessSearchResults(meetingId, keywordResult, actualDispatcher)
             }
         }
+    }
+
+    // Helper function to contain the actual processing logic
+    private suspend fun doProcessSearchResults(
+        meetingId: Long,
+        keywordResult: KeywordSearchResult,
+        actualDispatcher: CoroutineDispatcher
+    ): PlacesSearchResponse {
+        val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
+        val placesToProcess = candidatePlaces
+            .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
+            .take(totalFetchSize + photoFallbackBuffer)
+
+        val savedEntities = withContext(actualDispatcher) {
+            placeQuery.savePlacesFromTextSearch(placesToProcess)
+        }
+
+        if (savedEntities.isEmpty()) return PlacesSearchResponse(emptyList())
+
+        val googlePlaceIds = savedEntities.mapNotNull { it.googlePlaceId }
+        val placeIdMap = getPlaceStringIdToDbIdMap(googlePlaceIds, actualDispatcher)
+        val placeWeightByDbId = keywordResult.placeWeights.mapNotNull { (googleId, weight) ->
+            placeIdMap[googleId]?.let { it to weight }
+        }.toMap()
+
+        val likesMap = if (meetingId != null) { // Use the passed meetingId
+            buildLikesMapFromRedis(meetingId, savedEntities, null) // userId is null for cached result
+        } else emptyMap()
+
+        val items = savedEntities.mapNotNull { entity ->
+            runCatching {
+                val placeDbId = entity.id ?: return@mapNotNull null
+                val likeInfo = likesMap[placeDbId] ?: PlaceLikeInfo(0, false)
+
+                PlacesSearchResponse.PlaceItem(
+                    placeId = placeDbId,
+                    name = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(entity.name),
+                    address = entity.address.replace("대한민국 ", "").replace(" South Korea", "").replace(", South Korea", ""),
+                    rating = entity.rating,
+                    userRatingsTotal = entity.userRatingsTotal,
+                    openNow = entity.openNow,
+                    photos = entity.photos?.split(",")?.map { photoName ->
+                        "https://places.googleapis.com/v1/$photoName/media?key=${googlePlacesApiProperties.apiKey}&maxHeightPx=1000&maxWidthPx=1000"
+                    },
+                    link = entity.link ?: "",
+                    weekdayText = entity.weekdayText?.split("\n"),
+                    topReview = entity.topReviewRating?.let { rating ->
+                        entity.topReviewText?.let { text ->
+                            PlacesSearchResponse.PlaceItem.Review(rating.toInt(), text)
+                        }
+                    },
+                    priceRange = null,
+                    addressDescriptor = entity.addressDescriptor?.let { desc ->
+                        PlacesSearchResponse.PlaceItem.AddressDescriptor(org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
+                    },
+                    likeCount = likeInfo.likeCount,
+                    isLiked = likeInfo.isLiked
+                )
+            }.getOrNull()
+        }
+
+        val scoreByPlaceId = items.associate { item ->
+            val weight = placeWeightByDbId[item.placeId] ?: 0.0
+            val weightScore = weight * weightScoreMultiplier
+            val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
+            item.placeId to (weightScore + likeScore)
+        }
+
+        val sortedItems = items.sortedWith(
+            compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
+                .thenByDescending { it.likeCount }
+        )
+
+        val finalItems = sortedItems.take(totalFetchSize)
+        val response = PlacesSearchResponse(finalItems)
+
+        if (meetingId != null && finalItems.isNotEmpty()) {
+            searchService.save(meetingId, response, scoreByPlaceId)
+        }
+
+        return response
     }
 
     private suspend fun buildLikesMapFromRedis(meetingId: Long, places: List<PlaceEntity>, userId: Long?): Map<Long, PlaceLikeInfo> {
@@ -209,7 +233,7 @@ class ExecutePlaceSearchService(
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
     ): KeywordSearchResult = supervisorScope {
-        val requestSemaphore = Semaphore(BenchmarkApiOverride.requestSemaphoreSize)
+        val requestSemaphore = Semaphore(4)
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
             async(parentContext + dispatcher) {
