@@ -1,4 +1,4 @@
-package org.depromeet.team3.place.util
+package org.depromeet.team3.common.util
 
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate

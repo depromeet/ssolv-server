@@ -18,7 +18,7 @@ import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.depromeet.team3.place.util.DistributedLockService
+import org.depromeet.team3.common.util.DistributedLockService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

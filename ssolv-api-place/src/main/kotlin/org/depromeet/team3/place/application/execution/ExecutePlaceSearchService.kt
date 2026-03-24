@@ -25,7 +25,7 @@ import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
-import org.depromeet.team3.place.util.DistributedLockService
+import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
 
 import org.slf4j.LoggerFactory
