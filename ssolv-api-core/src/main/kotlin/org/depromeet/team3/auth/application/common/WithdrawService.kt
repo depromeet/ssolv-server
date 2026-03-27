@@ -96,15 +96,22 @@ class WithdrawService(
      * 호스팅 중인 모임 검증 (blocking, transactionTemplate.execute 내부에서 호출)
      */
     private fun validateHostedMeetings(userId: Long) {
+        val now = LocalDateTime.now()
         val hostedMeetings = meetingJpaRepository.findByHostUserId(userId)
 
         for (meeting in hostedMeetings) {
+            // 1. 이미 종료되었거나 기간이 만료된 모임은 탈퇴를 방해하지 않음
+            if (meeting.isClosed) continue
+            if (meeting.endAt != null && meeting.endAt.isBefore(now)) continue
+
             val meetingId = meeting.id ?: continue
             val attendees = meetingAttendeeJpaRepository.findByMeetingId(meetingId)
 
-            val hasOtherAttendees = attendees.any { it.user.id != userId }
+            // 2. 호스트 본인을 제외한 다른 참석자가 한 명이라도 있는지 확인
+            val hasOtherAttendees = attendees.any { it.user.id != null && it.user.id != userId }
+            
             if (hasOtherAttendees) {
-                log.warn("탈퇴 시도 실패 - userId: {}, 다른 참석자가 있는 모임 호스팅 중: meetingId: {}", userId, meetingId)
+                log.warn("탈퇴 시도 실패 - userId: {}, 다른 참석자가 있는 활성 모임 호스팅 중: meetingId: {}", userId, meetingId)
                 throw AuthException(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
             }
         }
