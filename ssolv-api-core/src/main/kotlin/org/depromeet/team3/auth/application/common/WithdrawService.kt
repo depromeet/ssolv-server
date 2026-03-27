@@ -102,7 +102,9 @@ class WithdrawService(
         for (meeting in hostedMeetings) {
             // 1. 이미 종료되었거나 기간이 만료된 모임은 탈퇴를 방해하지 않음
             if (meeting.isClosed) continue
-            if (meeting.endAt != null && meeting.endAt.isBefore(now)) continue
+            
+            val endAt = meeting.endAt
+            if (endAt != null && endAt.isBefore(now)) continue
 
             val meetingId = meeting.id ?: continue
             val attendees = meetingAttendeeJpaRepository.findByMeetingId(meetingId)
