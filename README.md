@@ -1,4 +1,3 @@
-# 17th-team3-Server
 
 ## Tech Stack
 
