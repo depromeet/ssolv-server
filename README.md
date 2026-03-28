@@ -1,4 +1,3 @@
-# 17th-team3-Server
 
 ## Tech Stack
 
@@ -14,7 +13,7 @@
 | Observability | Micrometer, OpenTelemetry, Sentry, Prometheus |
 | Build | Gradle 8 (Kotlin DSL), Jib |
 
-## Modules
+## Multi-Modules
 
 ```
 ssolv-server
