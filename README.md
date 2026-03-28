@@ -13,7 +13,7 @@
 | Observability | Micrometer, OpenTelemetry, Sentry, Prometheus |
 | Build | Gradle 8 (Kotlin DSL), Jib |
 
-## Modules
+## Multi-Modules
 
 ```
 ssolv-server
