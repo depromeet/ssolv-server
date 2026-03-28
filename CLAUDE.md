@@ -47,3 +47,25 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 - **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
 - **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
+
+## 진행 중인 작업
+
+현재 AWS 계정 이전 + 멀티 서버 마이그레이션 진행 중.
+워크로드 및 진행 상황: `.claude/WORKFLOW.md`
+인프라 의사결정 기록: `.claude/DECISIONS.md`
+
+## IaC 보안 감사 규칙
+
+`.tf` 파일 작성 또는 수정 시 아래 규칙을 **항상** 적용한다.
+
+**자동 감사 항목:**
+- RDS: `storage_encrypted = true`, `deletion_protection = true`, `backup_retention_period >= 1`, `publicly_accessible = false`
+- EC2: IMDSv2 강제 (`http_tokens = "required"`)
+- 보안그룹: 민감 포트(3306, 6379)는 EC2 보안그룹 참조만 허용, 0.0.0.0/0 금지
+- 모든 리소스에 `tags` 블록 포함
+- EBS: `encrypted = true`
+
+**감사 제외:** 인바운드 0.0.0.0/0 (의도된 설정으로 경고 생략)
+
+**온디맨드 전체 감사:** `/iac-audit` 슬래시 커맨드 실행
+**의사결정 추가:** 새로운 인프라 결정은 `.claude/DECISIONS.md`에 ADR 형식으로 기록
