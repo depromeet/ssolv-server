@@ -78,3 +78,30 @@
 - **결정**: `app_instance_count` 변수 하나로 서버 수 제어
 - **근거**: 롤백 시나리오 대비. 멀티 서버 운영 중 장애 시 즉시 단일 서버로 복귀 가능해야 함.
 - **구현**: `terraform.tfvars`에서 `app_instance_count = 1` 또는 `2`로 전환.
+
+---
+
+## ADR-008: 인스턴스 타입 — t3.micro(A) + t3.small(B) 혼합
+
+- **날짜**: 2026-03-29
+- **결정**: 인스턴스 A는 t3.micro, 인스턴스 B는 t3.small 사용
+- **근거**:
+  - 현재 app-server 실제 메모리 사용량: 357~484MB (limit 768MB)
+  - ALB 도입 시 ~$18/월 추가 비용 발생 → t3.small 2대($30/월)보다 오히려 비쌈
+  - JVM 힙을 `-Xmx400m`으로 축소하면 인스턴스 A(nginx + app-server)의 총 메모리가 ~650MB → t3.micro(1GB) 내 운용 가능
+  - 인스턴스 B는 app-server 외 redis, registry, alloy, exporters 다수 운영으로 t3.small 유지 필수
+- **인스턴스별 구성**:
+  - A (t3.micro / 1GB): nginx + app-server (`-Xms128m -Xmx400m`)
+  - B (t3.small / 2GB): nginx + app-server + redis + registry + alloy + exporters
+- **트레이드오프**: 인스턴스 A에서 트래픽 급증 시 OOM 위험. 모니터링 알림 필수.
+- **복원 조건**: 인스턴스 A 메모리 사용률 80% 초과 시 t3.small 업그레이드 검토.
+
+---
+
+## ADR-009: app-server JVM 힙 축소
+
+- **날짜**: 2026-03-29
+- **결정**: 인스턴스 A의 app-server JVM 힙을 768MB → 400MB로 축소
+- **근거**: t3.micro(1GB) 운용을 위한 메모리 확보. 실제 사용량(357~484MB) 기준 400MB limit은 피크 커버 가능.
+- **설정**: `docker-compose.prod.yml` 인스턴스 A 서버에 `JAVA_OPTS: "-Xms128m -Xmx400m"` 적용
+- **모니터링**: Grafana에서 JVM heap 사용률 알림 설정 필요.

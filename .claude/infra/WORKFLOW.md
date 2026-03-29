@@ -50,18 +50,18 @@ SSH Key: depromeet-secret (RSA)
 ## 목표 아키텍처
 
 ```
-[ 인스턴스 A ] — 앱 서버 1
-  ├── nginx (앞단)
-  └── app-server
+[ 인스턴스 A ] t3.micro / 1GB — 앱 서버 전용
+  ├── nginx (앞단, 80/443)
+  └── app-server (Spring Boot, -Xms128m -Xmx400m)
 
-[ 인스턴스 B ] — 앱 서버 2 + 인프라
-  ├── nginx (앞단)
-  ├── app-server
-  ├── redis
-  ├── registry
-  └── alloy + exporters
+[ 인스턴스 B ] t3.small / 2GB — 앱 서버 + 인프라
+  ├── nginx (앞단, 80/443)
+  ├── app-server (Spring Boot)
+  ├── redis:7-alpine (150MB limit)
+  ├── registry (registry.ssolv.site)
+  └── alloy + node/nginx/redis-exporter
 
-[ RDS ] 신규 계정으로 스냅샷 이전
+[ RDS ] MySQL 8.0.43 / db.t3.micro — 신규 계정으로 스냅샷 이전
 CloudFront 제거
 ```
 
@@ -128,6 +128,7 @@ app_instance_count = 2  # 1로 바꾸면 단일 서버로 복귀
 | Redis | ElastiCache 아닌 EC2 컨테이너 유지 |
 | Registry | 자체 registry 유지 (registry.ssolv.site) |
 | IaC 도구 | Terraform |
+| 인스턴스 타입 | A: t3.micro / B: t3.small (JVM 힙 축소로 micro 운용) |
 
 ---
 

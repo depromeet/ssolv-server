@@ -51,21 +51,46 @@ See `/architecture` skill for full module dependency graph and layer rules.
 ## 진행 중인 작업
 
 현재 AWS 계정 이전 + 멀티 서버 마이그레이션 진행 중.
-워크로드 및 진행 상황: `.claude/WORKFLOW.md`
-인프라 의사결정 기록: `.claude/DECISIONS.md`
+워크로드 및 진행 상황: `.claude/infra/WORKFLOW.md`
+인프라 의사결정 기록: `.claude/infra/DECISIONS.md`
 
-## IaC 보안 감사 규칙
+## Terraform 작성 규칙 (IaD)
 
-`.tf` 파일 작성 또는 수정 시 아래 규칙을 **항상** 적용한다.
+> ssolv 인프라 구성 요소: **EC2 + 탄력적 IP + RDS(MySQL)** 만 사용.
+> ALB, S3, Route53, ElastiCache, CloudFront는 사용하지 않는다. 해당 리소스 코드를 생성하지 말 것.
 
-**자동 감사 항목:**
-- RDS: `storage_encrypted = true`, `deletion_protection = true`, `backup_retention_period >= 1`, `publicly_accessible = false`
-- EC2: IMDSv2 강제 (`http_tokens = "required"`)
-- 보안그룹: 민감 포트(3306, 6379)는 EC2 보안그룹 참조만 허용, 0.0.0.0/0 금지
-- 모든 리소스에 `tags` 블록 포함
-- EBS: `encrypted = true`
+### 리소스별 필수 설정
 
-**감사 제외:** 인바운드 0.0.0.0/0 (의도된 설정으로 경고 생략)
+**EC2 (`aws_instance`)**
+- 인스턴스 A: `instance_type = "t3.micro"` (nginx + app-server 전용, JVM `-Xmx400m`)
+- 인스턴스 B: `instance_type = "t3.small"` (app-server + redis + registry + alloy + exporters)
+- `http_tokens = "required"` — IMDSv2 강제 (보안 필수)
+- `encrypted = true` — EBS 루트 볼륨 암호화
+- `instance_type`과 `ami`는 변수로 분리, 하드코딩 금지
+- EC2 수는 반드시 `app_instance_count` 변수로만 제어
 
-**온디맨드 전체 감사:** `/iac-audit` 슬래시 커맨드 실행
-**의사결정 추가:** 새로운 인프라 결정은 `.claude/DECISIONS.md`에 ADR 형식으로 기록
+**탄력적 IP (`aws_eip`)**
+- EC2 인스턴스에 `aws_eip_association`으로 연결
+- EIP는 EC2와 별도 리소스로 분리 (재사용 가능하도록)
+
+**RDS (`aws_db_instance`)**
+- `engine = "mysql"`, `engine_version = "8.0.43"` 고정
+- `publicly_accessible = false` — 퍼블릭 접근 금지
+- `storage_encrypted = true`
+- `deletion_protection = true`
+- `backup_retention_period >= 1`
+- `db_subnet_group_name`은 반드시 private subnet으로 구성된 서브넷 그룹 사용
+
+**보안그룹 (`aws_security_group`)**
+- 3306(MySQL), 6379(Redis)는 `source_security_group_id`로 EC2 보안그룹만 허용 — CIDR 직접 지정 금지
+- egress는 `0.0.0.0/0` 허용 (의도된 설정)
+- 인바운드 0.0.0.0/0은 80, 443, 22만 허용
+
+**공통**
+- 모든 리소스에 `tags` 블록 필수: `{ Project = "ssolv", ManagedBy = "terraform" }`
+- 민감 값(비밀번호, 키 등)은 `var` 또는 AWS Secrets Manager 참조 — 하드코딩 절대 금지
+
+### 자동 감사
+- `.tf` 파일 수정 시 PostToolUse Hook이 자동으로 보안 감사 실행
+- 온디맨드 전체 감사: `/iac-audit` 슬래시 커맨드
+- 새로운 인프라 결정은 `.claude/infra/DECISIONS.md`에 ADR 형식으로 기록
