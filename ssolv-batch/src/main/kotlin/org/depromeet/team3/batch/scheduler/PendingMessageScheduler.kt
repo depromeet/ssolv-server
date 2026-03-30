@@ -89,6 +89,8 @@ class PendingMessageScheduler(
                                     try {
                                         val updatedValue = messageRecord.value.toMutableMap()
                                         updatedValue["retryCount"] = (currentRetryCount + 1).toString()
+                                        // 재발행 시 requestId를 현재 WatchDog 실행 ID로 갱신하여 추적성 보장
+                                        updatedValue["requestId"] = requestId
                                         
                                         val reRecord = MapRecord.create(streamKey, updatedValue)
                                         stringRedisTemplate.opsForStream<String, String>().add(reRecord)
