@@ -72,7 +72,7 @@ function authHeaders(contentType = false) {
 let myToken = null;
 
 // ──────────────────────────────────────────
-// default function: 가중치 기반 현실 유저 플로우
+// default function: 가중치 기반 현실 유저 플로우 (병목 탐측 모드)
 // ──────────────────────────────────────────
 export default function () {
     // 1. 초기화: 토큰이 없다면 첫 번째 루프에서 무조건 생성 (의존성 해결)
@@ -82,24 +82,24 @@ export default function () {
         return;
     }
 
-    // 2. 가중치 기반 시나리오 (제시해주신 비율 반영)
+    // 2. 가중치 기반 시나리오 (30/30/30/10 비율)
     const rand = Math.random() * 100;
 
-    if (rand < 10) {
-        // [10%] POST /meetings (새 미팅 생성 및 토큰 갱신)
+    if (rand < 30) {
+        // [30%] POST /meetings (쓰기 부하)
         createMeeting();
-    } else if (rand < 35) {
-        // [25%] GET /meetings (목록 조회)
+    } else if (rand < 60) {
+        // [30%] GET /meetings (목록 조회)
         getMeetings();
-    } else if (rand < 80) {
-        // [45%] GET /meetings/{token} (상세 조회)
+    } else if (rand < 90) {
+        // [30%] GET /meetings/{token} (상세 조회)
         getMeetingDetail(myToken);
     } else {
-        // [20%] GET /meetings/validate-invite (초대 검증)
+        // [10%] GET /meetings/validate-invite (단순 검증)
         validateInvite(myToken);
     }
 
-    // Think time (300~700ms)
+    // 연타 수준의 Think time (100~300ms)
     sleep(randomIntBetween(THINK_MIN * 1000, THINK_MAX * 1000) / 1000);
 }
 
