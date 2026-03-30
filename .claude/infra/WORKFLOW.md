@@ -72,8 +72,9 @@ CloudFront 제거
 ### Phase 0: 준비
 - [x] EC2에 Claude Code 설치 (`npm install -g @anthropic-ai/claude-code`)
 - [x] ssolv.yaml CloudFormation 템플릿 확보 및 분석
-- [ ] 신규 AWS 계정 생성 및 IAM 설정
+- [x] 신규 AWS 계정 생성 완료 (IAM 미사용 — 루트 Access Key 방식)
 - [ ] Terraform 로컬 환경 설치 (`brew install terraform`)
+- [ ] 신규 계정 루트 Access Key 발급 및 로컬 환경변수 설정
 
 ### Phase 1: Terraform 기반 설계
 - [ ] `modules/network` — VPC, 서브넷, IGW, 보안그룹
@@ -86,12 +87,14 @@ CloudFront 제거
 ### Phase 2: 신규 계정 인프라 구축
 - [ ] Terraform으로 신규 계정에 네트워크 생성
 - [ ] EC2 인스턴스 2대 프로비저닝
-- [ ] RDS 스냅샷 → 신규 계정 복원
-- [ ] 보안그룹 규칙 (22, 80, 443, 6379, 3306, 4317/4318)
+- [ ] RDS 신규 생성 (스냅샷 이전 없음 — 코드 레벨 초기화로 대체)
+- [ ] 보안그룹 규칙 (22, 80, 443, 6379 내부만, 3306 내부만, 4317/4318 내부만)
 
 ### Phase 3: 앱 배포 및 검증
-- [ ] 각 EC2에 docker-compose 파일 배포
-- [ ] nginx 설정 이전 (nginx-app.conf, nginx-cicd.conf)
+- [ ] 인스턴스 A용 docker-compose 작성 (nginx + app-server, -Xmx400m)
+- [ ] 인스턴스 B용 docker-compose 작성 (nginx + app-server + redis + registry + alloy + exporters)
+- [ ] 인스턴스 간 내부 통신 설정 (A의 app-server → B의 Redis, 사설 IP)
+- [ ] nginx HTTPS 설정 (Let's Encrypt 재발급, 인스턴스 B에서 처리)
 - [ ] registry에 이미지 push 및 pull 확인
 - [ ] 헬스체크 통과 확인
 
@@ -104,7 +107,8 @@ CloudFront 제거
 - [ ] Firebase service account 이전
 
 ### Phase 5: DNS 컷오버
-- [ ] api.ssolv.site → 새 EC2 IP로 변경
+- [ ] api.ssolv.site → 인스턴스 A EIP로 가비아 DNS 변경
+- [ ] registry.ssolv.site → 인스턴스 B EIP로 가비아 DNS 변경
 - [ ] CloudFront 제거
 - [ ] 모니터링 정상 수집 확인 (Grafana, Sentry)
 
@@ -125,10 +129,15 @@ app_instance_count = 2  # 1로 바꾸면 단일 서버로 복귀
 |------|------|
 | CloudFront | 신규 계정에서 제거 |
 | ALB | 사용 안 함 (Nginx가 앞단) |
-| Redis | ElastiCache 아닌 EC2 컨테이너 유지 |
-| Registry | 자체 registry 유지 (registry.ssolv.site) |
-| IaC 도구 | Terraform |
+| Redis | ElastiCache 아닌 EC2 컨테이너 유지 (인스턴스 B) |
+| Registry | 자체 registry 유지 (registry.ssolv.site, 인스턴스 B) |
+| IaC 도구 | Terraform (state: 로컬 파일) |
 | 인스턴스 타입 | A: t3.micro / B: t3.small (JVM 힙 축소로 micro 운용) |
+| IAM | 미사용 — 루트 Access Key 방식으로 Terraform 인증 |
+| RDS 이전 | 스냅샷 없음 — 신규 RDS 생성 후 코드 레벨 초기화 (SurveyCategoryInitializer, StationInitializer) |
+| DNS | 가비아에서 수동 변경 (EIP 발급 후) |
+| HTTPS | Let's Encrypt 재발급 — 인스턴스 B에서 certbot 실행 |
+| 부하분산 | A, B 모두 트래픽 서빙 (기존 멀티 WAS 구조 유지, Nginx upstream) |
 
 ---
 
