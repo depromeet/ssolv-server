@@ -120,10 +120,15 @@ class CreateSurveyService(
                 val currentSurveyCount = surveyJpaRepository.countByMeetingId(meetingId)
                 if (currentSurveyCount >= meetingEntity.attendeeCount) {
                     
+                    val requestId = org.slf4j.MDC.get(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID) ?: java.util.UUID.randomUUID().toString().substring(0, 8)
+
                     // 1. 식당 검색 추천 요청 발행
                     // 부하가 걸릴 수 있는 검색 로직을 별도 워커나 비동기 리스너에서 처리하도록 큐에 적재합니다.
                     val calcRecord = MapRecord.create(
-                        RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
+                        RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>(
+                            "meetingId" to meetingId.toString(),
+                            "requestId" to requestId
+                        )
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
@@ -135,7 +140,8 @@ class CreateSurveyService(
                             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
                             mapOf(
                                 "meetingId" to meetingId.toString(),
-                                "userId" to attendee.user.id.toString()
+                                "userId" to attendee.user.id.toString(),
+                                "requestId" to requestId
                             )
                         )
                         stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
