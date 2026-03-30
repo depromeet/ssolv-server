@@ -117,6 +117,16 @@ class GlobalExceptionHandler {
     }
 
     /**
+     * 코루틴 타임아웃 처리
+     */
+    @ExceptionHandler(kotlinx.coroutines.TimeoutCancellationException::class)
+    fun handleTimeoutCancellationException(e: kotlinx.coroutines.TimeoutCancellationException): ResponseEntity<DpmApiResponse<Unit>> {
+        logger.warn("Request Timeout: ${e.message}", e)
+        return ResponseEntity.status(ErrorCode.REQUEST_TIMEOUT.httpStatus)
+            .body(DpmApiResponse.error(ErrorCode.REQUEST_TIMEOUT))
+    }
+
+    /**
      * 예상치 못한 예외
      */
     @ExceptionHandler(Exception::class)
