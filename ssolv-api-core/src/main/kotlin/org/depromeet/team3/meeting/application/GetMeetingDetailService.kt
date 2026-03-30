@@ -109,10 +109,14 @@ class GetMeetingDetailService(
             val surveyEntities = surveyJpaRepository.findByMeetingId(meetingId)
             val surveyIds = surveyEntities.mapNotNull { it.id }
 
-            // 설문 결과 조회
+            // 설문 결과 조회 (survey, surveyCategory fetch join 적용됨)
             val allSurveyResults = if (surveyIds.isEmpty()) emptyList()
             else surveyResultJpaRepository.findBySurveyIdIn(surveyIds)
             val surveyResultsMap = allSurveyResults.groupBy { it.survey.id }
+
+            // 카테고리 정보 일괄 조회 (N+1 해결)
+            val allCategoryIds = allSurveyResults.map { it.surveyCategory.id!! }.distinct()
+            val allCategoryMap = surveyCategoryJpaRepository.findAllById(allCategoryIds).associateBy { it.id }
 
             // Survey.participant.user.id == attendee.user.id 로 매핑
             val surveyByParticipantUserId = surveyEntities.associateBy { it.participant.user.id }
@@ -124,7 +128,8 @@ class GetMeetingDetailService(
 
                     val selectedCategoryList = buildParticipantSelectedCategories(
                         survey.id,
-                        surveyResultsMap
+                        surveyResultsMap,
+                        allCategoryMap
                     )
 
                     MeetingParticipantInfo(
@@ -146,13 +151,14 @@ class GetMeetingDetailService(
 
     private fun buildParticipantSelectedCategories(
         surveyId: Long?,
-        surveyResultsMap: Map<Long?, List<SurveyResultEntity>>
+        surveyResultsMap: Map<Long?, List<SurveyResultEntity>>,
+        allCategoryMap: Map<Long?, org.depromeet.team3.surveycategory.SurveyCategoryEntity>
     ): List<ParticipantSelectedCategory> {
         val surveyResults = surveyResultsMap[surveyId] ?: emptyList()
         if (surveyResults.isEmpty()) return emptyList()
 
-        val categoryIds = surveyResults.map { it.surveyCategory.id!! }
-        val categoryEntities = surveyCategoryJpaRepository.findAllById(categoryIds)
+        // 이미 일괄 조회된 Map에서 카테고리 추출
+        val categoryEntities = surveyResults.mapNotNull { allCategoryMap[it.surveyCategory.id] }
 
         val branchList = categoryEntities.filter { it.level == SurveyCategoryLevel.BRANCH && it.id != null }
         val leafList = categoryEntities.filter { it.level == SurveyCategoryLevel.LEAF && it.id != null }
