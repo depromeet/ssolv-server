@@ -9,6 +9,9 @@ import org.springframework.stereotype.Repository
 interface MeetingAttendeeJpaRepository : JpaRepository<MeetingAttendeeEntity, Long> {
     @Query("SELECT ma FROM MeetingAttendeeEntity ma JOIN ma.meeting m WHERE m.id = :meetingId")
     fun findByMeetingId(@Param("meetingId") meetingId: Long): List<MeetingAttendeeEntity>
+
+    @Query("SELECT ma FROM MeetingAttendeeEntity ma JOIN ma.meeting m WHERE m.id IN (:meetingIds)")
+    fun findByMeetingIdIn(@Param("meetingIds") meetingIds: List<Long>): List<MeetingAttendeeEntity>
     
     @Query("SELECT ma FROM MeetingAttendeeEntity ma JOIN ma.user u WHERE u.id = :userId")
     fun findByUserId(@Param("userId") userId: Long): List<MeetingAttendeeEntity>

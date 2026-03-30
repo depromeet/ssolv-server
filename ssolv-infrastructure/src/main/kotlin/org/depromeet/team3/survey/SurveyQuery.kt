@@ -35,6 +35,21 @@ class SurveyQuery(
         
         return entities.map { surveyMapper.toDomain(it) }
     }
+
+    override suspend fun findByMeetingIdIn(meetingIds: List<Long>): List<Survey> {
+        if (meetingIds.isEmpty()) return emptyList()
+        val qSurvey = QSurveyEntity.surveyEntity
+        
+        val entities = queryFactory
+            .selectFrom(qSurvey)
+            .leftJoin(qSurvey.meeting).fetchJoin()
+            .leftJoin(qSurvey.participant).fetchJoin()
+            .leftJoin(qSurvey.participant.user).fetchJoin()
+            .where(qSurvey.meeting.id.`in`(meetingIds))
+            .fetch()
+        
+        return entities.map { surveyMapper.toDomain(it) }
+    }
     
     override suspend fun existsByMeetingIdAndParticipantId(meetingId: Long, participantId: Long): Boolean {
         return surveyJpaRepository.existsByMeetingIdAndParticipantId(meetingId, participantId)

@@ -19,6 +19,11 @@ class MeetingAttendeeQuery(
             .map { meetingAttendeeMapper.toDomain(it) }
     }
 
+    override suspend fun findByMeetingIdIn(meetingIds: List<Long>): List<MeetingAttendee> {
+        return meetingAttendeeJpaRepository.findByMeetingIdIn(meetingIds)
+            .map { meetingAttendeeMapper.toDomain(it) }
+    }
+
     override suspend fun findByUserId(userId: Long): List<MeetingAttendee> {
         return meetingAttendeeJpaRepository.findByUserId(userId)
             .map { meetingAttendeeMapper.toDomain(it) }

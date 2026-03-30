@@ -32,14 +32,19 @@ class GetMeetingService(
             .distinctBy { it.id }
             .sortedByDescending { it.createdAt }
 
-        // 4. 역 정보 조회 (N+1 문제 해결)
+        // 4. 역 정보 및 응답자 정보 일괄 조회 (N+1 문제 해결)
+        val meetingIds = allMeetings.mapNotNull { it.id }
         val stationIds = allMeetings.mapNotNull { it.stationId }.distinct()
+        
         val stationMap = stationRepository.findAllById(stationIds).associateBy { it.id }
+        val respondentsMap = getSurveyListService.getRespondentsMap(meetingIds)
 
         allMeetings.map { meeting ->
             val stationName = stationMap[meeting.stationId]?.name ?: ""
+            val meetingId = meeting.id!!
+            
             val meetingInfo = MeetingInfoResponse(
-                id = meeting.id!!,
+                id = meetingId,
                 title = meeting.name,
                 hostUserId = meeting.hostUserId,
                 totalParticipantCnt = meeting.attendeeCount,
@@ -51,11 +56,7 @@ class GetMeetingService(
                 token = inviteTokenService.generateToken(meeting)
             )
 
-            val participantList = try {
-                getSurveyListService.getRespondents(meeting.id!!)
-            } catch (e: Exception) {
-                emptyList()
-            }
+            val participantList = respondentsMap[meetingId] ?: emptyList()
 
             MeetingsResponse(
                 meetingInfo = meetingInfo,

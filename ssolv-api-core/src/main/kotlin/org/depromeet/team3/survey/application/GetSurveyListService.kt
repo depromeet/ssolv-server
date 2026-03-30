@@ -112,6 +112,27 @@ class GetSurveyListService(
             .map { attendee -> attendee.toGetRespondents() }
     }
 
+    suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withContext(Dispatchers.IO) {
+        if (meetingIds.isEmpty()) return@withContext emptyMap()
+
+        // 1. 모든 미팅의 참가자 일괄 조회
+        val allAttendees = meetingAttendeeRepository.findByMeetingIdIn(meetingIds)
+        val attendeesByMeeting = allAttendees.groupBy { it.meetingId }
+
+        // 2. 모든 미팅의 설문 일괄 조회
+        val allSurveys = surveyRepository.findByMeetingIdIn(meetingIds)
+        val surveysByMeeting = allSurveys.groupBy { it.meetingId }
+
+        // 3. 미팅 ID별로 응답자 리스트 구성
+        meetingIds.associateWith { meetingId ->
+            val attendeeMap = attendeesByMeeting[meetingId]?.associateBy { it.userId } ?: emptyMap()
+            val participantIds = surveysByMeeting[meetingId]?.map { it.participantId } ?: emptyList()
+
+            participantIds.mapNotNull { id -> attendeeMap[id] }
+                .map { attendee -> attendee.toGetRespondents() }
+        }
+    }
+
     private fun MeetingAttendee.toGetRespondents(): GetRespondents {
         return GetRespondents(
             userId = this.userId,
