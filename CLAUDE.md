@@ -56,8 +56,9 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 ## Terraform 작성 규칙 (IaD)
 
-> ssolv 인프라 구성 요소: **EC2 + 탄력적 IP + RDS(MySQL)** 만 사용.
-> ALB, S3, Route53, ElastiCache, CloudFront는 사용하지 않는다. 해당 리소스 코드를 생성하지 말 것.
+> ssolv 인프라 구성 요소: **EC2 + 탄력적 IP + RDS(MySQL) + Route53** 사용.
+> ALB, S3, ElastiCache, CloudFront는 사용하지 않는다. 해당 리소스 코드를 생성하지 말 것.
+> Route53은 헬스체크 기반 DNS Failover 용도로만 사용한다 (Multivalue Answer 라우팅).
 
 ### 리소스별 필수 설정
 

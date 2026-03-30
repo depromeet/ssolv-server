@@ -56,6 +56,25 @@
 
 ---
 
+## ADR-016: Route53 도입 — 헬스체크 기반 DNS Failover
+
+- **날짜**: 2026-03-31
+- **결정**: Route53 Multivalue Answer 라우팅 + 헬스체크로 두 인스턴스 대등 부하분산
+- **근거**:
+  - DNS Round Robin(가비아)은 헬스체크 없어서 장애 인스턴스로 트래픽 계속 유입
+  - ALB($18/월) 대비 Route53 헬스체크($2/월)로 동일 효과 저비용 달성
+  - 인스턴스 A, B 대등 구조 유지 (각자 nginx → 로컬 app-server만)
+  - Terraform으로 관리되어 롤백 용이 (`terraform destroy -target=module.dns`)
+- **구현**:
+  - `api.ssolv.site` Multivalue Answer: A(3.34.32.206) + B(52.79.62.33)
+  - 헬스체크 대상: `https://api.ssolv.site/actuator/health` (각 IP)
+  - 헬스체크 실패 시 해당 IP DNS 응답에서 자동 제거
+  - 가비아 네임서버 → Route53 NS 레코드로 변경 필요 (사용자 직접)
+- **변경 사항**: CLAUDE.md 인프라 정책에 Route53 추가, ALB 미사용 유지
+- **트레이드오프**: 가비아 NS 변경 필요 (1회성 작업). TTL 동안 전파 지연 가능.
+
+---
+
 ## ADR-010: IAM 미사용 — 루트 Access Key 방식
 
 - **날짜**: 2026-03-31

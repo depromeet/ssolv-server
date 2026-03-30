@@ -1,0 +1,113 @@
+# 인스턴스 A nginx 설정 — envsubst 템플릿
+# ${INSTANCE_B_PRIVATE_IP} 는 docker-compose 환경변수로 주입됨
+#
+# certbot 발급 완료 전까지는 443 블록이 시작 실패함.
+# 발급 순서: certbot certonly --standalone -d api.ssolv.site (nginx 중지 상태에서)
+
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include      /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile        on;
+    keepalive_timeout 65;
+
+    log_format main '$request_id $remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" "$request_time" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    '"$ssl_protocol/$ssl_cipher" "$content_length" "$request_length"';
+
+    # A의 로컬 app-server + B의 app-server (사설 IP)
+    upstream app-server {
+        least_conn;
+        server app-server:8080;
+        server ${INSTANCE_B_PRIVATE_IP}:8080;
+    }
+
+    # stub_status (모니터링 내부 전용)
+    server {
+        listen 80;
+        server_name localhost;
+
+        location /stub_status {
+            stub_status on;
+            access_log off;
+            allow 127.0.0.1;
+            allow 172.16.0.0/12;
+            deny all;
+        }
+    }
+
+    # HTTP → HTTPS 리다이렉트 + Let's Encrypt ACME challenge
+    server {
+        listen 80 default_server;
+        server_name api.ssolv.site;
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS — API 서버
+    server {
+        listen 443 ssl default_server;
+        server_name api.ssolv.site;
+
+        ssl_certificate     /etc/letsencrypt/live/api.ssolv.site/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/api.ssolv.site/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         HIGH:!aNULL:!MD5;
+
+        absolute_redirect off;
+        access_log /var/log/nginx/access.log main;
+
+        # 악성 봇 차단
+        location ~* \.(php|asp|aspx|jsp|cgi|env|git|yaml|yml)$ {
+            access_log off;
+            log_not_found off;
+            return 444;
+        }
+
+        location ~* /(wp-admin|wp-login|wp-content|admin|phpmyadmin|console) {
+            access_log off;
+            log_not_found off;
+            return 444;
+        }
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_set_header X-RequestID $request_id;
+        proxy_pass_request_headers on;
+        proxy_next_upstream http_502 http_503 http_504;
+
+        # CORS
+        set $cors_origin "";
+        if ($http_origin ~* "^https?://(www\.ssolv\.site|localhost:3000)$") {
+            set $cors_origin $http_origin;
+        }
+        add_header 'Access-Control-Allow-Origin' '$cors_origin' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, PATCH, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        location / {
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+            proxy_pass http://app-server;
+        }
+    }
+}

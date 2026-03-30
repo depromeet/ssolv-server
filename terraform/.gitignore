@@ -1,0 +1,11 @@
+# terraform.tfvars — DB 비밀번호, SSH 공개키 포함
+terraform.tfvars
+
+# Terraform state (민감 정보 포함 가능)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# 플랜 파일
+*.tfplan
