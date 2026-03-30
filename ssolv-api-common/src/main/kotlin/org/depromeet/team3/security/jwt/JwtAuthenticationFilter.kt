@@ -47,6 +47,8 @@ class JwtAuthenticationFilter(
         } catch (e: Exception) {
             logger.error("[500] JWT 필터 처리 중 예상치 못한 오류 발생", e)
             handleInternalServerError(response)
+        } finally {
+            MDC.remove(UserIdArgumentResolver.USER_ID)
         }
     }
 

@@ -41,12 +41,18 @@ class MeetingExpirationListener(
             return
         }
 
-        logger.info("모임 $meetingId 만료 발생! 비동기 장소 검색 및 알림 스트림을 발행합니다.")
+        val requestId = "expire-" + java.util.UUID.randomUUID().toString().substring(0, 8)
+        org.slf4j.MDC.put(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID, requestId)
 
         try {
+            logger.info("모임 $meetingId 만료 발생! 비동기 장소 검색 및 알림 스트림을 발행합니다.")
+
             // 1. 식당 검색 추천 요청 발행
             val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>("meetingId" to meetingId.toString())
+                RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>(
+                    "meetingId" to meetingId.toString(),
+                    "requestId" to requestId
+                )
             )
             stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
@@ -59,7 +65,8 @@ class MeetingExpirationListener(
                         RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
                         mapOf<String, String>(
                             "meetingId" to meetingId.toString(),
-                            "userId" to attendee.userId.toString()
+                            "userId" to attendee.userId.toString(),
+                            "requestId" to requestId
                         )
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
@@ -70,6 +77,8 @@ class MeetingExpirationListener(
         } catch (e: Exception) {
             logger.error("모임 $meetingId 만료 처리 중 오류 발생", e)
             io.sentry.Sentry.captureException(e)
+        } finally {
+            org.slf4j.MDC.clear()
         }
     }
 }
