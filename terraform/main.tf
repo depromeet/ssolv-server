@@ -27,6 +27,8 @@ module "compute" {
   key_name           = var.key_name
   public_key         = var.public_key
   app_instance_count = var.app_instance_count
+  instance_type_a    = var.instance_type_a
+  instance_type_b    = var.instance_type_b
 
   vpc_id      = module.network.vpc_id
   subnet_a_id = module.network.public_subnet_a_id

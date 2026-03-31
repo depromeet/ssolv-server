@@ -10,6 +10,7 @@ resource "aws_route53_zone" "main" {
 # ─── 헬스체크 ─────────────────────────────────────────────────────────────────
 
 resource "aws_route53_health_check" "app_a" {
+  count             = var.instance_a_ip != null ? 1 : 0
   ip_address        = var.instance_a_ip
   port              = 443
   type              = "HTTPS"
@@ -42,12 +43,13 @@ resource "aws_route53_health_check" "app_b" {
 # ─── api.ssolv.site — Multivalue Answer (헬스체크 연동) ──────────────────────
 
 resource "aws_route53_record" "api_a" {
+  count                            = var.instance_a_ip != null ? 1 : 0
   zone_id                          = aws_route53_zone.main.zone_id
   name                             = "api.${var.domain}"
   type                             = "A"
   ttl                              = 60
   set_identifier                   = "instance-a"
-  health_check_id                  = aws_route53_health_check.app_a.id
+  health_check_id                  = aws_route53_health_check.app_a[0].id
   records                          = [var.instance_a_ip]
   multivalue_answer_routing_policy = true
 }

@@ -32,7 +32,7 @@ services:
         max-size: "10m"
         max-file: "7"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -44,8 +44,8 @@ services:
     container_name: redis
     image: redis:7-alpine
     command: redis-server --maxmemory 150mb --maxmemory-policy allkeys-lru --notify-keyspace-events Ex
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     networks:
       - ssolv_prod_network
     restart: always
@@ -80,7 +80,7 @@ services:
       registry:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/stub_status"]
+      test: [ "CMD", "curl", "-f", "http://localhost/stub_status" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -100,7 +100,7 @@ services:
       REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
       REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
       REGISTRY_CATALOG_MAXENTRIES: 5000
-      REGISTRY_HTTP_SECRET: "a-very-long-random-string-for-http-secret"
+      REGISTRY_HTTP_SECRET: ${REGISTRY_HTTP_SECRET}
       REGISTRY_HTTP_TIMEOUT_READ: "300s"
       REGISTRY_HTTP_TIMEOUT_WRITE: "300s"
       REGISTRY_HTTP_TIMEOUT_IDLE: "900s"
@@ -162,7 +162,7 @@ services:
     container_name: nginx-exporter
     restart: unless-stopped
     command:
-      - '--nginx.scrape-uri=http://nginx-cicd:80/stub_status'
+      - '--nginx.scrape-uri=http://nginx:80/stub_status'
     networks:
       - ssolv_cicd_network
       - ssolv_monitoring_network

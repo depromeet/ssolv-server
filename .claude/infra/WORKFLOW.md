@@ -109,6 +109,7 @@ CloudFront 제거
 **인스턴스 A**
 - [ ] .env에 INSTANCE_B_PRIVATE_IP 추가 (terraform output instance_b_private_ip)
 - [ ] .env에 PROD_DB_ENDPOINT 추가
+- [ ] nginx 설정 템플릿 치환: `envsubst '${INSTANCE_B_PRIVATE_IP}' < ssolv-infrastructure/nginx/nginx-app-instance-a.conf.template > ssolv-infrastructure/nginx/nginx-app-instance-a.conf`
 - [ ] firebase-service-account.json 배포
 - [ ] certbot으로 api.ssolv.site 인증서 발급 (가비아 DNS 변경 후)
 - [ ] docker compose -f docker-compose.instance-a.yml up -d

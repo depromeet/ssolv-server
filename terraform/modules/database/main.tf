@@ -27,7 +27,7 @@ resource "aws_db_instance" "main" {
 
   publicly_accessible     = false
   deletion_protection     = true
-  backup_retention_period = 0  # TODO: 결제 정보 등록 후 7로 변경
+  backup_retention_period = 1  # TODO: 결제 정보 등록 후 7로 변경
   skip_final_snapshot     = false
   final_snapshot_identifier = "${var.project}-mysql-final"
 

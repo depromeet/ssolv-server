@@ -18,6 +18,18 @@ variable "ami_id" {
   type        = string
 }
 
+variable "instance_type_a" {
+  description = "인스턴스 A (nginx + app-server) 인스턴스 타입"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "instance_type_b" {
+  description = "인스턴스 B (app-server + infra) 인스턴스 타입"
+  type        = string
+  default     = "t3.small"
+}
+
 variable "key_name" {
   description = "AWS EC2 키페어 이름"
   type        = string

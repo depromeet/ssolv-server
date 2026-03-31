@@ -15,7 +15,7 @@ resource "aws_instance" "app_a" {
   count = var.app_instance_count >= 2 ? 1 : 0
 
   ami                    = var.ami_id
-  instance_type          = "t3.micro"
+  instance_type          = var.instance_type_a
   subnet_id              = var.subnet_a_id
   vpc_security_group_ids = [var.ec2_sg_id]
   key_name               = aws_key_pair.ssolv.key_name
@@ -42,7 +42,7 @@ resource "aws_instance" "app_a" {
 
 resource "aws_instance" "app_b" {
   ami                    = var.ami_id
-  instance_type          = "t3.small"
+  instance_type          = var.instance_type_b
   subnet_id              = var.subnet_b_id
   vpc_security_group_ids = [var.ec2_sg_id]
   key_name               = aws_key_pair.ssolv.key_name

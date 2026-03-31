@@ -26,9 +26,12 @@ output "route53_name_servers" {
 output "next_steps" {
   value = <<-EOT
     ─── apply 완료 후 할 일 ───────────────────────────────────────────────
-    1. 가비아 DNS 변경
-       api.ssolv.site      → ${module.compute.eip_a}
-       registry.ssolv.site → ${module.compute.eip_b}
+    1. 가비아 DNS 변경 (네임서버 위임)
+       가비아 도메인 설정에서 네임서버 4개를 아래 값으로 변경:
+       ${join("\n       ", module.dns.name_servers)}
+
+       * 주의: A 레코드를 직접 수정하는 것이 아니라 NS 레코드를 위임해야 
+         Route53의 헬스체크 기반 장애 조치가 정상 작동합니다.
 
     2. 인스턴스 A .env에 추가
        INSTANCE_B_PRIVATE_IP=${module.compute.instance_b_private_ip}
