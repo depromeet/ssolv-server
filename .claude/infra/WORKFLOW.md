@@ -77,25 +77,42 @@ CloudFront 제거
 - [ ] 신규 계정 루트 Access Key 발급 및 로컬 환경변수 설정
 
 ### Phase 1: Terraform 기반 설계
-- [ ] `modules/network` — VPC, 서브넷, IGW, 보안그룹
-- [ ] `modules/compute` — EC2 (var로 1대↔2대 전환 가능하게)
-- [ ] `modules/database` — RDS MySQL 8.0.43
-- [ ] `modules/cache` — Redis (EC2 내 컨테이너 유지)
-- [ ] `modules/registry` — 자체 registry or ECR 결정
-- [ ] `environments/prod` — 실제 변수 연결
+- [x] `modules/network` — VPC, 서브넷, IGW, 보안그룹
+- [x] `modules/compute` — EC2 A(t3.micro) + B(t3.small), EIP, 키페어
+- [x] `modules/database` — RDS MySQL 8.0.43
+- [x] `terraform/main.tf`, `variables.tf`, `outputs.tf`, `terraform.tfvars`
+- [x] `terraform plan` 통과 — 20개 리소스, 에러 없음
+- [x] `docker-compose.instance-a.yml` — nginx(HTTPS) + app-server(Xmx400m)
+- [x] `docker-compose.instance-b.yml` — app-server + redis + registry + nginx-cicd + monitoring
+- [x] `nginx-app-instance-a.conf.template` — envsubst로 INSTANCE_B_PRIVATE_IP 치환
+- 참고: Redis, Registry는 EC2 내 컨테이너로 유지 (모듈 불필요)
 
 ### Phase 2: 신규 계정 인프라 구축
-- [ ] Terraform으로 신규 계정에 네트워크 생성
-- [ ] EC2 인스턴스 2대 프로비저닝
-- [ ] RDS 신규 생성 (스냅샷 이전 없음 — 코드 레벨 초기화로 대체)
-- [ ] 보안그룹 규칙 (22, 80, 443, 6379 내부만, 3306 내부만, 4317/4318 내부만)
+- [ ] `terraform apply` 실행 (cd terraform && terraform apply)
+- [ ] outputs 확인: EIP A/B, B 사설 IP, RDS 엔드포인트
 
 ### Phase 3: 앱 배포 및 검증
-- [ ] 인스턴스 A용 docker-compose 작성 (nginx + app-server, -Xmx400m)
-- [ ] 인스턴스 B용 docker-compose 작성 (nginx + app-server + redis + registry + alloy + exporters)
-- [ ] 인스턴스 간 내부 통신 설정 (A의 app-server → B의 Redis, 사설 IP)
-- [ ] nginx HTTPS 설정 (Let's Encrypt 재발급, 인스턴스 B에서 처리)
-- [ ] registry에 이미지 push 및 pull 확인
+
+**양 인스턴스 공통**
+- [ ] docker, docker-compose 설치
+- [ ] .env 파일 배포 (PROD_DB_ENDPOINT 신규 RDS 엔드포인트로 변경)
+- [ ] ssolv-infrastructure repo clone 또는 파일 복사
+- [ ] docker network create ssolv_prod_network
+
+**인스턴스 B 먼저**
+- [ ] docker network create ssolv_cicd_network ssolv_monitoring_network
+- [ ] .htpasswd, firebase-service-account.json 배포
+- [ ] certbot으로 registry.ssolv.site 인증서 발급 (가비아 DNS 변경 후)
+- [ ] docker compose -f docker-compose.instance-b.yml up -d
+- [ ] registry 헬스체크 확인 후 이미지 push
+
+**인스턴스 A**
+- [ ] .env에 INSTANCE_B_PRIVATE_IP 추가 (terraform output instance_b_private_ip)
+- [ ] .env에 PROD_DB_ENDPOINT 추가
+- [ ] nginx 설정 템플릿 치환: `envsubst '${INSTANCE_B_PRIVATE_IP}' < ssolv-infrastructure/nginx/nginx-app-instance-a.conf.template > ssolv-infrastructure/nginx/nginx-app-instance-a.conf`
+- [ ] firebase-service-account.json 배포
+- [ ] certbot으로 api.ssolv.site 인증서 발급 (가비아 DNS 변경 후)
+- [ ] docker compose -f docker-compose.instance-a.yml up -d
 - [ ] 헬스체크 통과 확인
 
 ### Phase 4: CD 파이프라인 업데이트

@@ -6,11 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: deploy-to-ssolv-prod-server
-      url: https://api.ssolv.site
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +28,15 @@ jobs:
             -Djib.to.auth.password=${{ secrets.REGISTRY_PASSWORD }} \
             -Djava.net.preferIPv4Stack=true
 
-      - name: EC2 Deployment
+  # Instance A 먼저 배포 — Route53 헬스체크가 A를 unhealthy로 감지하는 동안 B가 트래픽 처리
+  deploy-instance-a:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: deploy-to-ssolv-prod-server
+      url: https://api.ssolv.site
+    steps:
+      - name: Deploy to Instance A
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -40,34 +45,84 @@ jobs:
           envs: FIREBASE_SERVICE_ACCOUNT
           script: |
             cd ~/17th-team3-Server
-            
-            # Create Firebase Service Account JSON from secret
-            echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
-            chmod 600 firebase-service-account.json
-            
+
             git fetch origin
             git reset --hard origin/main
-            
-            docker rmi -f registry.ssolv.site/api-server:latest registry.ssolv.site/core-server:latest registry.ssolv.site/place-server:latest || true
-            
-            docker-compose -f docker-compose.prod.yml pull
-            
-            docker-compose -f docker-compose.prod.yml stop app-server-1 app-server-2 nginx-app
-            docker-compose -f docker-compose.prod.yml rm -f app-server-1 app-server-2 nginx-app
-            
-            docker-compose -f docker-compose.prod.yml up -d
-            
-            echo "Waiting for services to be healthy..."
-            sleep 10
-            
-            if docker-compose -f docker-compose.prod.yml ps | grep "unhealthy"; then
-              echo "Deployment Failed! Some services are unhealthy."
-              docker-compose -f docker-compose.prod.yml ps
+
+            echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
+            chmod 600 firebase-service-account.json
+
+            docker pull registry.ssolv.site/api-server:latest
+
+            docker-compose -f docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
+
+            echo "Waiting for app-server to be healthy (max 3.5 min)..."
+            for i in $(seq 1 21); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
+              if [ "$STATUS" = "healthy" ]; then
+                echo "Instance A healthy after ${i}0s"
+                break
+              fi
+              echo "  [$i/21] status=$STATUS, retrying in 10s..."
+              sleep 10
+            done
+
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
+            if [ "$STATUS" != "healthy" ]; then
+              echo "Instance A deployment failed (status=$STATUS)"
+              docker logs app-server --tail 80
               exit 1
             fi
-            
-            echo "Deployment Successful!"
-            
+
             docker image prune -f
+            echo "Instance A deployment complete"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+  # A가 healthy 확인된 후 B 배포 — 롤링 업데이트로 무중단 배포
+  deploy-instance-b:
+    needs: deploy-instance-a
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Instance B
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST_B }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: FIREBASE_SERVICE_ACCOUNT
+          script: |
+            cd ~/17th-team3-Server
+
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
+            chmod 600 firebase-service-account.json
+
+            docker pull registry.ssolv.site/api-server:latest
+
+            docker-compose -f docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
+
+            echo "Waiting for app-server to be healthy (max 3.5 min)..."
+            for i in $(seq 1 21); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
+              if [ "$STATUS" = "healthy" ]; then
+                echo "Instance B healthy after ${i}0s"
+                break
+              fi
+              echo "  [$i/21] status=$STATUS, retrying in 10s..."
+              sleep 10
+            done
+
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
+            if [ "$STATUS" != "healthy" ]; then
+              echo "Instance B deployment failed (status=$STATUS)"
+              docker logs app-server --tail 80
+              exit 1
+            fi
+
+            docker image prune -f
+            echo "Instance B deployment complete"
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
