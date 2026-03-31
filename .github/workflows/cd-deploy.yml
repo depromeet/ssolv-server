@@ -42,8 +42,10 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: FIREBASE_SERVICE_ACCOUNT
+          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
           script: |
+            set -e
+
             cd ~/17th-team3-Server
 
             git fetch origin
@@ -52,9 +54,10 @@ jobs:
             echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
             chmod 600 firebase-service-account.json
 
+            echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
             docker pull registry.ssolv.site/api-server:latest
 
-            docker-compose -f docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
+            docker compose -f docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
 
             echo "Waiting for app-server to be healthy (max 3.5 min)..."
             for i in $(seq 1 21); do
@@ -78,6 +81,8 @@ jobs:
             echo "Instance A deployment complete"
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
   # A가 healthy 확인된 후 B 배포 — 롤링 업데이트로 무중단 배포
   deploy-instance-b:
@@ -90,8 +95,10 @@ jobs:
           host: ${{ secrets.EC2_HOST_B }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: FIREBASE_SERVICE_ACCOUNT
+          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
           script: |
+            set -e
+
             cd ~/17th-team3-Server
 
             git fetch origin
@@ -100,9 +107,10 @@ jobs:
             echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
             chmod 600 firebase-service-account.json
 
+            echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
             docker pull registry.ssolv.site/api-server:latest
 
-            docker-compose -f docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
+            docker compose -f docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
 
             echo "Waiting for app-server to be healthy (max 3.5 min)..."
             for i in $(seq 1 21); do
@@ -126,3 +134,5 @@ jobs:
             echo "Instance B deployment complete"
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
