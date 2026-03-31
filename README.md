@@ -1,12 +1,31 @@
+## Tech Stack
+
+| Category | Stack |
+|---|---|
+| Language | Kotlin 1.9.25, Java 21 |
+| Framework | Spring Boot 3.4.9, Spring Cloud 2024.0.1 |
+| Database | MySQL, Redis 7 |
+| ORM | Spring Data JPA / Hibernate, Kotlin-JDSL 3.8.0 |
+| Auth | JWT, OAuth2 (Kakao, Apple) |
+| HTTP Client | Ktor Client 2.3.12 |
+| Push | Firebase FCM |
+| Observability | Micrometer, OpenTelemetry, Sentry, Prometheus |
+| Build | Gradle 8 (Kotlin DSL), Jib |
+
+---
+
 
 ## Infrastructure
 
+<img width="1166" height="630" alt="스크린샷 2026-03-31 오후 4 58 25" src="https://github.com/user-attachments/assets/63ec7142-ee2b-4636-a47d-47a0ede0978c" />
+
+
 ```
-[ Instance A ] t3.micro / ap-northeast-2a / EIP: 3.34.32.206
+[ Instance A ] ap-northeast-2a / EIP: 3.34.32.206
   ├── nginx (80/443, Let's Encrypt)
   └── app-server (Spring Boot, -Xmx400m)
 
-[ Instance B ] t3.small / ap-northeast-2c / EIP: 52.79.62.33
+[ Instance B ] ap-northeast-2c / EIP: 52.79.62.33
   ├── nginx (80/443 — api + registry)
   ├── app-server (Spring Boot, -Xmx400m)
   ├── redis:7-alpine
@@ -29,19 +48,6 @@ terraform apply
 
 ---
 
-## Tech Stack
-
-| Category | Stack |
-|---|---|
-| Language | Kotlin 1.9.25, Java 21 |
-| Framework | Spring Boot 3.4.9, Spring Cloud 2024.0.1 |
-| Database | MySQL, Redis 7 |
-| ORM | Spring Data JPA / Hibernate, Kotlin-JDSL 3.8.0 |
-| Auth | JWT, OAuth2 (Kakao, Apple) |
-| HTTP Client | Ktor Client 2.3.12 |
-| Push | Firebase FCM |
-| Observability | Micrometer, OpenTelemetry, Sentry, Prometheus |
-| Build | Gradle 8 (Kotlin DSL), Jib |
 
 ## Multi-Modules
 
