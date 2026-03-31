@@ -7,10 +7,10 @@
 
 DOCKER_COMPOSE ?= docker compose
 
-COMPOSE_PROD := docker-compose.prod.yml
-COMPOSE_MONITORING := docker-compose.monitoring.yml
-COMPOSE_CICD := docker-compose.cicd-infra.yml
-COMPOSE_NGRINDER := docker-compose.test-dev.yml
+COMPOSE_PROD := deploy/docker-compose.prod.yml
+COMPOSE_MONITORING := deploy/docker-compose.monitoring.yml
+COMPOSE_CICD := deploy/docker-compose.cicd-infra.yml
+COMPOSE_NGRINDER := deploy/docker-compose.test-dev.yml
 
 help:
 	@echo "Usage: make <target>"

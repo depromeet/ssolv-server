@@ -57,7 +57,7 @@ jobs:
             echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
             docker pull registry.ssolv.site/api-server:latest
 
-            docker compose -f docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
+            docker compose -f deploy/docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
 
             echo "Waiting for app-server to be healthy (max 3.5 min)..."
             for i in $(seq 1 21); do
@@ -110,7 +110,7 @@ jobs:
             echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
             docker pull registry.ssolv.site/api-server:latest
 
-            docker compose -f docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
+            docker compose -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
 
             echo "Waiting for app-server to be healthy (max 3.5 min)..."
             for i in $(seq 1 21); do
