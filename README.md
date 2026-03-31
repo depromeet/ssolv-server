@@ -69,5 +69,4 @@ ssolv-api-core  ──┐
 ssolv-api-place ──┘                     ──▶ ssolv-infrastructure
 ```
 
-./gradlew :ssolv-api-core:test --tests "org.depromeet.team3.SomeTest"  # 단일 테스트
-```
+
