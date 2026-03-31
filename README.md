@@ -1,4 +1,34 @@
 
+## Infrastructure
+
+```
+[ Instance A ] t3.micro / ap-northeast-2a / EIP: 3.34.32.206
+  ├── nginx (80/443, Let's Encrypt)
+  └── app-server (Spring Boot, -Xmx400m)
+
+[ Instance B ] t3.small / ap-northeast-2c / EIP: 52.79.62.33
+  ├── nginx (80/443 — api + registry)
+  ├── app-server (Spring Boot, -Xmx400m)
+  ├── redis:7-alpine
+  ├── registry (registry.ssolv.site)
+  └── alloy + node/nginx/redis-exporter
+
+[ RDS ] MySQL 8.0.43 / db.t3.micro / private subnet
+[ Route53 ] api.ssolv.site — Multivalue Answer + 헬스체크 기반 failover
+```
+
+**IaC**: Terraform (`terraform/`) — `app_instance_count` 변수로 단일↔멀티 서버 전환
+
+```bash
+cd terraform
+terraform plan
+terraform apply
+```
+
+> 인프라 설계 배경 및 의사결정: `.claude/infra/DECISIONS.md`
+
+---
+
 ## Tech Stack
 
 | Category | Stack |
