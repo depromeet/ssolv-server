@@ -69,22 +69,5 @@ ssolv-api-core  ──┐
 ssolv-api-place ──┘                     ──▶ ssolv-infrastructure
 ```
 
-## Getting Started
-
-```bash
-# 인프라 실행 (Redis)
-docker compose -f docker-compose.prod.yml up -d redis
-
-# API 서버 실행
-./gradlew :ssolv-api-core:bootRun    # http://localhost:8080
-./gradlew :ssolv-api-place:bootRun   # http://localhost:8081
-```
-
-## Commands
-
-```bash
-./gradlew build -x test                          # 빌드
-./gradlew test                                   # 전체 테스트
-./gradlew test jacocoTestReport --stacktrace     # 테스트 + 커버리지
 ./gradlew :ssolv-api-core:test --tests "org.depromeet.team3.SomeTest"  # 단일 테스트
 ```
