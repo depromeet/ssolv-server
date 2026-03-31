@@ -6,8 +6,10 @@ prometheus.scrape "node_exporter" {
 
 prometheus.scrape "spring_boot" {
   targets    = [
-    {"__address__" = "app-server-1:8080", "application" = "ssolv-api", "service" = "ssolv-api", "instance" = "app-server-1"},
-    {"__address__" = "app-server-2:8080", "application" = "ssolv-api", "service" = "ssolv-api", "instance" = "app-server-2"},
+    // 인스턴스 B 로컬 app-server
+    {"__address__" = "app-server:8080", "application" = "ssolv-api", "service" = "ssolv-api", "instance" = "instance-b"},
+    // 인스턴스 A app-server — B의 Alloy가 사설 IP로 원격 스크레이프
+    {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":8080", "application" = "ssolv-api", "service" = "ssolv-api", "instance" = "instance-a"},
   ]
   metrics_path = "/actuator/prometheus"
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
