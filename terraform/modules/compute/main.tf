@@ -20,6 +20,12 @@ resource "aws_instance" "app_a" {
   vpc_security_group_ids = [var.ec2_sg_id]
   key_name               = aws_key_pair.ssolv.key_name
 
+  # t3.micro 기본값은 standard(크레딧 소진 시 10% 스로틀).
+  # unlimited로 설정하면 크레딧 없어도 burst 유지 (베이스라인 초과분만 추가 과금).
+  credit_specification {
+    cpu_credits = "unlimited"
+  }
+
   root_block_device {
     volume_type = "gp3"
     volume_size = 20
