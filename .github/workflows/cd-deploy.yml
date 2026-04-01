@@ -43,6 +43,8 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
+          command_timeout: 10m
+          request_pty: true
           script: |
             set -e
 
@@ -96,6 +98,8 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
+          command_timeout: 10m
+          request_pty: true
           script: |
             set -e
 
