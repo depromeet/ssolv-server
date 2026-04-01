@@ -173,6 +173,8 @@ services:
     restart: unless-stopped
     environment:
       - REDIS_ADDR=redis:6379
+      # Stream PEL / length / group 메트릭 자동 노출
+      - REDIS_EXPORTER_CHECK_STREAMS=meeting_calculation_stream,meeting_notification_stream
     networks:
       - ssolv_prod_network
       - ssolv_monitoring_network

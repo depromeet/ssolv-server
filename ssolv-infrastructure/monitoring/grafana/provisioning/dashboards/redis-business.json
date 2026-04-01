@@ -1,0 +1,327 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "title": "ssolv — Redis Business Dashboard",
+  "uid": "ssolv-redis-business",
+  "description": "Redis 비즈니스 지표 — PEL, 활성 모임, 캐시 현황, 좋아요, Stream 상태",
+  "tags": ["ssolv", "redis", "business", "stream"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "instance-a,instance-b",
+        "current": { "value": "instance-b", "text": "Instance B" },
+        "options": [
+          { "value": "instance-b", "text": "Instance B", "selected": true }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "활성 모임 수",
+      "description": "현재 Redis에 장소 결과가 있는 모임 수 (meeting:places:* 키 수)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        { "expr": "redis_business_active_meetings{instance=~\"$instance.*\"}", "legendFormat": "활성 모임" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "캐시된 장소 수",
+      "description": "place:details:* 키 수 — 장소 상세 정보 캐시 규모",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        { "expr": "redis_business_cached_places{instance=~\"$instance.*\"}", "legendFormat": "캐시 장소" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "좋아요 활성 Key 수",
+      "description": "meeting:*:place:*:likes 키 수 — 현재 좋아요 인터랙션이 발생한 모임×장소 쌍",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        { "expr": "redis_business_active_like_keys{instance=~\"$instance.*\"}", "legendFormat": "좋아요 Key" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Google Places API 세마포어 가용량",
+      "description": "현재 동시 API 호출 가능 슬롯 수 (최대 15). 0에 가까울수록 병목 발생 중.",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 15,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "green", "value": 8 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "colorMode": "background", "orientation": "horizontal" },
+      "targets": [
+        { "expr": "google_api_semaphore_available{instance=~\"$instance.*\"}", "legendFormat": "가용 슬롯" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Stream PEL (Pending Entry List)",
+      "description": "각 Stream에서 Consumer가 가져갔지만 아직 XACK 하지 않은 메시지 수. 높으면 처리 지연 또는 Consumer 장애.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "redis_stream_calculation_pel{instance=~\"$instance.*\"}",
+          "legendFormat": "장소검색 PEL"
+        },
+        {
+          "expr": "redis_stream_notification_pel{instance=~\"$instance.*\"}",
+          "legendFormat": "알림 PEL"
+        },
+        {
+          "expr": "redis_stream_group_messages_pending{stream=\"meeting_calculation_stream\"}",
+          "legendFormat": "장소검색 PEL (exporter)"
+        },
+        {
+          "expr": "redis_stream_group_messages_pending{stream=\"meeting_notification_stream\"}",
+          "legendFormat": "알림 PEL (exporter)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Stream 총 메시지 수 (XLEN)",
+      "description": "Stream에 적재된 전체 메시지 수. 급격히 증가하면 Consumer 처리량 부족.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 5 } }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "redis_stream_calculation_length{instance=~\"$instance.*\"}",
+          "legendFormat": "장소검색 Stream 길이"
+        },
+        {
+          "expr": "redis_stream_notification_length{instance=~\"$instance.*\"}",
+          "legendFormat": "알림 Stream 길이"
+        },
+        {
+          "expr": "redis_stream_length{stream=\"meeting_calculation_stream\"}",
+          "legendFormat": "장소검색 Stream (exporter)"
+        },
+        {
+          "expr": "redis_stream_length{stream=\"meeting_notification_stream\"}",
+          "legendFormat": "알림 Stream (exporter)"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "활성 모임 수 추이",
+      "description": "시간대별 활성 모임 수 변화 — 사용량 패턴 파악",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 11, "w": 8, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15 }, "color": { "mode": "fixed", "fixedColor": "blue" } }
+      },
+      "targets": [
+        { "expr": "redis_business_active_meetings{instance=~\"$instance.*\"}", "legendFormat": "활성 모임" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "좋아요 인터랙션 추이",
+      "description": "시간대별 좋아요 Key 수 변화 — 사용자 참여도 지표",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 11, "w": 8, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15 }, "color": { "mode": "fixed", "fixedColor": "red" } }
+      },
+      "targets": [
+        { "expr": "redis_business_active_like_keys{instance=~\"$instance.*\"}", "legendFormat": "좋아요 Key" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "캐시 장소 수 추이",
+      "description": "place:details:* 캐시 누적량 — 캐시 성장 추이 및 TTL 만료 확인",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 11, "w": 8, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10 }, "color": { "mode": "fixed", "fixedColor": "green" } }
+      },
+      "targets": [
+        { "expr": "redis_business_cached_places{instance=~\"$instance.*\"}", "legendFormat": "캐시 장소 수" }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Stream Consumer 수",
+      "description": "각 Stream Group에 연결된 활성 Consumer 수 — 0이면 Consumer 다운 의심",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 17, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "장소검색 Consumer" }, "properties": [] },
+          { "matcher": { "id": "byName", "options": "알림 Consumer" }, "properties": [] }
+        ]
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "orientation": "horizontal" },
+      "targets": [
+        { "expr": "redis_stream_calculation_consumers{instance=~\"$instance.*\"}", "legendFormat": "장소검색 Consumer" },
+        { "expr": "redis_stream_notification_consumers{instance=~\"$instance.*\"}", "legendFormat": "알림 Consumer" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Redis 메모리 사용량",
+      "description": "redis_exporter 기준 실제 Redis 메모리 사용",
+      "type": "timeseries",
+      "gridPos": { "x": 6, "y": 17, "w": 10, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+      },
+      "targets": [
+        { "expr": "redis_memory_used_bytes", "legendFormat": "사용 중" },
+        { "expr": "redis_memory_max_bytes", "legendFormat": "최대" }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Redis 연결 수",
+      "description": "현재 Redis에 연결된 클라이언트 수",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 17, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        { "expr": "redis_connected_clients", "legendFormat": "연결 수" }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}
