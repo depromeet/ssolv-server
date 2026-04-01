@@ -84,9 +84,12 @@ class NotificationStreamsConfig(
         try {
             stringRedisTemplate.opsForStream<String, String>().createGroup(streamKey, groupName)
         } catch (e: Exception) {
-            if (e.message?.contains("BUSYGROUP") != true) {
-                logger.warn("Consumer Group 생성 실패 ($groupName): ${e.message}")
+            val causeMessage = e.cause?.message ?: ""
+            if (e.message?.contains("BUSYGROUP") == true || causeMessage.contains("BUSYGROUP")) {
+                // 이미 존재하는 그룹인 경우 무시
+                return
             }
+            logger.warn("Consumer Group 생성 실패 ($groupName): ${e.message} / Cause: $causeMessage")
         }
     }
 }
