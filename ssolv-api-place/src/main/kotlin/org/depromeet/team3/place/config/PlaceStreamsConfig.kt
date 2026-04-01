@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.stream.Consumer
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.ReadOffset
 import org.springframework.data.redis.connection.stream.StreamOffset
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -18,53 +19,74 @@ import java.util.UUID
 
 /**
  * 식당 도출(Place Recommendation) 처리를 위한 Redis Streams 설정 클래스
- * 
+ *
  * 주요 역할:
  * 1. 식당 도출 비동기 요청 수신을 위한 Consumer Group 관리
  * 2. 부하가 높은 검색 로직을 분산 처리하기 위한 메시지 큐 인프라 구축
+ * 3. Redis 연결 종료 시 자동 재시작으로 스트림 구독 안정성 보장
  */
 @Configuration
 @Profile("!test")
 class PlaceStreamsConfig(
-    private val placeSearchConsumer: PlaceSearchConsumer, // 식당 도출 실처리기
+    private val placeSearchConsumer: PlaceSearchConsumer,
     private val stringRedisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(PlaceStreamsConfig::class.java)
+
+    private lateinit var savedFactory: RedisConnectionFactory
+    private lateinit var container: StreamMessageListenerContainer<String, MapRecord<String, String, String>>
 
     @Bean
     fun placeSearchStreamMessageListenerContainer(
         redisConnectionFactory: RedisConnectionFactory
     ): Subscription {
+        savedFactory = redisConnectionFactory
+        return createAndStart()
+    }
+
+    private fun createAndStart(): Subscription {
         val streamKey = RedisStreamConstants.MEETING_CALCULATION_STREAM
         val groupName = RedisStreamConstants.MEETING_CALCULATION_GROUP
         val consumerName = "app_server_${UUID.randomUUID()}"
 
-        // Consumer Group 초기화 (존재하지 않으면 생성)
-        try {
-            stringRedisTemplate.opsForStream<String, String>().createGroup(streamKey, groupName)
-        } catch (e: Exception) {
-            // 그룹이 이미 존재하는 경우 무시
-            if (e.message?.contains("BUSYGROUP") != true) {
-                logger.warn("Consumer Group을 생성하는 데 실패했습니다: ${e.message}")
+        initConsumerGroup(streamKey, groupName)
+
+        val options = StreamMessageListenerContainer.StreamMessageListenerContainerOptions
+            .builder()
+            .pollTimeout(Duration.ofSeconds(1))
+            .errorHandler { throwable ->
+                logger.error("[Redis Stream] [$streamKey] 연결 오류 감지, 3초 후 재시작 시도", throwable)
+                Thread {
+                    Thread.sleep(3_000)
+                    runCatching { createAndStart() }
+                        .onSuccess { logger.info("[Redis Stream] [$streamKey] 재시작 완료") }
+                        .onFailure { logger.error("[Redis Stream] [$streamKey] 재시작 실패", it) }
+                }.also { it.isDaemon = true }.start()
             }
+            .build()
+
+        if (::container.isInitialized && container.isRunning) {
+            container.stop()
         }
 
-        val options = StreamMessageListenerContainer.StreamMessageListenerContainerOptions.builder()
-            .pollTimeout(Duration.ofSeconds(1))
-            .build()
-            
-        val container = StreamMessageListenerContainer.create(redisConnectionFactory, options)
-
-        // 스트림 구독 시작
+        container = StreamMessageListenerContainer.create(savedFactory, options)
         val subscription = container.receive(
             Consumer.from(groupName, consumerName),
             StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
             placeSearchConsumer
         )
-        
         container.start()
         logger.info("Redis Stream 구독 시작 ($streamKey / $groupName / $consumerName)")
-        
         return subscription
+    }
+
+    private fun initConsumerGroup(streamKey: String, groupName: String) {
+        try {
+            stringRedisTemplate.opsForStream<String, String>().createGroup(streamKey, groupName)
+        } catch (e: Exception) {
+            if (e.message?.contains("BUSYGROUP") != true) {
+                logger.warn("Consumer Group 생성 실패 ($groupName): ${e.message}")
+            }
+        }
     }
 }

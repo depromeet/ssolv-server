@@ -1,0 +1,262 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Grafana Cloud Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    },
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Grafana Cloud Loki",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    },
+    {
+      "name": "DS_TEMPO",
+      "label": "Tempo",
+      "description": "Grafana Cloud Tempo",
+      "type": "datasource",
+      "pluginId": "tempo",
+      "pluginName": "Tempo"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" },
+    { "type": "datasource", "id": "tempo", "name": "Tempo", "version": "1.0.0" }
+  ],
+  "title": "ssolv — Coroutine MDC Tracing",
+  "uid": "ssolv-coroutine-mdc",
+  "description": "코루틴 환경에서 request_id / user_id / trace_id 기반 로그·트레이스 통합 추적",
+  "tags": ["ssolv", "mdc", "coroutine", "tracing"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "instance-a,instance-b",
+        "current": { "value": "$__all", "text": "All" },
+        "options": [
+          { "value": "$__all", "text": "All", "selected": true },
+          { "value": "instance-a", "text": "Instance A" },
+          { "value": "instance-b", "text": "Instance B" }
+        ],
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "request_id",
+        "label": "Request ID",
+        "type": "textbox",
+        "query": "",
+        "current": { "value": "", "text": "" }
+      },
+      {
+        "name": "user_id",
+        "label": "User ID",
+        "type": "textbox",
+        "query": "",
+        "current": { "value": "", "text": "" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP Error Rate (5xx)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{instance=~\"$instance\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "5xx rate"
+        }
+      ],
+      "options": { "tooltip": { "mode": "single" } }
+    },
+    {
+      "id": 2,
+      "title": "Request Latency P50 / P95 / P99",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(http_server_requests_seconds_bucket{instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(http_server_requests_seconds_bucket{instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(http_server_requests_seconds_bucket{instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "MDC 컨텍스트 손실 감지 (request_id=startup)",
+      "description": "request_id가 'startup'인 로그 = MDC 전파 실패. 코루틴 컨텍스트 전환 시 MDCContext()가 누락된 경우.",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\"} |= \"request_id=startup\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <_> - <message>`",
+          "legendFormat": "MDC 손실 로그"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Request 추적 — request_id / user_id 필터",
+      "description": "위 변수에 request_id 또는 user_id를 입력하면 해당 요청의 전체 로그 흐름을 추적합니다. 코루틴 스레드 전환(thread 컬럼 변화)을 확인할 수 있습니다.",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\"} |= \"${request_id}\" |= \"${user_id}\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <logger> - <message>`",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "ERROR 로그 스트림",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 23, "w": 16, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "signature"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\"} |= \"ERROR\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <logger> - <message>`",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "에러 로그 발생 빈도",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 23, "w": 8, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } }
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=~\"app-server.*\"} |= \"ERROR\" [1m]))",
+          "legendFormat": "ERROR/min"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Redis Stream 에러 (StreamPollTask)",
+      "description": "SSOLV-SERVER-1 추적 — Redis 연결 끊김 감지",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 31, "w": 16, "h": 6 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "signature"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\"} |~ \"Redis Stream|RedisSystemException|StreamPollTask|연결 오류|재시작\"",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "JVM Heap 사용률",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 31, "w": 8, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
+      "targets": [
+        {
+          "expr": "sum by(instance) (jvm_memory_used_bytes{area=\"heap\", instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} heap used"
+        },
+        {
+          "expr": "sum by(instance) (jvm_memory_max_bytes{area=\"heap\", instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} heap max"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Trace 연동 — trace_id로 Tempo 드릴다운",
+      "description": "로그에 trace_id가 있으면 클릭 시 Tempo 트레이스로 이동합니다. 현재 OTel trace_id → MDC 주입 미설정 시 이 패널은 비어있습니다.",
+      "type": "traces",
+      "gridPos": { "x": 0, "y": 37, "w": 24, "h": 8 },
+      "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{.service.name = \"ssolv-api\"}",
+          "limit": 20
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}
