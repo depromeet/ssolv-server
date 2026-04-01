@@ -18,10 +18,7 @@ services:
       - MYSQL_PASSWORD=${PROD_DB_PASSWORD}
       - MYSQL_URL=jdbc:mysql://${PROD_DB_ENDPOINT}:3306/${PROD_DB_NAME}
       - REDIS_HOST=${INSTANCE_B_PRIVATE_IP}
-      # ZGC: 동시 GC로 stop-the-world 최소화 → CPU 스파이크 억제
-      # ConcGCThreads=1: GC 스레드 t3.micro CPU 보호
-      # SoftMaxHeapSize: GC가 360m 이하로 유지하려 노력 → GC 빈도 줄임
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx400m -XX:+UseZGC -XX:+ZGenerational -XX:ConcGCThreads=1 -XX:SoftMaxHeapSize=360m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx400m
       - OTLP_ENDPOINT=http://${INSTANCE_B_PRIVATE_IP}:4318/v1/traces
     volumes:
       - ./firebase-service-account.json:/home/ubuntu/17th-team3-Server/firebase-service-account.json:ro
