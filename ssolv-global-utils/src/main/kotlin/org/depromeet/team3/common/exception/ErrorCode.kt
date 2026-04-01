@@ -98,6 +98,10 @@ enum class ErrorCode(
     TOKEN_EXPIRED("T005", "만료된 초대 토큰입니다.", 400),
     MEETING_NOT_FOUND_FOR_TOKEN("T006", "토큰에 해당하는 모임을 찾을 수 없습니다.", 404),
 
+    // Notification 관련 에러 (N001~N099)
+    NOTIFICATION_NOT_FOUND("N001", "알림을 찾을 수 없습니다.", 404),
+    NOTIFICATION_ACCESS_DENIED("N002", "해당 알림에 접근 권한이 없습니다.", 403),
+
     // Place 관련 에러 (P001~P099)
     PLACE_SEARCH_FAILED("P001", "맛집 검색 중 오류가 발생했습니다.", 500),
     PLACE_API_ERROR("P002", "Google Places API 호출 중 오류가 발생했습니다.", 500),
