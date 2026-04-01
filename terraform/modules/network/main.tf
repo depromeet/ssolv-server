@@ -166,6 +166,22 @@ resource "aws_security_group" "ec2" {
     self        = true
   }
 
+  ingress {
+    description = "Node Exporter internal (Alloy scrape)"
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "Nginx Exporter internal (Alloy scrape)"
+    from_port   = 9113
+    to_port     = 9113
+    protocol    = "tcp"
+    self        = true
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
