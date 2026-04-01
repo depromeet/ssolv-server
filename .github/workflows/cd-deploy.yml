@@ -61,8 +61,8 @@ jobs:
 
             docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
 
-            echo "Waiting for app-server to be healthy (max 3.5 min)..."
-            for i in $(seq 1 21); do
+            echo "Waiting for app-server to be healthy (max 5 min)..."
+            for i in $(seq 1 30); do
               STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
               if [ "$STATUS" = "healthy" ]; then
                 echo "Instance A healthy after ${i}0s"
@@ -116,8 +116,8 @@ jobs:
 
             docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
 
-            echo "Waiting for app-server to be healthy (max 3.5 min)..."
-            for i in $(seq 1 21); do
+            echo "Waiting for app-server to be healthy (max 5 min)..."
+            for i in $(seq 1 30); do
               STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
               if [ "$STATUS" = "healthy" ]; then
                 echo "Instance B healthy after ${i}0s"
