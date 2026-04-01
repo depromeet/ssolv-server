@@ -31,7 +31,7 @@ services:
         max-size: "10m"
         max-file: "7"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -62,12 +62,42 @@ services:
       app-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/stub_status"]
+      test: [ "CMD", "curl", "-f", "http://localhost/stub_status" ]
       interval: 30s
       timeout: 10s
       retries: 3
     mem_limit: 128m
     mem_reservation: 32m
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node-exporter
+    restart: unless-stopped
+    pid: host
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter
+    restart: unless-stopped
+    ports:
+      - "9113:9113"
+    command:
+      - '--nginx.scrape-uri=http://nginx:80/stub_status'
+    networks:
+      - ssolv_prod_network
+    depends_on:
+      nginx:
+        condition: service_healthy
 
 networks:
   ssolv_prod_network:
