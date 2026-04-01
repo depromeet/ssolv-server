@@ -75,6 +75,22 @@ resource "aws_route53_record" "registry" {
   records = [var.instance_b_ip]
 }
 
-# ─── www.ssolv.site → ssolv.site (프론트엔드 대비) ───────────────────────────
-# 현재는 API 서버만 있으므로 주석 처리
-# resource "aws_route53_record" "www" { ... }
+# ─── Vercel Frontend (ssolv.site / www.ssolv.site) ───────────────────────────
+
+# 루트 도메인 (ssolv.site) — Vercel Anycast IP로 연결
+resource "aws_route53_record" "apex" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = var.domain
+  type    = "A"
+  ttl     = 300
+  records = ["76.76.21.21"]
+}
+
+# WWW 도메인 (www.ssolv.site) — Vercel DNS로 연결
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "www.${var.domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["cname.vercel-dns.com."]
+}
