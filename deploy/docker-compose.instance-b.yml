@@ -37,7 +37,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    mem_limit: 512m
+    mem_limit: 640m
     mem_reservation: 256m
 
   redis:
@@ -179,7 +179,25 @@ services:
       - ssolv_prod_network
       - ssolv_monitoring_network
 
+  # ─── Redis 데이터 브라우저 ─────────────────────────────────────────────────
+  # 접속: SSH 터널 후 http://localhost:5540
+  #   ssh -L 5540:localhost:5540 -i ~/dpm-server/depromeet-secret.pem ubuntu@52.79.62.33
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5540:5540"
+    volumes:
+      - redisinsight_data:/data
+    networks:
+      - ssolv_prod_network
+    mem_limit: 256m
+    mem_reservation: 64m
+
 volumes:
+  redisinsight_data:
+    driver: local
   registry_data:
     driver: local
 
