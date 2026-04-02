@@ -9,7 +9,8 @@ object PlaceFormatter {
      * 네이버 플레이스 링크 생성
      */
     fun generateNaverPlaceLink(placeName: String): String {
-        return "https://m.place.naver.com/place/list?query=$placeName"
+        val encodedName = java.net.URLEncoder.encode(placeName, "UTF-8").replace("+", "%20")
+        return "https://map.naver.com/p/search/$encodedName"
     }
 
     /**

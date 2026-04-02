@@ -131,7 +131,15 @@ class ExecutePlaceSearchService(
         actualDispatcher: CoroutineDispatcher
     ): PlacesSearchResponse {
         val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
-        val placesToProcess = candidatePlaces
+        
+        // 거리 기반 필터링 (역 기준 5km 이상은 제외)
+        val stationCoords = (createSurveyKeywordService.getStationCoordinates(meetingId)) ?: return PlacesSearchResponse(emptyList())
+        val filteredPlaces = candidatePlaces.filter { place ->
+            val placeLoc = place.location ?: return@filter true // 위치 정보 없으면 일단 포함
+            calculateDistance(stationCoords.latitude, stationCoords.longitude, placeLoc.latitude, placeLoc.longitude) <= 5.0
+        }
+
+        val placesToProcess = filteredPlaces
             .sortedByDescending { keywordResult.placeWeights[it.id] ?: 0.0 }
             .take(totalFetchSize + photoFallbackBuffer)
 
@@ -187,7 +195,16 @@ class ExecutePlaceSearchService(
             val weight = placeWeightByDbId[item.placeId] ?: 0.0
             val weightScore = weight * weightScoreMultiplier
             val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
-            item.placeId to (weightScore + likeScore)
+            
+            // 거리 가중치 추가 (역 기준 좌표 정보를 다시 조회)
+            val distanceScore = savedEntities.find { it.id == item.placeId }?.let { entity ->
+                if (entity.latitude != null && entity.longitude != null && stationCoords != null) {
+                    val dist = calculateDistance(stationCoords.latitude, stationCoords.longitude, entity.latitude!!, entity.longitude!!)
+                    maxOf(0.0, 100.0 - (dist * 20.0)) // 5km 이내일 때 0~100점 (가까울수록 높음)
+                } else 0.0
+            } ?: 0.0
+            
+            item.placeId to (weightScore + likeScore + distanceScore)
         }
 
         val sortedItems = items.sortedWith(
@@ -363,6 +380,7 @@ class ExecutePlaceSearchService(
             requestSemaphore.withPermit {
                 withContext(dispatcher) {
                     try {
+                        logger.info("Google API 검색 실행: query={}, coords=({}, {})", query, stationCoordinates?.latitude, stationCoordinates?.longitude)
                         val response = withTimeout(googleApiTimeoutMs) {
                             placeQuery.textSearch(
                                 sanitizedQuery,
@@ -401,6 +419,20 @@ class ExecutePlaceSearchService(
         return withContext(dispatcher) {
             placeQuery.findByGooglePlaceIds(googlePlaceIds).mapNotNull { it.id?.let { id -> it.googlePlaceId?.let { gid -> gid to id } } }.toMap()
         }
+    }
+
+    /**
+     * 하버사인 공식 (Haversine Formula) - 두 좌표 간의 직선 거리 계산 (단위: km)
+     */
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371.0 // 지구 반지름 (km)
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return r * c
     }
 
     private data class KeywordSearchResult(val places: List<PlacesTextSearchResponse.Place>, val fallbackPlaces: List<PlacesTextSearchResponse.Place>, val placeWeights: Map<String, Double>, val usedKeywords: List<String>)

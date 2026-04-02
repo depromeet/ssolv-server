@@ -100,10 +100,10 @@ class GooglePlacesClient(
         ) {
             try {
                 withTimeout(apiTimeoutMillis) {
-                    val locationBias = if (latitude != null && longitude != null) {
-                        PlacesTextSearchRequest.LocationBias(
-                            circle = PlacesTextSearchRequest.LocationBias.Circle(
-                                center = PlacesTextSearchRequest.LocationBias.Circle.Center(
+                    val locationRestriction = if (latitude != null && longitude != null) {
+                        PlacesTextSearchRequest.LocationRestriction(
+                            circle = PlacesTextSearchRequest.Circle(
+                                center = PlacesTextSearchRequest.Circle.Center(
                                     latitude = latitude,
                                     longitude = longitude
                                 ),
@@ -116,7 +116,7 @@ class GooglePlacesClient(
                         textQuery = query,
                         languageCode = "ko",
                         maxResultCount = maxResults,
-                        locationBias = locationBias
+                        locationRestriction = locationRestriction
                     )
 
                     httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
@@ -156,7 +156,8 @@ class GooglePlacesClient(
             "places.userRatingCount",
             "places.photos",
             "places.location",
-            "places.types"
+            "places.types",
+            "places.googleMapsUri"
         ).joinToString(",")
     }
 }

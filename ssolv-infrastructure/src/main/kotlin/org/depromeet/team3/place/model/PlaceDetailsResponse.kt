@@ -24,7 +24,9 @@ data class PlaceDetailsResponse(
     val priceRange: PriceRange? = null,
     @JsonProperty("addressDescriptor")
     val addressDescriptor: AddressDescriptor? = null,
-    val location: Location? = null
+    val location: Location? = null,
+    @JsonProperty("googleMapsUri")
+    val googleMapsUri: String? = null
 ) {
     data class DisplayName(
         val text: String,

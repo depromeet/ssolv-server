@@ -48,6 +48,43 @@ See `/architecture` skill for full module dependency graph and layer rules.
 - **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
 - **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
 
+## 운영 서버 SSH 접속
+
+운영 환경 작업(서버 상태 확인, 컨테이너 재시작, 로그 조회, .env 수정 등)이 필요하면 **사용자에게 묻지 말고 직접 SSH 접속해서 처리**한다.
+
+```
+SSH Key  : /Users/parkmineum/.ssh/gdg-cicd-key.pem
+User     : ubuntu
+
+Instance A (t3.micro  — nginx + app-server)
+  Public IP  : 3.34.32.206
+  Private IP : 10.1.0.43 (ap-northeast-2a / 10.1.0.0/24)
+
+Instance B (t3.small — app-server + redis + registry + monitoring)
+  Public IP  : 52.79.62.33
+  Private IP : 10.1.1.160 (ap-northeast-2c / 10.1.1.0/24)
+
+RDS Endpoint : ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com
+```
+
+**자주 쓰는 SSH 명령 패턴:**
+```bash
+# Instance A/B 접속
+ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206
+ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33
+
+# 컨테이너 재시작 (Instance B 예시)
+ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33 "
+  cd ~/17th-team3-Server
+  docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate <service>
+"
+
+# 로그 확인
+ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "docker logs app-server --tail 100"
+```
+
+> IP가 바뀌었을 경우 `cd terraform && terraform output`으로 최신 IP를 먼저 확인한다.
+
 ## 진행 중인 작업
 
 현재 AWS 계정 이전 + 멀티 서버 마이그레이션 진행 중.

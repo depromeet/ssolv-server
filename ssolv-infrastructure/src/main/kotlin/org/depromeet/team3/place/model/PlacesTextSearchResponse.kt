@@ -20,7 +20,9 @@ data class PlacesTextSearchResponse(
         val currentOpeningHours: OpeningHours? = null,
         val location: Location?,
         val types: List<String>? = null,
-        val photos: List<Photo>? = null
+        val photos: List<Photo>? = null,
+        @JsonProperty("googleMapsUri")
+        val googleMapsUri: String? = null
     ) {
         data class Location(
             val latitude: Double,

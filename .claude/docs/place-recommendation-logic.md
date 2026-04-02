@@ -134,11 +134,11 @@ private val minimalKeywordWeight = 0.1  // 최소 가중치 (Fallback 시)
 |------|----|
 | API | Google Places Text Search v1 (`/v1/places:searchText`) |
 | 키워드당 최대 요청 수 | `20개` (요금 구간 내 최대치) |
-| 검색 반경 | 역 좌표 중심 `3km` 이내 (`locationBias`) |
+| 검색 반경 제약 | 역 좌표 중심 `3km` 이내 고정 (**`locationRestriction`**) |
 | 언어 | `ko` (한국어 결과 우선) |
 | 타임아웃 | `5초` (초과 시 예외 처리) |
 
-### � 요청 받아오는 필드 (Field Mask)
+### 🛠 요청 받아오는 필드 (Field Mask)
 
 ```
 places.id
@@ -149,6 +149,7 @@ places.userRatingCount
 places.photos
 places.location
 places.types
+places.googleMapsUri  <-- 추가: 구글 맵 원본 링크 확보
 ```
 
 ### 🔄 재시도 정책 (Exponential Backoff)
@@ -179,10 +180,12 @@ places.types
 반올림 오차 발생 시 → 가중치 높은 키워드에 1개씩 추가 할당
 ```
 
-### 🧹 결과 필터링 (Keyword Matching)
+### 🧹 결과 필터링 (Post-Filtering)
 
-API 응답 결과 중 실제로 해당 카테고리와 관련 있는 장소만 남깁니다.  
-장소의 **이름(displayName)** 또는 **타입(types)** 이 매칭 키워드를 포함해야 합니다.
+API 응답 결과 중 실제로 해당 카테고리와 관련 있고 위치가 적절한 장소만 남깁니다.  
+
+1.  **키워드 매칭**: 장소의 **이름(displayName)** 또는 **타입(types)** 이 매칭 키워드를 포함해야 합니다.
+2.  **거리 필터링 (Strict)**: 하버사인(Haversine) 공식을 사용하여 **역 기준 반경 5km**를 초과하는 데이터는 위치 관련성이 낮다고 판단하여 제외합니다.
 
 #### 동의어(Synonym) 매핑으로 정확도 향상
 
@@ -202,16 +205,15 @@ API 응답 결과 중 실제로 해당 카테고리와 관련 있는 장소만 �
 
 수집된 후보 장소에 대해 종합 점수를 산출하여 내림차순 정렬합니다.
 
-$$\text{Score} = (\text{Weight} \times 100) + (\ln(\text{LikeCount} + 1) \times 50) + \text{UserLikedBoost}$$
+$$\text{Score} = (\text{Weight} \times 100) + (\text{LikeCount} \times 50) + \text{DistanceScore}$$
 
 | 구성 요소 | 계산 | 최대 기여도 | 설명 |
 |----------|------|-----------|------|
-| **설문 가중치** | `weight × 100` | ~100점 | 가중치 1.0인 장소는 최대 100점 |
-| **팀원 좋아요** | `ln(likeCount + 1) × 50` | ~이론상 무제한 | 로그 스케일 적용으로 독점 방지 |
-| **본인 좋아요** | `100` (좋아요 누른 경우) | 100점 | 내가 가고 싶은 곳 최우선 |
+| **설문 가중치** | `weight × 100` | ~100점 | 카테고리 득표율이 높을수록 높은 점수 |
+| **팀원 좋아요** | `likeCount × 50` | 가변 | 팀원들이 많이 선호할수록 높은 점수 |
+| **거리 가중치** | `max(0, 100 - (dist × 20))` | 100점 | 5km 이내일 때 0~100점 (가까울수록 높음) |
 
-> **로그 스케일을 사용하는 이유**: 좋아요 1개 ≫ 0개의 차별화는 크지만, 10개 ≫ 9개의 차별화는 작아야 하기 때문.  
-> 참고: `ln(2)×50 ≈ 35`, `ln(6)×50 ≈ 90`, `ln(11)×50 ≈ 120`
+> **거리 점수를 반영하는 이유**: Google의 `locationRestriction`을 통과했더라도, 기왕이면 역에서 더 가까운 곳을 최우선으로 추천하기 위함입니다. (1km 멀어질 때마다 20점 감점)
 
 ### 📊 정렬 우선순위
 
