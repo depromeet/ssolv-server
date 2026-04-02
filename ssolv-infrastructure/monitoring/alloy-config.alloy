@@ -2,7 +2,7 @@
 prometheus.scrape "node_exporter" {
   targets = [
     {"__address__" = "node-exporter:9100", "instance" = "instance-b"},
-    {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":9100", "instance" = "instance-a"}
+    {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":9100", "instance" = "instance-a"},
   ]
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
@@ -14,6 +14,7 @@ prometheus.scrape "spring_boot" {
     // 인스턴스 A app-server — B의 Alloy가 사설 IP로 원격 스크레이프
     {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":8080", "application" = "ssolv-api", "service" = "ssolv-api", "instance" = "instance-a"},
   ]
+
   metrics_path = "/actuator/prometheus"
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
@@ -21,7 +22,7 @@ prometheus.scrape "spring_boot" {
 prometheus.scrape "nginx_exporter" {
   targets = [
     {"__address__" = "nginx-exporter:9113", "instance" = "instance-b"},
-    {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":9113", "instance" = "instance-a"}
+    {"__address__" = sys.env("INSTANCE_A_PRIVATE_IP") + ":9113", "instance" = "instance-a"},
   ]
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
