@@ -40,5 +40,4 @@ data class PlacesTextSearchRequest(
                 val longitude: Double
             )
         }
-    }
 }
