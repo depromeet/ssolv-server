@@ -53,6 +53,10 @@ discovery.relabel "docker_logs" {
     regex         = "/(.*)"
     target_label  = "container"
   }
+  rule {
+    replacement  = "instance-b"
+    target_label = "instance"
+  }
 }
 
 loki.source.docker "logs" {

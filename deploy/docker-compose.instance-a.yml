@@ -69,6 +69,23 @@ services:
     mem_limit: 128m
     mem_reservation: 32m
 
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    user: root
+    restart: unless-stopped
+    volumes:
+      - ./ssolv-infrastructure/monitoring/alloy-config-instance-a.alloy:/etc/alloy/config.alloy:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    env_file:
+      - .env
+    networks:
+      - ssolv_prod_network
+    mem_limit: 192m
+    mem_reservation: 64m
+
   node-exporter:
     image: prom/node-exporter:v1.7.0
     container_name: node-exporter

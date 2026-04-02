@@ -1,0 +1,43 @@
+// Instance A 전용 Alloy 설정 — 로그 수집만 담당
+// 메트릭 스크레이프는 Instance B의 Alloy가 원격으로 처리하므로 중복 수집 안 함
+// 트레이스도 Instance A의 app-server가 Instance B Alloy(OTLP :4318)로 직접 전송
+
+// ─── 로그 수집 ────────────────────────────────────────────────────────────────
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    replacement  = "instance-a"
+    target_label = "instance"
+  }
+}
+
+loki.source.docker "logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_logs.output
+  forward_to = [loki.process.labels.receiver]
+}
+
+loki.process "labels" {
+  stage.docker { }
+  forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
