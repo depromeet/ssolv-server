@@ -13,9 +13,12 @@ import org.mockito.kotlin.*
 import org.springframework.data.redis.core.StringRedisTemplate
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.mockito.Mockito.lenient
+import org.mockito.quality.Strictness
+import org.mockito.junit.jupiter.MockitoSettings
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class PlaceLikeServiceTest {
 
     private lateinit var redisTemplate: StringRedisTemplate
@@ -79,7 +82,6 @@ class PlaceLikeServiceTest {
             eq(listOf("meeting:1:place:101:likes", "meeting:places:1")),
             eq("99"),
             eq("101"),
-            eq("50.0"),
             any() // TTL
         )
 

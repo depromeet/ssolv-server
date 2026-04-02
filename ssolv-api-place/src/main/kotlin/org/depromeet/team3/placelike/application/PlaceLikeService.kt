@@ -28,26 +28,23 @@ class PlaceLikeService(
         local meetingKey = KEYS[2]
         local userId = ARGV[1]
         local placeId = ARGV[2]
-        local bonus = tonumber(ARGV[3])
-        local ttl = tonumber(ARGV[4])
+        local ttl = tonumber(ARGV[3])
 
         local added = redis.call('SADD', likeKey, userId)
         local isLiked = 0
-        local scoreDelta = 0
 
         if added == 1 then
             isLiked = 1
-            scoreDelta = bonus
         else
             redis.call('SREM', likeKey, userId)
             isLiked = 0
-            scoreDelta = -bonus
         end
 
-        redis.call('ZINCRBY', meetingKey, scoreDelta, placeId)
+        -- 정확한 로그 점수 산출을 위해 단순 증감이 아닌 전체 캐시 무효화 선택
+        redis.call('DEL', meetingKey)
+        
         if ttl > 0 then
             redis.call('EXPIRE', likeKey, ttl)
-            redis.call('EXPIRE', meetingKey, ttl)
         end
         
         local count = redis.call('SCARD', likeKey)
@@ -60,18 +57,14 @@ class PlaceLikeService(
         val likeKey = searchService.getLikeKey(meetingId, placeId)
         val meetingKey = searchService.getMeetingKey(meetingId)
         
-        // 기존 TTL 우선 재사용, 만료되었거나 없을 때만 DB fallback
-        var ttlSeconds = redisTemplate.getExpire(meetingKey)
-        if (ttlSeconds <= 0L) {
-            ttlSeconds = calculateMeetingTTL(meetingId)
-        }
+        // TTL 30일 고정 정책 반영
+        val ttlSeconds = 30 * 24 * 3600L
         
         val result = redisTemplate.execute(
             toggleScript,
             listOf(likeKey, meetingKey),
             userId.toString(),
             placeId.toString(),
-            likeScoreMultiplier.toString(),
             ttlSeconds.toString()
         ) as List<*>
 
