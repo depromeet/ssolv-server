@@ -48,6 +48,18 @@ See `/architecture` skill for full module dependency graph and layer rules.
 - **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
 - **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
 
+## 후속 작업 안내 원칙
+
+코드 변경 후 커밋/푸시 완료 시, **CI/CD만으로 반영되지 않는 작업이 있을 때만** 후속 작업을 안내한다.
+CI/CD로 자동 반영되는 경우엔 별도 안내 없이 종료한다.
+
+후속 작업이 필요한 대표 케이스:
+- CD가 `--no-deps`로 특정 서비스만 재시작하기 때문에 다른 서비스도 재시작해야 할 때
+- 서비스 최초 추가라 CD 스크립트에 없어서 수동 `docker compose up` 필요할 때
+- `.env` 값 추가/변경이 필요할 때
+- Terraform apply가 필요할 때
+- DB 마이그레이션 등 수동 작업이 필요할 때
+
 ## 운영 서버 SSH 접속
 
 운영 환경 작업(서버 상태 확인, 컨테이너 재시작, 로그 조회, .env 수정 등)이 필요하면 **사용자에게 묻지 말고 직접 SSH 접속해서 처리**한다.
