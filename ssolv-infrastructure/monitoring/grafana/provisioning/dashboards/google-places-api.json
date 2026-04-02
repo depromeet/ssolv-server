@@ -1,0 +1,272 @@
+{
+  "title": "Google Places API",
+  "uid": "google-places-api",
+  "tags": ["ssolv", "google", "places"],
+  "timezone": "Asia/Seoul",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "type": "custom",
+        "label": "Instance",
+        "query": "instance-a,instance-b",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "API Call Rate (req/min)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(google_api_call_count_total{instance=~\"$instance\"}[5m])) * 60",
+          "legendFormat": "req/min"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "reqpm", "decimals": 1, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 20 }, { "color": "red", "value": 40 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Success Rate",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(google_api_call_count_total{result=\"success\",instance=~\"$instance\"}[5m])) / sum(rate(google_api_call_count_total{instance=~\"$instance\"}[5m])) * 100",
+          "legendFormat": "success %"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 90 }, { "color": "green", "value": 98 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Cache Hit Rate",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(google_api_cache_hit_total{instance=~\"$instance\"}[5m])) / (sum(rate(google_api_cache_hit_total{instance=~\"$instance\"}[5m])) + sum(rate(google_api_cache_miss_total{instance=~\"$instance\"}[5m]))) * 100",
+          "legendFormat": "hit %"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 80 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Semaphore In Use",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(google_api_semaphore_used{instance=~\"$instance\"})",
+          "legendFormat": "used"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 14 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "429 Rate Limit Hits",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(increase(google_api_rate_limit_hit_total{instance=~\"$instance\"}[1h]))",
+          "legendFormat": "429 hits (1h)"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Retry Count (1h)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(increase(google_api_retry_count_total{instance=~\"$instance\"}[1h]))",
+          "legendFormat": "retries (1h)"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 }] } } }
+    },
+    {
+      "type": "row",
+      "title": "API Call Health",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "API Call Rate by Result",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by(result) (rate(google_api_call_count_total{instance=~\"$instance\"}[2m])) * 60",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqpm", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "timeout" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "api_error" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "business_error" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "unknown_error" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "sum"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "API Response Latency (P50 / P95 / P99)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(google_api_response_latency_seconds_bucket{result=\"success\",instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(google_api_response_latency_seconds_bucket{result=\"success\",instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(google_api_response_latency_seconds_bucket{result=\"success\",instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2, "fillOpacity": 5 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } }
+    },
+    {
+      "type": "row",
+      "title": "Semaphore",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Semaphore Permits (Available / Used / Total=15)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(google_api_semaphore_available{instance=~\"$instance\"})",
+          "legendFormat": "available"
+        },
+        {
+          "expr": "sum(google_api_semaphore_used{instance=~\"$instance\"})",
+          "legendFormat": "in use"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0, "max": 15, "custom": { "lineWidth": 2, "fillOpacity": 15 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "available" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "in use" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Semaphore Wait Time (P50 / P95)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(google_api_semaphore_wait_seconds_bucket{instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(google_api_semaphore_wait_seconds_bucket{instance=~\"$instance\"}[5m]))) * 1000",
+          "legendFormat": "P95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "P95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } }
+    },
+    {
+      "type": "row",
+      "title": "Cache & Retries",
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Hit vs Miss Rate",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(google_api_cache_hit_total{instance=~\"$instance\"}[5m])) * 60",
+          "legendFormat": "hit"
+        },
+        {
+          "expr": "sum(rate(google_api_cache_miss_total{instance=~\"$instance\"}[5m])) * 60",
+          "legendFormat": "miss (→ Google API call)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqpm", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "hit" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "miss (→ Google API call)" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "sum"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Retry Rate by Attempt",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by(attempt) (rate(google_api_retry_count_total{instance=~\"$instance\"}[5m])) * 60",
+          "legendFormat": "attempt {{attempt}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqpm", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "sum"] } }
+    }
+  ],
+  "schemaVersion": 36
+}

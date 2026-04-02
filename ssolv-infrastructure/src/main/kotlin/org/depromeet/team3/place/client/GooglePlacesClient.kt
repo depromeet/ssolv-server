@@ -1,6 +1,7 @@
 package org.depromeet.team3.place.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
@@ -23,6 +24,7 @@ import kotlin.random.Random
 class GooglePlacesClient(
     private val httpClient: HttpClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
+    private val meterRegistry: MeterRegistry,
 ) {
 
     private val logger = KotlinLogging.logger { GooglePlacesClient::class.java.name }
@@ -64,8 +66,14 @@ class GooglePlacesClient(
                 if (isRetryable && attempt < maxRetries - 1) {
                     val jitter = Random.nextLong(0, jitterMaxMillis)
                     val totalDelay = delayMillis + jitter
-                    logger.warn(e) { 
-                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 에러: ${e.message}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)" 
+                    logger.warn(e) {
+                        "$operation 재시도 (${attempt + 1}/${maxRetries - 1}) - 에러: ${e.message}, $operationDetail, ${totalDelay}ms 후 재시도 (지터: ${jitter}ms)"
+                    }
+                    // 재시도 카운터
+                    meterRegistry.counter("google.api.retry.count", "attempt", (attempt + 1).toString()).increment()
+                    // 429 Rate Limit 카운터
+                    if (e is ResponseException && e.response.status.value == 429) {
+                        meterRegistry.counter("google.api.rate_limit.hit").increment()
                     }
                     delay(totalDelay)
                     delayMillis = minOf(delayMillis * 2, maxDelayMillis)

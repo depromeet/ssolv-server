@@ -11,8 +11,13 @@ import org.springframework.context.annotation.Configuration
  * 장소 서비스에서 사용하는 공통 자원 및 모니터링 메트릭 설정
  */
 
+import org.depromeet.team3.common.GooglePlacesApiProperties
+
 @Configuration
-class PlaceMetricsConfig(private val meterRegistry: MeterRegistry) {
+class PlaceMetricsConfig(
+    private val meterRegistry: MeterRegistry,
+    private val properties: GooglePlacesApiProperties
+) {
 
     /**
      * [전역 Semaphore] 서버 전체의 Google Places API 동시 호출 수 상한 제어
@@ -30,13 +35,16 @@ class PlaceMetricsConfig(private val meterRegistry: MeterRegistry) {
      */
     @Bean
     fun globalApiSemaphore(): Semaphore {
-        val semaphore = Semaphore(15)
+        val semaphore = Semaphore(properties.globalSemaphoreSize)
         
-        // 전역 세마포어 가용량 모니터링 메트릭 등록 (Prometheus/Grafana용)
+        // 전역 세마포어 가용량 / 사용량 모니터링 메트릭 등록 (Prometheus/Grafana용)
         meterRegistry.gauge("google.api.semaphore.available", semaphore) {
             it.availablePermits.toDouble()
         }
-        
+        meterRegistry.gauge("google.api.semaphore.used", semaphore) {
+            (properties.globalSemaphoreSize - it.availablePermits).toDouble()
+        }
+
         return semaphore
     }
 }

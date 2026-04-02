@@ -53,12 +53,13 @@ class ExecutePlaceSearchService(
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
-    private val totalFetchSize = 10
-    private val photoFallbackBuffer = 5
-    private val keywordFetchSize = 20
+    private val totalFetchSize get() = googlePlacesApiProperties.totalFetchSize
+    private val photoFallbackBuffer get() = googlePlacesApiProperties.photoFallbackBuffer
+    private val keywordFetchSize get() = googlePlacesApiProperties.keywordFetchSize
     private val weightScoreMultiplier = 100.0
     private val likeScoreMultiplier = 50.0
-    private val googleApiTimeoutMs = 3000L // 개별 Google API 호출 타임아웃 (3초)
+    private val googleApiTimeoutMs get() = googlePlacesApiProperties.apiTimeoutMs
+    private val semaphoreTimeoutMs get() = googlePlacesApiProperties.semaphoreTimeoutMs
 
     suspend fun execute(meetingId: Long): PlacesSearchResponse {
         val plan = createSurveyKeywordService.generateKeywordPlan(meetingId)
@@ -95,8 +96,10 @@ class ExecutePlaceSearchService(
                 val storedResult = searchService.find(meetingId, request.userId)
 
                 if (storedResult != null) {
+                    meterRegistry.counter("google.api.cache.hit", "type", "result").increment()
                     return@supervisorScope storedResult
                 }
+                meterRegistry.counter("google.api.cache.miss", "type", "result").increment()
 
                 val automaticPlan = plan as? PlaceSearchPlan.Automatic
                     ?: throw IllegalArgumentException("PlaceSearchPlan.Automatic만 지원합니다.")
@@ -120,22 +123,11 @@ class ExecutePlaceSearchService(
                     }
 
                     if (result != null) return@supervisorScope result
-
-                    // 락 획득 실패 시: 다른 노드/스레드가 작업 중이므로 잠시 대기 후 캐시 확인
                     delay(1000)
-                    searchService.find(meetingId, null)?.let { return@supervisorScope it }
                 }
 
-                // 최후의 수단: 락이나 캐시 결과가 없으면 직접 실행 수행 (Fallback)
-                val rawCacheKey = "meeting:places:raw:$meetingId"
-                val rawCacheJson = redisTemplate.opsForValue().get(rawCacheKey)
-                if (rawCacheJson != null) {
-                    val rawCache = objectMapper.readValue(rawCacheJson, KeywordSearchResult::class.java)
-                    return@supervisorScope doProcessSearchResults(meetingId, rawCache, actualDispatcher)
-                }
-                
-                val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
-                return@supervisorScope doProcessSearchResults(meetingId, keywordResult, actualDispatcher)
+                // 최후의 수단: 락 획득 실패 시에도 검색 서비스에서 최종 캐시 확인 후 반환
+                return@supervisorScope searchService.find(meetingId, null) ?: throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
             }
         }
     }
@@ -282,7 +274,7 @@ class ExecutePlaceSearchService(
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
     ): KeywordSearchResult = supervisorScope {
-        val requestSemaphore = Semaphore(4)
+        val requestSemaphore = Semaphore(googlePlacesApiProperties.requestSemaphoreSize)
         val parentContext = currentCoroutineContext()
         val deferredResponses = plan.keywords.map { candidate ->
             async(parentContext + dispatcher) {
@@ -398,42 +390,52 @@ class ExecutePlaceSearchService(
         /**
          * 2-tier Semaphore 중첩 적용
          *
-         * [외부] globalApiSemaphore(15): 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
-         *        모임방이 몇 개 동시에 처리되든, 서버 전체에서 Google API 호출은 항상 15개 이하
+         * [외부] requestSemaphore: 단일 모임방 내 fan-out 제한.
+         * [내부] globalApiSemaphore: 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
          *
-         * [내부] requestSemaphore(4): 단일 모임방 내 fan-out 제한.
-         *        한 모임방의 키워드가 아무리 많아도, 해당 모임방은 한 번에 4개까지만 호출
-         *
-         * 중첩 순서: 전역(외부) → 모임별(내부)
-         * 이유: 전역 슬롯을 먼저 확보한 뒤 모임별 슬롯을 확보해야
-         *       데드락 없이 항상 일관된 방향으로 락이 획득됨
+         * 중첩 순서: 모임별(외부) → 전역(내부)
+         * 이유: 모임방 내부 쿼터에 당첨된 요청만 전역 슬롯을 요청하도록 하여 
+         *       전역 자원 기아 현상(Starvation)을 방지함.
          */
-        return globalApiSemaphore.withPermit {
+        return withTimeout(semaphoreTimeoutMs) {
             requestSemaphore.withPermit {
-                withContext(dispatcher) {
-                    try {
-                        logger.info("Google API 검색 실행: query={}, coords=({}, {})", query, stationCoordinates?.latitude, stationCoordinates?.longitude)
-                        val response = withTimeout(googleApiTimeoutMs) {
-                            placeQuery.textSearch(
-                                sanitizedQuery,
-                                keywordFetchSize,
-                                stationCoordinates?.latitude,
-                                stationCoordinates?.longitude,
-                                3000.0
-                            )
-                        }
-                        recordMetric("success")
-                        response
+                val semaphoreWaitStart = System.nanoTime()
+                globalApiSemaphore.withPermit {
+                    meterRegistry.timer("google.api.semaphore.wait")
+                        .record(System.nanoTime() - semaphoreWaitStart, java.util.concurrent.TimeUnit.NANOSECONDS)
+                    withContext(dispatcher) {
+                        try {
+                            logger.info("Google API 검색 실행: query={}, coords=({}, {})", query, stationCoordinates?.latitude, stationCoordinates?.longitude)
+                            val apiStart = System.nanoTime()
+                            val response = withTimeout(googleApiTimeoutMs) {
+                                placeQuery.textSearch(
+                                    sanitizedQuery,
+                                    keywordFetchSize,
+                                    stationCoordinates?.latitude,
+                                    stationCoordinates?.longitude,
+                                    3000.0
+                                )
+                            }
+                            meterRegistry.timer("google.api.response.latency", "result", "success")
+                                .record(System.nanoTime() - apiStart, java.util.concurrent.TimeUnit.NANOSECONDS)
+                            recordMetric("success")
+                            response
                     } catch (e: TimeoutCancellationException) {
+                        meterRegistry.timer("google.api.response.latency", "result", "timeout")
+                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                         recordMetric("timeout")
                         logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
                         throw e
                     } catch (e: PlaceSearchException) {
                         val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
+                        meterRegistry.timer("google.api.response.latency", "result", reason)
+                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                         recordMetric(reason)
                         logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
                         throw e
                     } catch (e: Exception) {
+                        meterRegistry.timer("google.api.response.latency", "result", "unknown_error")
+                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                         recordMetric("unknown_error")
                         logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
                         throw e
@@ -442,6 +444,7 @@ class ExecutePlaceSearchService(
             }
         }
     }
+}
 
     private fun recordMetric(result: String) {
         meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
