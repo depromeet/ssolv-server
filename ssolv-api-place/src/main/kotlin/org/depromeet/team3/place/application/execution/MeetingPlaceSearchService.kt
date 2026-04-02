@@ -1,5 +1,6 @@
 package org.depromeet.team3.place.application.execution
 import kotlinx.coroutines.Dispatchers
+import kotlin.math.ln
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
@@ -8,9 +9,6 @@ import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import java.time.Duration
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,13 +24,11 @@ class MeetingPlaceSearchService(
     private val objectMapper: ObjectMapper,
     private val placeQuery: PlaceQuery,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
-    private val meetingQuery: MeetingQuery
 ) {
 
     private val MEETING_KEY_PREFIX = "meeting:places:"
     private val PLACE_KEY_PREFIX = "place:details:"
     private val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
-    private val DEFAULT_TTL = 604800L // 7 days fallback
 
     /**
      * 검색 결과 저장 (Redis 기반 - ZSET 및 개별 상세정보 캐싱)
@@ -48,14 +44,12 @@ class MeetingPlaceSearchService(
         redisTemplate.delete(meetingKey)
         
         if (result.items.isNotEmpty()) {
-            val ttlSeconds = calculateMeetingTTL(meetingId)
             result.items.forEach { item ->
                 val score = scores[item.placeId] ?: 0.0
                 redisTemplate.opsForZSet().add(meetingKey, item.placeId.toString(), score)
             }
-            if (ttlSeconds > 0) {
-                redisTemplate.expire(meetingKey, ttlSeconds, TimeUnit.SECONDS)
-            }
+            // 30일 후 자동 만료 (RDB 결과 저장 없음)
+            redisTemplate.expire(meetingKey, 30, TimeUnit.DAYS)
         }
 
         // 2. 장소별 상세정보 캐싱 (상세 정보 원본만 저장, 좋아요 정보는 조회 시점에 Redis Set에서 결합)
@@ -68,19 +62,6 @@ class MeetingPlaceSearchService(
         }
     }
 
-    private suspend fun calculateMeetingTTL(meetingId: Long): Long {
-        val meeting = meetingQuery.findById(meetingId)
-        val endAt = meeting?.endAt ?: return DEFAULT_TTL
-        
-        val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
-        val duration = Duration.between(now, endAt)
-        
-        return if (duration.isNegative || duration.isZero) {
-            3600L // 1 hour fallback
-        } else {
-            duration.seconds
-        }
-    }
 
     /**
      * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
@@ -88,12 +69,15 @@ class MeetingPlaceSearchService(
     suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(Dispatchers.IO) {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
-        // 1. ZSET에서 점수 높은 순으로 상위 10개 ID 가져오기...
-        val placeIds = redisTemplate.opsForZSet().reverseRange(meetingKey, 0, 9)
+        // 1. ZSET에서 점수(BaseScore)와 함께 상위 10개 ID 가져오기
+        val placeIdWithScores = redisTemplate.opsForZSet().reverseRangeWithScores(meetingKey, 0, 9)
         
-        if (placeIds.isNullOrEmpty()) {
+        if (placeIdWithScores.isNullOrEmpty()) {
             return@withContext null
         }
+        
+        val placeIds = placeIdWithScores.mapNotNull { it.value }
+        val scoreMap = placeIdWithScores.associate { (it.value ?: "") to (it.score ?: 0.0) }
 
         // 2. 장소 상세 정보 (Global Cache) 일괄 조회
         val placeKeys = placeIds.map { "$PLACE_KEY_PREFIX$it" }
@@ -158,7 +142,7 @@ class MeetingPlaceSearchService(
             }
         }
 
-        // 4. 실시간 좋아요 정보 결합 (Redis Pipeline 사용: N번의 RTT -> 1번의 RTT)
+        // 4. 실시간 좋아요 정보 결합 + 실시간 재정렬 (Personalization)
         val finalItemsToProcess = items.filter { it.placeId != -1L }
         if (finalItemsToProcess.isEmpty()) return@withContext null
 
@@ -174,7 +158,7 @@ class MeetingPlaceSearchService(
         }
 
         var resIdx = 0
-        val finalItems = finalItemsToProcess.map { item ->
+        val finalItemsWithLike = finalItemsToProcess.map { item ->
             val likeCount = (pipelineResults[resIdx++] as? Long) ?: 0L
             val isLiked = if (userId != null) (pipelineResults[resIdx++] as? Boolean) ?: false else false
             
@@ -183,7 +167,16 @@ class MeetingPlaceSearchService(
                 isLiked = isLiked
             )
         }
-        PlacesSearchResponse(finalItems)
+
+        // 실시간 점수 계산 및 재정렬
+        val sortedItems = finalItemsWithLike.sortedByDescending { item ->
+            val baseScore = scoreMap[item.placeId.toString()] ?: 0.0
+            val realtimeLikeScore = ln(item.likeCount + 1.0) * 50.0
+            
+            baseScore + realtimeLikeScore
+        }
+
+        PlacesSearchResponse(sortedItems)
     }
 
     fun getLikeKey(meetingId: Long, placeId: Long): String = String.format(LIKE_KEY_TEMPLATE, meetingId, placeId)

@@ -217,31 +217,41 @@ class SelectSurveyKeywordsService {
     }
 
     private fun leafSynonyms(name: String): List<String> = when (name) {
-        "초밥·사시미" -> listOf("초밥", "스시", "사시미", "sushi")
-        "베트남 음식" -> listOf("베트남", "Vietnam", "포", "pho", "banh", "banh mi")
-        "태국 음식" -> listOf("태국", "타이", "Thai", "pad thai")
-        "파스타" -> listOf("이탈리안", "Italian", "파스타", "pasta")
+        "초밥·사시미" -> listOf("초밥", "스시", "사시미", "sushi", "izakaya", "회")
+        "베트남 음식" -> listOf("베트남", "Vietnam", "포", "pho", "쌀국수", "분짜", "banh", "banh mi")
+        "태국 음식" -> listOf("태국", "타이", "Thai", "팟타이", "pad thai", "푸팟퐁커리")
+        "파스타" -> listOf("이탈리안", "Italian", "파스타", "pasta", "spaghetti", "스테이크")
         "피자" -> listOf("피자", "pizza", "이탈리안")
         "면류" -> listOf(
-            "중식", "중국", "중화", "짜장", "짜장면", "짬뽕", "마라", "마라탕",
+            "중식", "중국", "중화", "짜장", "짜장면", "짬뽕", "마라", "마라탕", "마라샹궈",
             "noodle", "chinese", "china", "zhong"
         )
         "튀김·볶음류" -> listOf(
-            "중식", "중국", "중화", "탕수육", "깐풍", "볶음", "튀김", "마라",
+            "중식", "중국", "중화", "탕수육", "깐풍", "볶음", "튀김", "마라", "꿔바로우",
             "chinese", "china"
         )
+        "카페" -> listOf("카페", "커피", "cafe", "coffee", "디저트", "베이커리", "bakery")
+        "디저트" -> listOf("디저트", "dessert", "케이크", "빵", "베이커리", "bakery", "cafe", "카페")
+        "술집" -> listOf("술집", "호프", "pub", "bar", "맥주", "와인", "펍", "포차", "이자카야", "beer")
+        "이자카야" -> listOf("이자카야", "izakaya", "선술집", "술집")
+        "삼겹살·고기구이" -> listOf("삼겹살", "고기", "갈비", "한우", "bbq", "korean bbq", "구이")
+        "패스트푸드" -> listOf("버거", "햄버거", "burger", "샌드위치", "sandwich", "fast food")
+        "스테이크" -> listOf("스테이크", "steak", "그릴", "grill", "레스토랑")
+        "전통주·막걸리" -> listOf("막걸리", "전통주", "민속주", "포차", "주막", "파전")
         else -> emptyList()
     }
 
     private fun branchSynonyms(name: String): List<String> = when (name) {
-        "양식" -> listOf("양식", "서양", "이탈리안", "파스타", "스테이크", "italian", "western")
-        "일식" -> listOf("일식", "스시", "초밥", "사시미", "라멘", "japanese")
+        "양식" -> listOf("양식", "서양", "이탈리안", "파스타", "스테이크", "italian", "western", "pasta", "steak")
+        "일식" -> listOf("일식", "스시", "초밥", "사시미", "라멘", "카츠", "japanese", "sushi", "izakaya")
         "중식" -> listOf(
             "중식", "중국", "중화", "짜장", "짬뽕", "탕수육", "깐풍", "마라",
             "마라탕", "chinese", "china", "sichuan"
         )
-        "동남아 음식" -> listOf("동남아", "베트남", "태국", "타이", "아시안", "asian", "Vietnam", "Thai")
-        "한식" -> listOf("한식", "korean")
+        "동남아 음식" -> listOf("동남아", "베트남", "태국", "타이", "아시안", "asian", "Vietnam", "Thai", "south east asian")
+        "한식" -> listOf("한식", "한국", "korean", "k-food")
+        "카페·디저트" -> listOf("카페", "디저트", "커피", "cafe", "dessert", "coffee", "bakery")
+        "술집" -> listOf("술집", "호프", "포차", "맥주", "와인", "펍", "pub", "bar", "beer", "izakaya")
         else -> emptyList()
     }
 

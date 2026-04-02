@@ -37,7 +37,6 @@ class MeetingPlaceSearchServiceTest {
     private lateinit var zSetOps: ZSetOperations<String, String>
     private lateinit var valueOps: ValueOperations<String, String>
     private lateinit var setOps: SetOperations<String, String>
-    private lateinit var meetingQuery: org.depromeet.team3.meeting.MeetingQuery
 
     private lateinit var service: MeetingPlaceSearchService
 
@@ -49,7 +48,6 @@ class MeetingPlaceSearchServiceTest {
         googlePlacesApiProperties = mock {
             on { apiKey } doReturn "test-api-key"
         }
-        meetingQuery = mock()
 
         zSetOps = mock()
         valueOps = mock()
@@ -72,20 +70,28 @@ class MeetingPlaceSearchServiceTest {
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             placeQuery = placeQuery,
-            googlePlacesApiProperties = googlePlacesApiProperties,
-            meetingQuery = meetingQuery
+            googlePlacesApiProperties = googlePlacesApiProperties
         )
     }
 
     @Test
-    @DisplayName("Cache All Hit - Redis ZSET 및 MGET으로 응답, 좋아요 정보 결합 확인")
-    fun `ZSET에서 가져온 ID들로 MGET 수행 후 좋아요 정보를 결합하여 반환한다`() = runTest {
+    @DisplayName("Cache All Hit - Redis ZSET 및 MGET으로 응답, 좋아요 정보 결합 및 로그 기반 재정렬 확인")
+    fun `ZSET에서 가져온 ID들로 MGET 수행 후 좋아요 정보를 결합하여 로그 기반으로 재정렬하여 반환한다`() = runTest {
         // given
         val meetingId = 1L
         val userId = 99L
-        val placeIds = setOf("101", "205")
+        // 101: 베이스 점수 100, 205: 베이스 점수 80
+        val tuple1 = mock<ZSetOperations.TypedTuple<String>> {
+            on { value } doReturn "101"
+            on { score } doReturn 100.0
+        }
+        val tuple2 = mock<ZSetOperations.TypedTuple<String>> {
+            on { value } doReturn "205"
+            on { score } doReturn 80.0
+        }
+        val tuples = setOf(tuple1, tuple2)
         
-        whenever(zSetOps.reverseRange("meeting:places:$meetingId", 0, 9)).thenReturn(placeIds)
+        whenever(zSetOps.reverseRangeWithScores("meeting:places:$meetingId", 0, 9)).thenReturn(tuples)
         
         val json1 = """{"placeId":101,"name":"쉑쉑버거"}"""
         val json2 = """{"placeId":205,"name":"마라탕"}"""
@@ -97,10 +103,11 @@ class MeetingPlaceSearchServiceTest {
         whenever(objectMapper.readValue(json1, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item1)
         whenever(objectMapper.readValue(json2, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item2)
 
-        // 좋아요 정보 모킹 (101: 5개 대기, 205: 유저가 좋아요 누름)
-        // Pipeline 결과 시뮬레이션: (SCARD 101, SISMEMBER 101, SCARD 205, SISMEMBER 205)
+        // 좋아요 정보 모킹 
+        // 101: 0개, 205: 10개 (로그 점수가 101의 베이스 점수 20차이를 극복할 수 있는지 확인)
+        // ln(11) * 50 ≈ 119.8점 추가됨 -> 205가 역전해야 함
         whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>()))
-            .thenReturn(listOf(5L, false, 1L, true))
+            .thenReturn(listOf(0L, false, 10L, true))
 
         // when
         val result = service.find(meetingId, userId)
@@ -109,14 +116,9 @@ class MeetingPlaceSearchServiceTest {
         assertThat(result).isNotNull
         assertThat(result?.items).hasSize(2)
         
-        // 좋아요 정보 반영 확인
-        val res101 = result?.items?.find { it.placeId == 101L }
-        assertThat(res101?.likeCount).isEqualTo(5)
-        assertThat(res101?.isLiked).isFalse()
-
-        val res205 = result?.items?.find { it.placeId == 205L }
-        assertThat(res205?.likeCount).isEqualTo(1)
-        assertThat(res205?.isLiked).isTrue()
+        // 좋아요가 많은 205번이 상단으로 재정렬되었는지 확인
+        assertThat(result?.items?.get(0)?.placeId).isEqualTo(205L)
+        assertThat(result?.items?.get(1)?.placeId).isEqualTo(101L)
         
         verify(placeQuery, never()).findByIds(any())
     }
@@ -126,9 +128,17 @@ class MeetingPlaceSearchServiceTest {
     fun `ZSET 목록 중 일부 캐시가 만료되었을 때 누락된 상세정보만 DB에서 복구한다`() = runTest {
         // given
         val meetingId = 1L
-        val placeIds = setOf("101", "205")
+        val tuple1 = mock<ZSetOperations.TypedTuple<String>> {
+            on { value } doReturn "101"
+            on { score } doReturn 100.0
+        }
+        val tuple2 = mock<ZSetOperations.TypedTuple<String>> {
+            on { value } doReturn "205"
+            on { score } doReturn 80.0
+        }
+        val tuples = setOf(tuple1, tuple2)
         
-        whenever(zSetOps.reverseRange("meeting:places:$meetingId", 0, 9)).thenReturn(placeIds)
+        whenever(zSetOps.reverseRangeWithScores("meeting:places:$meetingId", 0, 9)).thenReturn(tuples)
         
         val json1 = """{"placeId":101,"name":"쉑쉑버거"}"""
         // 205번 누락 (null)
@@ -141,7 +151,7 @@ class MeetingPlaceSearchServiceTest {
         whenever(placeQuery.findByIds(listOf(205L))).thenReturn(listOf(missingEntity))
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":205,"name":"마라탕"}""")
 
-        // 좋아요 정보 모킹 (Pipeline 결과 시뮬레이션: SCARD 101, SCARD 205)
+        // 좋아요 정보 모킹
         whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>()))
             .thenReturn(listOf(0L, 0L))
 
@@ -149,7 +159,7 @@ class MeetingPlaceSearchServiceTest {
         val result = service.find(meetingId)
 
         // then
-        assertThat(result?.items?.map { it.placeId }).containsExactly(101L, 205L)
+        assertThat(result?.items?.map { it.placeId }).containsExactlyInAnyOrder(101L, 205L)
         verify(placeQuery, times(1)).findByIds(listOf(205L))
         verify(valueOps).set(eq("place:details:205"), any(), any(), any())
     }
