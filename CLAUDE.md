@@ -48,6 +48,10 @@ See `/architecture` skill for full module dependency graph and layer rules.
 - **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
 - **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
 
+## Commit Message Language
+
+All commit messages must be written in **English**. No Korean in commit messages.
+
 ## 후속 작업 안내 원칙
 
 코드 변경 후 커밋/푸시 완료 시, **CI/CD만으로 반영되지 않는 작업이 있을 때만** 후속 작업을 안내한다.
