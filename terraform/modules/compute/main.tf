@@ -53,6 +53,11 @@ resource "aws_instance" "app_b" {
   vpc_security_group_ids = [var.ec2_sg_id]
   key_name               = aws_key_pair.ssolv.key_name
 
+  # t3.small도 T3 계열이므로 크레딧 소진 시 스로틀 방지
+  credit_specification {
+    cpu_credits = "unlimited"
+  }
+
   root_block_device {
     volume_type = "gp3"
     volume_size = 30

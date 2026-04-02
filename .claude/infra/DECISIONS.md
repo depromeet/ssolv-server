@@ -97,13 +97,12 @@
 
 ---
 
-## ADR-012: DNS — 가비아 수동 변경
+## ADR-012: DNS — 가비아 수동 변경 ~~(superseded by ADR-016)~~
 
 - **날짜**: 2026-03-31
-- **결정**: Route53 없이 가비아에서 직접 A 레코드 변경
-- **근거**: 기존 도메인이 가비아 관리. Route53 전환 시 추가 비용 + 마이그레이션 복잡도 증가.
-- **변경 대상**: `api.ssolv.site` → 인스턴스 A EIP, `registry.ssolv.site` → 인스턴스 B EIP
-- **타이밍**: Terraform apply 후 EIP 확인 시 즉시 변경 가능
+- **상태**: ❌ Superseded by ADR-016 (Route53 Multivalue Answer 도입으로 대체됨)
+- **결정 당시**: Route53 없이 가비아에서 직접 A 레코드 변경 예정
+- **변경 경위**: 단순 A 레코드로는 헬스체크 기반 failover 불가 → ADR-016에서 Route53 도입으로 결정 번복
 
 ---
 
@@ -116,14 +115,29 @@
 
 ---
 
-## ADR-014: 멀티서버 부하분산 — 양 인스턴스 모두 트래픽 서빙
+## ADR-014: 멀티서버 부하분산 — 양 인스턴스 모두 트래픽 서빙 ~~(superseded by ADR-016)~~
 
 - **날짜**: 2026-03-31
-- **결정**: 인스턴스 A, B 모두 nginx + app-server를 올려 트래픽 분산 (기존 멀티 WAS 구조 유지)
-- **근거**: 인스턴스 B를 인프라 전용으로 쓰면 A 단일 장애 포인트 문제 발생. B의 여유 자원 활용.
-- **트래픽 구조**: 가비아 DNS는 인스턴스 A만 가리킴 (단일 IP). A의 nginx에서 B로 upstream 프록시.
-  - 또는: 두 도메인 각각 다른 IP로 분리 (선택 사항, 추후 결정)
-- **내부 통신**: 인스턴스 A의 app-server → 인스턴스 B의 Redis (B의 사설 IP:6379)
+- **상태**: ❌ Superseded by ADR-016 (트래픽 구조가 변경됨)
+- **결정 당시**: 가비아 DNS → A 단일 IP, A의 nginx에서 B로 upstream 프록시 예정
+- **변경 경위**: Route53 Multivalue Answer 도입으로 각 인스턴스가 독립적으로 트래픽 서빙.
+  A→B upstream 프록시 구조 불필요. 각자 nginx → 로컬 app-server만 처리.
+- **현재 구조 (ADR-016 참고)**: Route53이 A/B를 대등하게 부하분산, nginx는 로컬 처리만 담당
+
+---
+
+## ADR-017: Vercel 프론트엔드 DNS — Route53으로 통합 관리
+
+- **날짜**: 2026-04-03
+- **결정**: `ssolv.site` (apex) 및 `www.ssolv.site` DNS 레코드를 Route53에서 함께 관리
+- **근거**:
+  - 가비아 NS를 Route53으로 위임한 이후 모든 DNS 레코드는 Route53에서 일원 관리
+  - apex 도메인은 CNAME 불가 → Vercel Anycast IP(`76.76.21.21`)로 A 레코드 직접 등록
+  - www는 CNAME으로 `cname.vercel-dns.com.` 연결
+- **구현**:
+  - `aws_route53_record.apex`: `ssolv.site` → `76.76.21.21` (A, TTL 300)
+  - `aws_route53_record.www`: `www.ssolv.site` → `cname.vercel-dns.com.` (CNAME, TTL 300)
+- **트레이드오프**: Vercel IP가 변경되면 Terraform 코드도 업데이트 필요 (단, Vercel Anycast IP는 장기 고정값)
 
 ---
 

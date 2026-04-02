@@ -27,7 +27,7 @@ resource "aws_db_instance" "main" {
 
   publicly_accessible     = false
   deletion_protection     = true
-  backup_retention_period = 1  # TODO: 결제 정보 등록 후 7로 변경
+  backup_retention_period = 1  # Free tier 제한: 최대 1일. 계정 업그레이드 후 7로 변경 가능
   skip_final_snapshot     = false
   final_snapshot_identifier = "${var.project}-mysql-final"
 

@@ -134,16 +134,16 @@ Security Group (rds):
   - `REGISTRY_USERNAME` / `REGISTRY_PASSWORD`
 - [x] 멀티 서버 rolling update 배포 전략 (A 먼저 → B)
 - [x] `cd-deploy.yml` 업데이트 완료
-- [ ] CD 파이프라인 실제 트리거 후 배포 확인
+- [x] CD 파이프라인 실제 트리거 후 배포 확인
 
 ### Phase 5: DNS 컷오버
 - [x] 가비아 네임서버 → Route53 NS 4개로 변경
 - [x] Route53 `api.ssolv.site` Multivalue Answer 등록 (A + B)
 - [x] Route53 헬스체크 A/B 모두 Healthy 확인
 - [x] `dig api.ssolv.site` — 두 IP 정상 응답 확인
-- [ ] CloudFront 삭제 (구 계정)
-- [ ] 구 EC2 (`13.125.182.175`) 종료 (구 계정)
-- [ ] 모니터링 정상 수집 확인 (Grafana, Sentry)
+- [ ] CloudFront 삭제 (구 계정 — 수동 작업 필요)
+- [ ] 구 EC2 (`13.125.182.175`) 종료 (구 계정 — 수동 작업 필요)
+- [x] 모니터링 정상 수집 확인 (Grafana, Sentry)
 
 ---
 

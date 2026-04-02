@@ -76,6 +76,8 @@ resource "aws_route53_record" "registry" {
 }
 
 # ─── Vercel Frontend (ssolv.site / www.ssolv.site) ───────────────────────────
+# 출처: Vercel Anycast IP (https://vercel.com/docs/concepts/projects/domains#apex-domains)
+# Vercel 대시보드에서 도메인 설정 후 발급받은 고정 IP
 
 # 루트 도메인 (ssolv.site) — Vercel Anycast IP로 연결
 resource "aws_route53_record" "apex" {
