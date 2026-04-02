@@ -58,6 +58,7 @@ class CreateSurveyKeywordService(
         val weight: Double,
         val type: KeywordType,
         val categoryName: String? = null,
+        val branchName: String? = null,
         val matchKeywords: Set<String> = emptySet(),
         val fallbackKeyword: String? = null,
         val fallbackMatchKeywords: Set<String> = emptySet()

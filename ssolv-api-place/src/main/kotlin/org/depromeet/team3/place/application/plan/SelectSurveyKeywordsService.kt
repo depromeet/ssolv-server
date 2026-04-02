@@ -55,6 +55,7 @@ class SelectSurveyKeywordsService {
                 weight = weight.coerceIn(0.0, 1.0),
                 type = KeywordType.LEAF,
                 categoryName = leaf.name,
+                branchName = branch?.name,
                 matchKeywords = buildMatchKeywords(leaf.name, KeywordType.LEAF),
                 fallbackKeyword = branchKeyword,
                 fallbackMatchKeywords = branchMatchKeywords
@@ -70,6 +71,7 @@ class SelectSurveyKeywordsService {
                 weight = weight.coerceIn(0.0, 1.0),
                 type = KeywordType.BRANCH,
                 categoryName = branch.name,
+                branchName = branch.name,
                 matchKeywords = buildMatchKeywords(branch.name, KeywordType.BRANCH)
             )
         }
@@ -123,17 +125,22 @@ class SelectSurveyKeywordsService {
         if (filteredKeywords.isEmpty()) {
             val keyword = buildGeneralKeyword(aggregate.stationName)
             val normalized = CreateSurveyKeywordService.normalizeKeyword(keyword)
-            keywordMap[normalized] = KeywordCandidate(
+            val candidate = KeywordCandidate(
                 keyword = normalized,
                 weight = minimalKeywordWeight,
                 type = KeywordType.GENERAL,
                 categoryName = null,
+                branchName = null,
                 matchKeywords = emptySet()
             )
-            filteredKeywords = keywordMap.values.toList()
+            filteredKeywords = listOf(candidate)
         }
 
-        return filteredKeywords.take(maxKeywordCount)
+        return filteredKeywords
+            .groupBy { it.branchName ?: it.keyword }
+            .map { (_, candidates) -> candidates.maxBy { it.weight } }
+            .sortedByDescending { it.weight }
+            .take(maxKeywordCount)
     }
 
     /**

@@ -1,4 +1,6 @@
 package org.depromeet.team3.place.client
+import io.micrometer.core.instrument.MeterRegistry
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -27,8 +29,6 @@ class GooglePlacesClientTest {
 
     @BeforeEach
     fun setUp() {
-        val webClient = mock<org.springframework.web.reactive.function.client.WebClient>()
-        
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
             baseUrl = "https://places.googleapis.com"
@@ -36,9 +36,11 @@ class GooglePlacesClientTest {
         
         googlePlacesClient = GooglePlacesClient(
             httpClient = mock(),
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
+            meterRegistry = mock()
         )
     }
+
 
     @org.junit.jupiter.api.Disabled("WebClient 마이그레이션으로 인한 테스트 수정 필요")
     @Test
