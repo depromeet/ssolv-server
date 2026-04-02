@@ -1,6 +1,7 @@
 package org.depromeet.team3.place.application.execution
 
 import io.micrometer.core.instrument.MeterRegistry
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.*
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
@@ -47,6 +48,8 @@ class ExecutePlaceSearchServiceConcurrencyTest {
     lateinit var globalApiSemaphore: Semaphore
     @MockK
     lateinit var lockService: DistributedLockService
+    @MockK
+    lateinit var objectMapper: ObjectMapper
 
     @InjectMockKs
     lateinit var executePlaceSearchService: ExecutePlaceSearchService
@@ -63,6 +66,13 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         every { meterRegistry.counter(any<String>(), any<Iterable<io.micrometer.core.instrument.Tag>>()) } returns mockk(relaxed = true)
         every { meterRegistry.counter(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<*>>()) } returns listOf(0L, false)
+        
+        // Redis ValueOps 및 ObjectMapper 모킹 추가
+        val valueOps = mockk<org.springframework.data.redis.core.ValueOperations<String, String>>(relaxed = true)
+        every { redisTemplate.opsForValue() } returns valueOps
+        every { valueOps.get(any<String>()) } returns null // 초기 상태는 Raw 캐시 없음
+        every { objectMapper.writeValueAsString(any()) } returns "{}"
+        every { objectMapper.readValue(any<String>(), any<Class<Any>>()) } returns mockk(relaxed = true)
     }
 
     @Test
@@ -125,6 +135,7 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         coEvery { placeQuery.textSearch(any(), any(), any(), any(), any()) } returns PlacesTextSearchResponse(mockPlaces)
         coEvery { placeQuery.savePlacesFromTextSearch(any()) } returns mockEntities
         coEvery { placeQuery.findByGooglePlaceIds(any()) } returns mockEntities
+        coEvery { createSurveyKeywordService.getStationCoordinates(meetingId) } returns org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.0, 127.0)
 
 
         // 10명의 사용자가 동시에 요청

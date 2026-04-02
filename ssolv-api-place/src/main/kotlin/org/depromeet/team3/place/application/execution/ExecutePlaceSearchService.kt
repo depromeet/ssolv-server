@@ -1,5 +1,7 @@
 package org.depromeet.team3.place.application.execution
 import kotlinx.coroutines.Dispatchers
+import com.fasterxml.jackson.databind.ObjectMapper
+import kotlin.math.ln
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.TimeoutCancellationException
@@ -47,6 +49,7 @@ class ExecutePlaceSearchService(
     private val globalApiSemaphore: Semaphore,
     private val meterRegistry: MeterRegistry,
     private val lockService: DistributedLockService,
+    private val objectMapper: ObjectMapper,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
@@ -102,10 +105,16 @@ class ExecutePlaceSearchService(
                 val lockKey = "place_search_lock:$meetingId"
                 repeat(5) { attempt ->
                     val result = lockService.withLock(lockKey, Duration.ofSeconds(10)) {
-                        // 락 획득 후 캐시 다시 확인 (Double-Check)
-                        searchService.find(meetingId, null)?.let { return@withLock it }
+                        // 캐시가 여전이 없으면 Raw 캐시 확인 (Google API 호출 방지)
+                        val rawCacheKey = "meeting:places:raw:$meetingId"
+                        val rawCacheJson = redisTemplate.opsForValue().get(rawCacheKey)
+                        
+                        if (rawCacheJson != null) {
+                            val rawCache = objectMapper.readValue(rawCacheJson, KeywordSearchResult::class.java)
+                            return@withLock doProcessSearchResults(meetingId, rawCache, actualDispatcher)
+                        }
 
-                        // 캐시가 여전히 없으면 직접 실행 및 결과 저장
+                        // 캐시가 아예 없으면 직접 실행 및 결과 저장
                         val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
                         doProcessSearchResults(meetingId, keywordResult, actualDispatcher)
                     }
@@ -117,7 +126,14 @@ class ExecutePlaceSearchService(
                     searchService.find(meetingId, null)?.let { return@supervisorScope it }
                 }
 
-                // 최후의 수단: 5초 대기 후에도 락이나 캐시 결과가 없으면 직접 실행 수행 (Fallback)
+                // 최후의 수단: 락이나 캐시 결과가 없으면 직접 실행 수행 (Fallback)
+                val rawCacheKey = "meeting:places:raw:$meetingId"
+                val rawCacheJson = redisTemplate.opsForValue().get(rawCacheKey)
+                if (rawCacheJson != null) {
+                    val rawCache = objectMapper.readValue(rawCacheJson, KeywordSearchResult::class.java)
+                    return@supervisorScope doProcessSearchResults(meetingId, rawCache, actualDispatcher)
+                }
+                
                 val keywordResult = fetchPlacesForKeywords(automaticPlan, photoFallbackBuffer, actualDispatcher)
                 return@supervisorScope doProcessSearchResults(meetingId, keywordResult, actualDispatcher)
             }
@@ -192,19 +208,31 @@ class ExecutePlaceSearchService(
         }
 
         val scoreByPlaceId = items.associate { item ->
+            val entity = savedEntities.find { it.id == item.placeId } ?: return@associate item.placeId to 0.0
+            
+            // 1. 설문 가중치 점수
             val weight = placeWeightByDbId[item.placeId] ?: 0.0
             val weightScore = weight * weightScoreMultiplier
-            val likeScore = if (item.likeCount > 0) item.likeCount * likeScoreMultiplier else 0.0
             
-            // 거리 가중치 추가 (역 기준 좌표 정보를 다시 조회)
-            val distanceScore = savedEntities.find { it.id == item.placeId }?.let { entity ->
-                if (entity.latitude != null && entity.longitude != null && stationCoords != null) {
-                    val dist = calculateDistance(stationCoords.latitude, stationCoords.longitude, entity.latitude!!, entity.longitude!!)
-                    maxOf(0.0, 100.0 - (dist * 20.0)) // 5km 이내일 때 0~100점 (가까울수록 높음)
-                } else 0.0
-            } ?: 0.0
+            // 2. 좋아요 점수: 로그 스케일 적용 (ln(count + 1))
+            val likeScore = ln(item.likeCount + 1.0) * likeScoreMultiplier
             
-            item.placeId to (weightScore + likeScore + distanceScore)
+            // 3. 구글 신뢰도 점수 (별점 * ln(리뷰수+1) * 2) - 신규
+            val googleScore = (entity.rating) * ln(entity.userRatingsTotal.toDouble() + 1.0) * 2.0
+            
+            // 4. 거리 가중치 및 도보권 보너스 - 신규
+            var distanceScore = 0.0
+            var proximityBoost = 0.0
+            if (entity.latitude != null && entity.longitude != null && stationCoords != null) {
+                val dist = calculateDistance(stationCoords.latitude, stationCoords.longitude, entity.latitude!!, entity.longitude!!)
+                distanceScore = maxOf(0.0, 100.0 - (dist * 20.0)) // 5km 이내일 때 0~100점
+                if (dist <= 1.0) proximityBoost = 50.0 // 1km 이내 도보권 보너스 50점
+            }
+            
+            // 5. 카테고리 매칭 보너스 (구글 타입과 검색 키워드 일치 여부) - 신규
+            val categoryMatchBoost = if (entity.types != null && keywordResult.usedKeywords.any { kw -> entity.types!!.contains(kw.lowercase().replace(" ", "")) }) 50.0 else 0.0
+            
+            item.placeId to (weightScore + likeScore + googleScore + distanceScore + proximityBoost + categoryMatchBoost)
         }
 
         val sortedItems = items.sortedWith(
@@ -215,8 +243,12 @@ class ExecutePlaceSearchService(
         val finalItems = sortedItems.take(totalFetchSize)
         val response = PlacesSearchResponse(finalItems)
 
-        if (meetingId != null && finalItems.isNotEmpty()) {
+        if (finalItems.isNotEmpty()) {
             searchService.save(meetingId, response, scoreByPlaceId)
+            
+            // Raw 캐시 저장 (좋아요 시 ZSET 무효화 대응용)
+            val rawCacheKey = "meeting:places:raw:$meetingId"
+            redisTemplate.opsForValue().set(rawCacheKey, objectMapper.writeValueAsString(keywordResult), 30, java.util.concurrent.TimeUnit.DAYS)
         }
 
         return response

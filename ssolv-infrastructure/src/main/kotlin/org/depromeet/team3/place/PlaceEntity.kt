@@ -62,6 +62,9 @@ class PlaceEntity(
     
     @Column(name = "photos", columnDefinition = "TEXT")
     val photos: String? = null,
+
+    @Column(name = "types", columnDefinition = "TEXT")
+    val types: String? = null,
     
     @Column(name = "is_deleted", nullable = false)
     val isDeleted: Boolean = false

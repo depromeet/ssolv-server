@@ -40,14 +40,6 @@ class PlaceQuery(
 
             val entities = places.map { place ->
                 val existing = existingPlaces[place.id]
-                val lastUpdated = existing?.updatedAt ?: LocalDateTime.MIN
-
-                // 30일 이내 데이터가 있고 필수 정보(link)가 있으면 업데이트 스킵 (비용 최적화 및 구글 약관 준수)
-                if (existing != null && 
-                    existing.link != null && 
-                    lastUpdated.isAfter(LocalDateTime.now().minusDays(30))) {
-                    return@map existing
-                }
 
                 PlaceEntity(
                     id = existing?.id,
@@ -61,6 +53,7 @@ class PlaceQuery(
                     openNow = place.currentOpeningHours?.openNow ?: existing?.openNow,
                     // 리스트 검색 정보로 엔티티 생성, 상세 정보는 나중에 채워짐
                     photos = place.photos?.take(5)?.joinToString(",") { it.name } ?: existing?.photos,
+                    types = place.types?.joinToString(",") ?: existing?.types,
                     isDeleted = existing?.isDeleted ?: false,
                     // 장소 이름을 이용해 네이버 플레이스 링크 생성
                     link = org.depromeet.team3.place.util.PlaceFormatter.generateNaverPlaceLink(
