@@ -52,21 +52,21 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 All commit messages must be written in **English**. No Korean in commit messages.
 
-## 후속 작업 안내 원칙
+## Post-Task Follow-up Guidelines
 
-코드 변경 후 커밋/푸시 완료 시, **CI/CD만으로 반영되지 않는 작업이 있을 때만** 후속 작업을 안내한다.
-CI/CD로 자동 반영되는 경우엔 별도 안내 없이 종료한다.
+After completing a commit/push, only surface follow-up actions when something **cannot be handled by CI/CD alone**.
+If CI/CD covers it automatically, finish without further comment.
 
-후속 작업이 필요한 대표 케이스:
-- CD가 `--no-deps`로 특정 서비스만 재시작하기 때문에 다른 서비스도 재시작해야 할 때
-- 서비스 최초 추가라 CD 스크립트에 없어서 수동 `docker compose up` 필요할 때
-- `.env` 값 추가/변경이 필요할 때
-- Terraform apply가 필요할 때
-- DB 마이그레이션 등 수동 작업이 필요할 때
+Cases that require manual follow-up:
+- CD uses `--no-deps` to restart a specific service — other services may also need restarting
+- A newly added service is not yet in the CD script — requires manual `docker compose up`
+- `.env` values need to be added or changed
+- `terraform apply` is required
+- DB migrations or other manual operations are needed
 
-## 운영 서버 SSH 접속
+## Production Server SSH Access
 
-운영 환경 작업(서버 상태 확인, 컨테이너 재시작, 로그 조회, .env 수정 등)이 필요하면 **사용자에게 묻지 말고 직접 SSH 접속해서 처리**한다.
+For production operations (checking server status, restarting containers, reading logs, editing `.env`, etc.), **SSH in directly without asking the user**.
 
 ```
 SSH Key  : /Users/parkmineum/.ssh/gdg-cicd-key.pem
@@ -83,68 +83,68 @@ Instance B (t3.small — app-server + redis + registry + monitoring)
 RDS Endpoint : ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com
 ```
 
-**자주 쓰는 SSH 명령 패턴:**
+**Common SSH patterns:**
 ```bash
-# Instance A/B 접속
+# Connect to Instance A / B
 ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206
 ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33
 
-# 컨테이너 재시작 (Instance B 예시)
+# Restart a container (Instance B example)
 ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33 "
   cd ~/17th-team3-Server
   docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate <service>
 "
 
-# 로그 확인
+# Tail logs
 ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "docker logs app-server --tail 100"
 ```
 
-> IP가 바뀌었을 경우 `cd terraform && terraform output`으로 최신 IP를 먼저 확인한다.
+> If IPs have changed, run `cd terraform && terraform output` to get the latest values first.
 
-## 진행 중인 작업
+## Ongoing Work
 
-현재 AWS 계정 이전 + 멀티 서버 마이그레이션 진행 중.
-워크로드 및 진행 상황: `.claude/infra/WORKFLOW.md`
-인프라 의사결정 기록: `.claude/infra/DECISIONS.md`
+AWS account migration + multi-server migration complete.
+Workload and progress: `.claude/infra/WORKFLOW.md`
+Infrastructure decision records: `.claude/infra/DECISIONS.md`
 
-## Terraform 작성 규칙 (IaD)
+## Terraform Authoring Rules (IaC)
 
-> ssolv 인프라 구성 요소: **EC2 + 탄력적 IP + RDS(MySQL) + Route53** 사용.
-> ALB, S3, ElastiCache, CloudFront는 사용하지 않는다. 해당 리소스 코드를 생성하지 말 것.
-> Route53은 헬스체크 기반 DNS Failover 용도로만 사용한다 (Multivalue Answer 라우팅).
+> ssolv infrastructure: **EC2 + Elastic IP + RDS (MySQL) + Route53** only.
+> Do NOT create resources for ALB, S3, ElastiCache, or CloudFront.
+> Route53 is used exclusively for health-check-based DNS failover (Multivalue Answer routing).
 
-### 리소스별 필수 설정
+### Required Settings per Resource
 
 **EC2 (`aws_instance`)**
-- 인스턴스 A: `instance_type = "t3.micro"` (nginx + app-server 전용, JVM `-Xmx400m`)
-- 인스턴스 B: `instance_type = "t3.small"` (app-server + redis + registry + alloy + exporters)
-- `http_tokens = "required"` — IMDSv2 강제 (보안 필수)
-- `encrypted = true` — EBS 루트 볼륨 암호화
-- `instance_type`과 `ami`는 변수로 분리, 하드코딩 금지
-- EC2 수는 반드시 `app_instance_count` 변수로만 제어
+- Instance A: `instance_type = "t3.micro"` (nginx + app-server only, JVM `-Xmx400m`)
+- Instance B: `instance_type = "t3.small"` (app-server + redis + registry + alloy + exporters)
+- `http_tokens = "required"` — enforce IMDSv2 (security requirement)
+- `encrypted = true` — encrypt EBS root volume
+- `instance_type` and `ami` must be variables — no hardcoding
+- Instance count must be controlled solely via the `app_instance_count` variable
 
-**탄력적 IP (`aws_eip`)**
-- EC2 인스턴스에 `aws_eip_association`으로 연결
-- EIP는 EC2와 별도 리소스로 분리 (재사용 가능하도록)
+**Elastic IP (`aws_eip`)**
+- Associate with EC2 instances via `aws_eip_association`
+- EIP must be a separate resource from EC2 (for reusability)
 
 **RDS (`aws_db_instance`)**
-- `engine = "mysql"`, `engine_version = "8.0.43"` 고정
-- `publicly_accessible = false` — 퍼블릭 접근 금지
+- `engine = "mysql"`, `engine_version = "8.0.43"` — fixed
+- `publicly_accessible = false` — no public access
 - `storage_encrypted = true`
 - `deletion_protection = true`
 - `backup_retention_period >= 1`
-- `db_subnet_group_name`은 반드시 private subnet으로 구성된 서브넷 그룹 사용
+- `db_subnet_group_name` must use a subnet group composed of private subnets only
 
-**보안그룹 (`aws_security_group`)**
-- 3306(MySQL), 6379(Redis)는 `source_security_group_id`로 EC2 보안그룹만 허용 — CIDR 직접 지정 금지
-- egress는 `0.0.0.0/0` 허용 (의도된 설정)
-- 인바운드 0.0.0.0/0은 80, 443, 22만 허용
+**Security Groups (`aws_security_group`)**
+- Ports 3306 (MySQL) and 6379 (Redis) must use `source_security_group_id` referencing the EC2 SG — no direct CIDR
+- Egress: allow `0.0.0.0/0` (intentional)
+- Inbound `0.0.0.0/0` allowed only on ports 80, 443, 22
 
-**공통**
-- 모든 리소스에 `tags` 블록 필수: `{ Project = "ssolv", ManagedBy = "terraform" }`
-- 민감 값(비밀번호, 키 등)은 `var` 또는 AWS Secrets Manager 참조 — 하드코딩 절대 금지
+**General**
+- All resources must include a `tags` block: `{ Project = "ssolv", ManagedBy = "terraform" }`
+- Sensitive values (passwords, keys) must use `var` or AWS Secrets Manager — never hardcode
 
-### 자동 감사
-- `.tf` 파일 수정 시 PostToolUse Hook이 자동으로 보안 감사 실행
-- 온디맨드 전체 감사: `/iac-audit` 슬래시 커맨드
-- 새로운 인프라 결정은 `.claude/infra/DECISIONS.md`에 ADR 형식으로 기록
+### Automated Audit
+- PostToolUse Hook runs a security audit automatically when any `.tf` file is modified
+- On-demand full audit: `/iac-audit` slash command
+- New infrastructure decisions must be recorded as ADRs in `.claude/infra/DECISIONS.md`

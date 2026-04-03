@@ -1,26 +1,26 @@
-# ssolv 인프라 마이그레이션 워크로드
+# ssolv Infrastructure Migration Workload
 
-> 목표: 단일 EC2 → 멀티 서버 + 신규 AWS 계정으로 Terraform 기반 마이그레이션
-> 작성일: 2026-03-29 / 완료일: 2026-03-31
+> Goal: Single EC2 → Multi-server + new AWS account migration via Terraform
+> Started: 2026-03-29 / Completed: 2026-03-31
 
 ---
 
-## 구 아키텍처 (마이그레이션 전)
+## Previous Architecture (before migration)
 
 ```
-[ EC2 단일 서버 ] ap-northeast-2 / t3.small / 30GB gp3
-  ├── nginx-app (port 80) — 로드밸런서
+[ Single EC2 ] ap-northeast-2 / t3.small / 30GB gp3
+  ├── nginx-app (port 80) — load balancer
   ├── app-server-1 (768MB, Spring Boot)
   ├── app-server-2 (768MB, Spring Boot)
   ├── redis:7-alpine (100MB max)
   ├── alloy + node/nginx/redis-exporter
   └── nginx-cicd (443) + registry (registry.ssolv.site)
 
-[ RDS ] MySQL 8.0.43 / db.t3.micro / 20GB gp3 / 단일 AZ (ap-northeast-2b)
-[ CloudFront ] → 이관 후 제거 완료
+[ RDS ] MySQL 8.0.43 / db.t3.micro / 20GB gp3 / single AZ (ap-northeast-2b)
+[ CloudFront ] → removed after migration
 ```
 
-### 구 계정 네트워크 상세 (ssolv.yaml 분석)
+### Old Account Network Details (from ssolv.yaml)
 
 ```
 VPC: vpc-0619f2e27641372f4 / 10.0.0.0/16 (depromeet)
@@ -31,29 +31,29 @@ VPC: vpc-0619f2e27641372f4 / 10.0.0.0/16 (depromeet)
 EC2:
   ├── Instance: t3.small / AMI: ami-010be25c3775061c9
   ├── Private IP: 10.0.14.101 (Public Subnet)
-  ├── EIP: 13.125.182.175  ← 구 계정, 이미 정리됨
+  ├── EIP: 13.125.182.175  ← old account, already cleaned up
   ├── Volume: 30GB gp3 (iops 3000)
   └── Security Group (depromeet-security-group):
-      인바운드: 22, 80, 443, 900, 3306, 4430, 8080 (0.0.0.0/0)
+      Inbound: 22, 80, 443, 900, 3306, 4430, 8080 (0.0.0.0/0)
 
 RDS:
-  ├── DB명: depromeet / User: depromeet
+  ├── DB: depromeet / User: depromeet
   ├── AZ: ap-northeast-2b (Private Subnet)
-  ├── 퍼블릭 접근: 불가
-  └── Security Group: EC2에서만 3306 접근 허용
+  ├── Publicly accessible: no
+  └── Security Group: 3306 allowed from EC2 only
 
-SSH Key: depromeet-secret (RSA) → 신규 계정에서도 동일 키 재사용
+SSH Key: depromeet-secret (RSA) → reused in new account
 ```
 
-## 현재 아키텍처 (마이그레이션 완료)
+## Current Architecture (migration complete)
 
 ```
-[ 인스턴스 A ] t3.micro / ap-northeast-2a / EIP: 3.34.32.206
+[ Instance A ] t3.micro / ap-northeast-2a / EIP: 3.34.32.206
   ├── nginx (80/443, Let's Encrypt)
   └── app-server (Spring Boot, -Xms128m -Xmx400m)
 
-[ 인스턴스 B ] t3.small / ap-northeast-2c / EIP: 52.79.62.33
-  ├── nginx (80/443, Let's Encrypt — api + registry 동시 처리)
+[ Instance B ] t3.small / ap-northeast-2c / EIP: 52.79.62.33
+  ├── nginx (80/443, Let's Encrypt — api + registry)
   ├── app-server (Spring Boot, -Xms128m -Xmx400m)
   ├── redis:7-alpine (150MB limit)
   ├── registry (registry.ssolv.site)
@@ -62,90 +62,88 @@ SSH Key: depromeet-secret (RSA) → 신규 계정에서도 동일 키 재사용
 [ RDS ] MySQL 8.0.43 / db.t3.micro
   └── ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com
 
-[ Route53 ] api.ssolv.site — Multivalue Answer (A + B 헬스체크 연동)
-  ├── A: 3.34.32.206 (인스턴스 A)
-  └── B: 52.79.62.33 (인스턴스 B)
+[ Route53 ] api.ssolv.site — Multivalue Answer (A + B with health checks)
+  ├── A: 3.34.32.206 (Instance A)
+  └── B: 52.79.62.33 (Instance B)
 ```
 
-### 신규 계정 네트워크 상세
+### New Account Network Details
 
 ```
 VPC: 10.1.0.0/16 (ssolv-vpc)
-  ├── Public Subnet A:  10.1.0.0/24  ap-northeast-2a  (인스턴스 A)
-  ├── Public Subnet C:  10.1.1.0/24  ap-northeast-2c  (인스턴스 B)
+  ├── Public Subnet A:  10.1.0.0/24  ap-northeast-2a  (Instance A)
+  ├── Public Subnet C:  10.1.1.0/24  ap-northeast-2c  (Instance B)
   ├── Private Subnet A: 10.1.128.0/24 ap-northeast-2a (RDS)
-  └── Private Subnet B: 10.1.129.0/24 ap-northeast-2b (RDS 멀티AZ 대비)
+  └── Private Subnet B: 10.1.129.0/24 ap-northeast-2b (RDS multi-AZ standby)
 
-인스턴스 A: t3.micro / Private IP: 10.1.0.43
-인스턴스 B: t3.small / Private IP: 10.1.1.160
+Instance A: t3.micro / Private IP: 10.1.0.43
+Instance B: t3.small / Private IP: 10.1.1.160
 
 Security Group (ec2):
-  인바운드: 22, 80, 443 (0.0.0.0/0) / 8080, 6379, 4317-4318, 5000 (self)
+  Inbound: 22, 80, 443 (0.0.0.0/0) / 8080, 6379, 4317-4318, 5000 (self)
 Security Group (rds):
-  인바운드: 3306 (ec2 보안그룹만)
+  Inbound: 3306 (ec2 security group only)
 ```
 
 ---
 
-## 작업 목록
+## Task List
 
-### Phase 0: 준비
-- [x] EC2에 Claude Code 설치
-- [x] ssolv.yaml CloudFormation 템플릿 확보 및 분석
-- [x] 신규 AWS 계정 생성 완료 (IAM 미사용 — 루트 Access Key 방식)
-- [x] Terraform 로컬 환경 설치
-- [x] 신규 계정 루트 Access Key 발급 및 로컬 환경변수 설정
+### Phase 0: Preparation
+- [x] Install Claude Code on EC2
+- [x] Obtain and analyze ssolv.yaml CloudFormation template
+- [x] Create new AWS account (no IAM — root Access Key method)
+- [x] Install Terraform locally
+- [x] Issue root Access Key for new account and set local environment variables
 
-### Phase 1: Terraform 기반 설계
-- [x] `modules/network` — VPC, 서브넷, IGW, 보안그룹
-- [x] `modules/compute` — EC2 A(t3.micro) + B(t3.small), EIP, 키페어
+### Phase 1: Terraform-Based Design
+- [x] `modules/network` — VPC, subnets, IGW, security groups
+- [x] `modules/compute` — EC2 A (t3.micro) + B (t3.small), EIP, key pair
 - [x] `modules/database` — RDS MySQL 8.0.43
-- [x] `modules/dns` — Route53 Hosted Zone + Multivalue Answer + 헬스체크
+- [x] `modules/dns` — Route53 Hosted Zone + Multivalue Answer + health checks
 - [x] `terraform/main.tf`, `variables.tf`, `outputs.tf`
-- [x] `terraform plan` 통과 — 에러 없음
-- [x] `docker-compose.instance-a.yml` — nginx(HTTPS) + app-server(Xmx400m)
+- [x] `terraform plan` passes — no errors
+- [x] `docker-compose.instance-a.yml` — nginx (HTTPS) + app-server (Xmx400m)
 - [x] `docker-compose.instance-b.yml` — app-server + redis + registry + nginx + monitoring
-- [x] `nginx-app-instance-a.conf` — 인스턴스 A 전용 (Route53이 부하분산 담당)
-- [x] `nginx-instance-b.conf` — api + registry 통합 처리
-- [x] `alloy-config.alloy` — 멀티서버 메트릭 수집 (instance-a/b 레이블 분리)
+- [x] `nginx-app-instance-a.conf` — Instance A dedicated (Route53 handles load balancing)
+- [x] `nginx-instance-b.conf` — handles api + registry together
+- [x] `alloy-config.alloy` — multi-server metrics collection (instance-a/b label separation)
 
-### Phase 2: 신규 계정 인프라 구축
-- [x] `terraform apply` 완료
-- [x] outputs 확인: EIP A(`3.34.32.206`) / B(`52.79.62.33`), B 사설 IP(`10.1.1.160`), RDS 엔드포인트
+### Phase 2: New Account Infrastructure Provisioning
+- [x] `terraform apply` complete
+- [x] Verified outputs: EIP A (`3.34.32.206`) / B (`52.79.62.33`), B private IP (`10.1.1.160`), RDS endpoint
 
-### Phase 3: 앱 배포 및 검증
-- [x] docker, docker-compose 설치 (양 인스턴스)
-- [x] .env 파일 배포
-  - 공통: `PROD_DB_ENDPOINT`, `PROD_DB_USERNAME`, `PROD_DB_PASSWORD`
-  - 인스턴스 A: `INSTANCE_B_PRIVATE_IP=10.1.1.160`
-  - 인스턴스 B: `INSTANCE_A_PRIVATE_IP=10.1.0.43`
-- [x] docker network 생성 (ssolv_prod_network, ssolv_cicd_network, ssolv_monitoring_network)
-- [x] certbot DNS-01 챌린지로 SSL 인증서 발급
-  - 인스턴스 A: `api.ssolv.site`
-  - 인스턴스 B: `api.ssolv.site` + `registry.ssolv.site`
-- [x] docker compose up (양 인스턴스)
-- [x] `curl https://api.ssolv.site/actuator/health` 정상 응답 확인
+### Phase 3: App Deployment and Verification
+- [x] Install docker, docker-compose (both instances)
+- [x] Deploy `.env` files
+  - Common: `PROD_DB_ENDPOINT`, `PROD_DB_USERNAME`, `PROD_DB_PASSWORD`
+  - Instance A: `INSTANCE_B_PRIVATE_IP=10.1.1.160`
+  - Instance B: `INSTANCE_A_PRIVATE_IP=10.1.0.43`
+- [x] Create docker networks (ssolv_prod_network, ssolv_cicd_network, ssolv_monitoring_network)
+- [x] Issue SSL certificates via certbot DNS-01 challenge
+  - Instance A: `api.ssolv.site`
+  - Instance B: `api.ssolv.site` + `registry.ssolv.site`
+- [x] `docker compose up` (both instances)
+- [x] `curl https://api.ssolv.site/actuator/health` returns healthy response
 
-### Phase 4: CD 파이프라인 업데이트
-- [x] GitHub Actions secrets 신규 계정용으로 교체
+### Phase 4: CD Pipeline Update
+- [x] Replace GitHub Actions secrets for new account
   - `EC2_HOST` → `3.34.32.206`
   - `EC2_HOST_B` → `52.79.62.33`
-  - `EC2_SSH_KEY` → depromeet-secret.pem 내용
+  - `EC2_SSH_KEY` → depromeet-secret.pem contents
   - `REGISTRY_USERNAME` / `REGISTRY_PASSWORD`
-- [x] 멀티 서버 rolling update 배포 전략 (A 먼저 → B)
-- [x] `cd-deploy.yml` 업데이트 완료
-- [x] CD 파이프라인 실제 트리거 후 배포 확인
+- [x] Multi-server rolling update strategy (A first → B)
+- [x] `cd-deploy.yml` updated
+- [x] CD pipeline triggered and deployment verified
 
-### Phase 5: DNS 컷오버
-- [x] 가비아 네임서버 → Route53 NS 4개로 변경
-- [x] Route53 `api.ssolv.site` Multivalue Answer 등록 (A + B)
-- [x] Route53 헬스체크 A/B 모두 Healthy 확인
-- [x] `dig api.ssolv.site` — 두 IP 정상 응답 확인
-- [ ] CloudFront 삭제 (구 계정 — 수동 작업 필요)
-- [ ] 구 EC2 (`13.125.182.175`) 종료 (구 계정 — 수동 작업 필요)
-- [x] 모니터링 정상 수집 확인 (Grafana, Sentry)
-
----
+### Phase 5: DNS Cutover
+- [x] Gabia nameservers → Route53 NS (4 records) updated
+- [x] Route53 `api.ssolv.site` Multivalue Answer registered (A + B)
+- [x] Route53 health checks for A/B both Healthy
+- [x] `dig api.ssolv.site` — both IPs responding correctly
+- [ ] Delete CloudFront (old account — manual action required)
+- [ ] Terminate old EC2 (`13.125.182.175`) (old account — manual action required)
+- [x] Monitoring confirmed working (Grafana, Sentry)
 
 ---
 
@@ -172,39 +170,39 @@ The following automated tasks are active in production. No manual intervention n
 
 ---
 
-## 단일↔멀티 전환 전략
+## Single↔Multi Server Switching
 
 ```hcl
 # terraform.tfvars
-app_instance_count = 2  # 1로 바꾸면 단일 서버(B만)로 복귀
+app_instance_count = 2  # set to 1 to revert to single server (B only)
 ```
 
 ---
 
-## 주요 결정 사항
+## Key Decisions Summary
 
-| 항목 | 결정 |
-|------|------|
-| CloudFront | 신규 계정에서 제거 |
-| ALB | 사용 안 함 (Nginx가 앞단, Route53이 부하분산) |
-| Redis | ElastiCache 아닌 EC2 컨테이너 유지 (인스턴스 B) |
-| Registry | 자체 registry 유지 (registry.ssolv.site, 인스턴스 B) |
-| IaC 도구 | Terraform (state: 로컬 파일, `.gitignore` 처리됨) |
-| 인스턴스 타입 | A: t3.micro / B: t3.small |
-| IAM | 미사용 — 루트 Access Key 방식으로 Terraform 인증 |
-| RDS 이전 | 스냅샷 없음 — 신규 RDS 생성 후 코드 레벨 초기화 (SurveyCategoryInitializer, StationInitializer) |
-| DNS | Route53 Multivalue Answer + 헬스체크 (가비아 NS → Route53 위임) |
-| HTTPS | Let's Encrypt DNS-01 챌린지 (certbot-dns-route53) |
-| 부하분산 | Route53 Multivalue Answer — A/B 헬스체크 기반 자동 failover |
+| Item | Decision |
+|------|----------|
+| CloudFront | Removed in new account |
+| ALB | Not used (Nginx handles front, Route53 handles load balancing) |
+| Redis | EC2 container on Instance B — no ElastiCache |
+| Registry | Self-hosted at registry.ssolv.site on Instance B |
+| IaC tool | Terraform (state: local file, added to `.gitignore`) |
+| Instance types | A: t3.micro / B: t3.small |
+| IAM | Not used — root Access Key for Terraform auth |
+| RDS migration | No snapshot — fresh RDS + code-level initialization (SurveyCategoryInitializer, StationInitializer) |
+| DNS | Route53 Multivalue Answer + health checks (Gabia NS → Route53 delegation) |
+| HTTPS | Let's Encrypt DNS-01 challenge (certbot-dns-route53) |
+| Load balancing | Route53 Multivalue Answer — automatic failover based on A/B health checks |
 
 ---
 
-## 세션 간 공유 메모
+## Cross-Session Reference
 
-- SSH 키: `~/dpm-server/depromeet-secret.pem` (A/B 공통)
-- 인스턴스 A EIP: `3.34.32.206` / 사설: `10.1.0.43`
-- 인스턴스 B EIP: `52.79.62.33` / 사설: `10.1.1.160`
-- RDS 엔드포인트: `ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com`
-- RDS 접근: SSH 터널링 필요 (private subnet) — 터널 호스트: `52.79.62.33`
-- CD 파이프라인: `.github/workflows/cd-deploy.yml` (rolling update, A→B 순서)
-- 모니터링: Alloy on 인스턴스 B (`docker-compose.instance-b.yml`)
+- SSH key: `~/dpm-server/depromeet-secret.pem` (shared for A and B)
+- Instance A EIP: `3.34.32.206` / Private: `10.1.0.43`
+- Instance B EIP: `52.79.62.33` / Private: `10.1.1.160`
+- RDS endpoint: `ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com`
+- RDS access: SSH tunnel required (private subnet) — tunnel host: `52.79.62.33`
+- CD pipeline: `.github/workflows/cd-deploy.yml` (rolling update, A→B order)
+- Monitoring: Alloy on Instance B (`docker-compose.instance-b.yml`)
