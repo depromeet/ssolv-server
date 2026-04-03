@@ -88,6 +88,7 @@ jobs:
 
   # A가 healthy 확인된 후 B 배포 — 롤링 업데이트로 무중단 배포
   deploy-instance-b:
+
     needs: deploy-instance-a
     runs-on: ubuntu-latest
     steps:
@@ -140,3 +141,53 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+  # Collect diagnostics when any deploy job fails
+  diagnose-on-failure:
+    needs: [deploy-instance-a, deploy-instance-b]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose Instance A
+        if: needs.deploy-instance-a.result == 'failure'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            echo "====== DIAGNOSIS: Instance A ======"
+            echo "--- Container status ---"
+            docker ps -a | grep app-server || true
+            echo "--- App server logs (last 100 lines) ---"
+            docker logs app-server --tail 100 2>&1 || true
+            echo "--- Memory ---"
+            free -h
+            echo "--- Docker stats snapshot ---"
+            docker stats --no-stream 2>/dev/null || true
+            echo "--- Disk ---"
+            df -h /
+            echo "======================================"
+
+      - name: Diagnose Instance B
+        if: needs.deploy-instance-b.result == 'failure'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST_B }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            echo "====== DIAGNOSIS: Instance B ======"
+            echo "--- Container status ---"
+            docker ps -a | grep app-server || true
+            echo "--- App server logs (last 100 lines) ---"
+            docker logs app-server --tail 100 2>&1 || true
+            echo "--- Memory ---"
+            free -h
+            echo "--- Docker stats snapshot ---"
+            docker stats --no-stream 2>/dev/null || true
+            echo "--- Disk ---"
+            df -h /
+            echo "======================================"
