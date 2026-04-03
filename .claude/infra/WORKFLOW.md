@@ -147,6 +147,31 @@ Security Group (rds):
 
 ---
 
+---
+
+## Automation
+
+The following automated tasks are active in production. No manual intervention needed unless noted.
+
+| # | Automation | Mechanism | Schedule | Target |
+|---|-----------|-----------|----------|--------|
+| 1 | CD failure diagnostics | GitHub Actions `diagnose-on-failure` job | On deploy failure | A or B (whichever failed) |
+| 2 | Health check + auto-restart | `health-recovery.sh` via crontab | Every 5 min | Instance A + B |
+| 3 | Memory monitoring (t3.micro) | `memory-check.sh` via crontab | Every 5 min | Instance A only |
+| 4 | Sentry issue analysis | Claude scheduled task | Daily 09:00 | ssolv Sentry project |
+| 5 | Terraform drift detection | Claude scheduled task | Every Monday 10:00 | terraform/ |
+
+### Log locations (on instances)
+- `/var/log/ssolv-health-recovery.log` — health check events and restarts
+- `/var/log/ssolv-memory-check.log` — memory alerts and diagnostics
+
+### Scheduled task management
+- View/run: Claude Code sidebar → "Scheduled" section
+- Task files: `~/.claude/scheduled-tasks/{task-id}/SKILL.md`
+- First run: click "Run now" in sidebar to pre-approve tool permissions
+
+---
+
 ## 단일↔멀티 전환 전략
 
 ```hcl

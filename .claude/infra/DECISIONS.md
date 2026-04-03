@@ -199,3 +199,66 @@
 - **근거**: t3.micro(1GB) 운용을 위한 메모리 확보. 실제 사용량(357~484MB) 기준 400MB limit은 피크 커버 가능.
 - **설정**: `docker-compose.prod.yml` 인스턴스 A 서버에 `JAVA_OPTS: "-Xms128m -Xmx400m"` 적용
 - **모니터링**: Grafana에서 JVM heap 사용률 알림 설정 필요.
+
+---
+
+## ADR-018: CD Failure Auto-Diagnostics
+
+- **Date**: 2026-04-03
+- **Decision**: Add a `diagnose-on-failure` job to `cd-deploy.yml` that automatically SSHes into the failed instance and collects diagnostics when a deploy job fails.
+- **Rationale**:
+  - Without this, a failed deploy requires manual SSH to investigate logs — slow feedback loop.
+  - Rolling deployment (A→B) means partial failure state can persist; surfacing it immediately reduces MTTR.
+- **Implementation**: `.github/workflows/cd-deploy.yml` — `diagnose-on-failure` job with `if: failure()`, runs only for the failed instance (A or B).
+- **Output**: Container status, last 100 lines of docker logs, free memory, docker stats, disk usage — all visible in GitHub Actions run output.
+
+---
+
+## ADR-019: Health Check Auto-Recovery (Crontab)
+
+- **Date**: 2026-04-03
+- **Decision**: Run `deploy/scripts/health-recovery.sh` every 5 minutes via crontab on both Instance A and B.
+- **Rationale**:
+  - Route53 health check detects failure but only removes the instance from DNS — it does not restart the container.
+  - A dead container on Instance A means 50% of traffic goes to a non-existent endpoint until manually fixed.
+  - Auto-restart covers the gap between Route53 failover (DNS-level) and actual container recovery.
+- **Trigger**: Container stopped OR Docker health status = `unhealthy`.
+- **Log**: `/var/log/ssolv-health-recovery.log` (rotates at 1MB).
+- **Trade-off**: Blind restart on unhealthy status may mask underlying bug. Log is preserved for post-mortem.
+
+---
+
+## ADR-020: Instance A Memory Monitoring (Crontab)
+
+- **Date**: 2026-04-03
+- **Decision**: Run `deploy/scripts/memory-check.sh` every 5 minutes on Instance A (t3.micro) only.
+- **Rationale**:
+  - Instance A runs nginx + app-server on 1GB RAM with `-Xmx400m`. OOM risk is real under traffic spikes (ADR-008).
+  - Grafana alerts require Alloy scrape cycle; crontab-based check is immediate and independent of monitoring stack health.
+- **Thresholds**: Log diagnostic snapshot at ≥80%; auto-restart app-server at ≥90% if container is also unhealthy.
+- **Log**: `/var/log/ssolv-memory-check.log` (rotates at 1MB).
+
+---
+
+## ADR-021: Sentry Auto-Analysis (Claude Scheduled Task)
+
+- **Date**: 2026-04-03
+- **Decision**: Run a Claude scheduled task daily at 09:00 that fetches new Sentry issues and produces a prioritized root-cause report.
+- **Rationale**:
+  - ssolv integrates Google Places API, Kakao OAuth, and Firebase FCM — external API failures are common noise.
+  - Manual Sentry triage requires context-switching; Claude can correlate stack traces with source code automatically.
+- **Implementation**: `~/.claude/scheduled-tasks/sentry-auto-analysis/SKILL.md` — runs daily, notifies on completion.
+- **Output**: Per-issue root cause + affected file:line + priority (HIGH/MEDIUM/LOW).
+
+---
+
+## ADR-022: Terraform Drift Detection (Claude Scheduled Task)
+
+- **Date**: 2026-04-03
+- **Decision**: Run a Claude scheduled task every Monday at 10:00 that executes `terraform plan` and reports any infrastructure drift.
+- **Rationale**:
+  - Terraform state is local (ADR-015); no remote locking or drift detection built in.
+  - Manual console changes (e.g., temporary security group rule) can silently diverge from IaC.
+  - Weekly cadence balances cost (Terraform plan hits AWS APIs) and detection lag.
+- **Implementation**: `~/.claude/scheduled-tasks/terraform-drift-check/SKILL.md`.
+- **Output**: Per-resource change summary; flags unexpected drift as HIGH priority. Never runs `terraform apply`.
