@@ -3,7 +3,7 @@
     <!-- 콘솔 출력 설정 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>[%d{yyyy-MM-dd HH:mm:ss}:%-3relative] [%thread] [request_id=%X{request_id:-startup}] [user_id=%X{user_id:-anonymous}] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}:%-3relative] [%thread] [request_id=%X{request_id:-startup}] [user_id=%X{user_id:-anonymous}] [trace_id=%X{traceId:-none}] %-5level %logger{36} - %msg%n</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>

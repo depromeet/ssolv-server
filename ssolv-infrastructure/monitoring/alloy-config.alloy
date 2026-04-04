@@ -68,6 +68,26 @@ loki.source.docker "logs" {
 
 loki.process "labels" {
   stage.docker { }
+
+  // app-server MDC 필드 추출 → structured metadata
+  stage.match {
+    selector = "{container=\"app-server\"}"
+
+    stage.regex {
+      expression = `\[request_id=(?P<request_id>[^\]]+)\] \[user_id=(?P<user_id>[^\]]+)\] \S+ \S+ - (?:HTTP Request Completed - )?(?:status=(?P<status>\d+) )?(?:method=(?P<method>\w+) )?(?:uri=(?P<uri>[^ ]+))?`
+    }
+
+    stage.structured_metadata {
+      values = {
+        request_id = "request_id",
+        user_id    = "user_id",
+        method     = "method",
+        uri        = "uri",
+        status     = "status",
+      }
+    }
+  }
+
   forward_to = [loki.write.grafana_cloud.receiver]
 }
 

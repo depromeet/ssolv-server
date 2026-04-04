@@ -67,6 +67,22 @@
         "type": "textbox",
         "query": "",
         "current": { "value": "", "text": "" }
+      },
+      {
+        "name": "method",
+        "label": "Method",
+        "type": "custom",
+        "query": "ALL,GET,POST,PUT,DELETE,PATCH",
+        "current": { "value": "ALL", "text": "ALL" },
+        "options": [
+          { "value": "ALL", "text": "ALL", "selected": true },
+          { "value": "GET", "text": "GET" },
+          { "value": "POST", "text": "POST" },
+          { "value": "PUT", "text": "PUT" },
+          { "value": "DELETE", "text": "DELETE" },
+          { "value": "PATCH", "text": "PATCH" }
+        ],
+        "includeAll": false
       }
     ]
   },
@@ -239,6 +255,80 @@
         {
           "expr": "sum by(instance) (jvm_memory_max_bytes{area=\"heap\", instance=~\"$instance\"})",
           "legendFormat": "{{instance}} heap max"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "User Activity — API 호출 전체 기록",
+      "description": "user_id 변수 입력 시 해당 유저의 모든 API 호출 이력을 시간순으로 표시합니다. method, uri, status, duration 포함.",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 45, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\", instance=~\"$instance\"} |= \"HTTP Request Completed\" |= \"${user_id}\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <_> - HTTP Request Completed - status=<status> method=<method> uri=<uri> duration=<duration>`",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "User Activity — Top 유저 요청 수",
+      "description": "최근 1시간 내 요청이 많은 상위 유저 목록",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 55, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (user_id) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" | logfmt | user_id != \"anonymous\" [1h])))",
+          "legendFormat": "{{user_id}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "User Activity — URI별 호출 빈도",
+      "description": "특정 user_id가 어떤 API를 얼마나 호출했는지",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 55, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "expr": "sum by (uri) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" |= \"[user_id=${user_id}]\" | pattern `<_> uri=<uri> <_>` [24h]))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "User Activity — 에러 발생 이력",
+      "description": "특정 user_id 요청 중 에러(4xx/5xx 또는 ERROR 로그)만 필터",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 63, "w": 24, "h": 7 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{container=~\"app-server.*\", instance=~\"$instance\"} |= \"${user_id}\" |~ \"ERROR|status=4|status=5\"",
+          "legendFormat": ""
         }
       ]
     },
