@@ -75,6 +75,7 @@ enum class ErrorCode(
     APPLE_REDIRECT_URI_NOT_CONFIGURED("O017", "애플 OAuth redirect URI가 설정되지 않았습니다.", 500),
     APPLE_INVALID_ID_TOKEN("O018", "유효하지 않은 애플 ID 토큰입니다.", 401),
     APPLE_TOKEN_VERIFICATION_FAILED("O019", "애플 토큰 검증에 실패했습니다.", 401),
+    DEMO_INVALID_CREDENTIALS("O020", "데모 계정 이메일 또는 비밀번호가 올바르지 않습니다.", 401),
 
     // JWT 토큰 관련 에러 (J001~J099)
     JWT_TOKEN_MISSING("J001", "JWT 토큰이 누락되었습니다.", 401),

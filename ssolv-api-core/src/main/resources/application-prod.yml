@@ -47,6 +47,10 @@ api:
 firebase:
   service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:file:/home/ubuntu/17th-team3-Server/firebase-service-account.json}
 
+demo:
+  email: ${DEMO_EMAIL:ssolvofficial@gmail.com}
+  password: ${DEMO_PASSWORD}
+
 sentry:
   dsn: ${SENTRY_DSN:}
   traces-sample-rate: 0.5

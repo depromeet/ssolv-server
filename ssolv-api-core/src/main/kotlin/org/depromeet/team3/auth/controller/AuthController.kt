@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.depromeet.team3.auth.application.login.AppleOAuthService
+import org.depromeet.team3.auth.application.login.DemoLoginService
 import org.depromeet.team3.auth.application.login.KakaoLoginService
 import org.depromeet.team3.auth.application.token.UpdateTokenService
 import org.depromeet.team3.auth.application.common.LogoutService
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.*
 class AuthController(
     private val kakaoLoginService: KakaoLoginService,
     private val appleOAuthService: AppleOAuthService,
+    private val demoLoginService: DemoLoginService,
     private val updateTokenService: UpdateTokenService,
     private val logoutService: LogoutService,
     private val withdrawService: WithdrawService
@@ -110,6 +112,25 @@ class AuthController(
     ): DpmApiResponse<LoginResponse> {
         val command = AppleLoginCommand(authorizationCode = code, redirectUri = redirectUri, user = user)
         val result = appleOAuthService.login(command)
+        return DpmApiResponse.ok(result)
+    }
+
+    @Operation(
+        summary = "앱스토어 심사용 데모 로그인 API",
+        description = "소셜 로그인 없이 데모 계정으로 로그인합니다. 앱스토어 심사 전용 엔드포인트입니다."
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "로그인 성공"),
+        ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치 (O020)")
+    )
+    @PostMapping("/demo-login")
+    suspend fun demoLogin(
+        @Parameter(description = "데모 계정 이메일", required = true)
+        @RequestParam("email") email: String,
+        @Parameter(description = "데모 계정 비밀번호", required = true)
+        @RequestParam("password") password: String
+    ): DpmApiResponse<LoginResponse> {
+        val result = demoLoginService.login(email, password)
         return DpmApiResponse.ok(result)
     }
 
