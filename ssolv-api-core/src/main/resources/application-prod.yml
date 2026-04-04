@@ -22,6 +22,11 @@ spring:
       port: ${REDIS_PORT:6379}
 
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
 app:
   env: prod
 
