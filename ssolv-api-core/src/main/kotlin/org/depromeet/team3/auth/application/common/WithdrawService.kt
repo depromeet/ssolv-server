@@ -86,6 +86,9 @@ class WithdrawService(
                 AuthProvider.APPLE -> {
                     // 애플 연동 해제는 추후 구현
                 }
+                AuthProvider.DEMO -> {
+                    // 데모 계정은 소셜 연동 해제 불필요
+                }
             }
         } catch (e: Exception) {
             log.error("소셜 연동 해제 실패 - provider: {}, error: {}", provider, e.message)
