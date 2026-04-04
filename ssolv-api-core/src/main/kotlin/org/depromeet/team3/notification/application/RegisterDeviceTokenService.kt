@@ -45,7 +45,7 @@ class RegisterDeviceTokenService(
                 updatedAt = LocalDateTime.now()
             )
             deviceTokenCommandRepository.save(updatedToken)
-            return@withContext
+            return@withTracingContext
         }
 
         // 2. 해당 사용자에게 이미 해당 플랫폼용 토큰이 있는지 확인 (토큰 갱신 케이스)

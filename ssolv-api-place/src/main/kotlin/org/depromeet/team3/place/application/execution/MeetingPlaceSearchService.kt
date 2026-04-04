@@ -73,7 +73,7 @@ class MeetingPlaceSearchService(
         val placeIdWithScores = redisTemplate.opsForZSet().reverseRangeWithScores(meetingKey, 0, 9)
         
         if (placeIdWithScores.isNullOrEmpty()) {
-            return@withContext null
+            return@withTracingContext null
         }
         
         val placeIds = placeIdWithScores.mapNotNull { it.value }
@@ -81,7 +81,7 @@ class MeetingPlaceSearchService(
 
         // 2. 장소 상세 정보 (Global Cache) 일괄 조회
         val placeKeys = placeIds.map { "$PLACE_KEY_PREFIX$it" }
-        val cachedJsons = redisTemplate.opsForValue().multiGet(placeKeys) ?: return@withContext null
+        val cachedJsons = redisTemplate.opsForValue().multiGet(placeKeys) ?: return@withTracingContext null
 
         val items = mutableListOf<PlacesSearchResponse.PlaceItem>()
         val missingIndices = mutableListOf<Int>()
@@ -144,7 +144,7 @@ class MeetingPlaceSearchService(
 
         // 4. 실시간 좋아요 정보 결합 + 실시간 재정렬 (Personalization)
         val finalItemsToProcess = items.filter { it.placeId != -1L }
-        if (finalItemsToProcess.isEmpty()) return@withContext null
+        if (finalItemsToProcess.isEmpty()) return@withTracingContext null
 
         val pipelineResults = redisTemplate.executePipelined { connection ->
             finalItemsToProcess.forEach { item ->

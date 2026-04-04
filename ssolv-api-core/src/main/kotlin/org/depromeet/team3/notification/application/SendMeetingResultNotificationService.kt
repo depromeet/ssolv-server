@@ -47,7 +47,7 @@ class SendMeetingResultNotificationService(
 
         if (!isNew) {
             logger.debug("중복 처리 방지: 이미 발송된 알림입니다. (meetingId: $meetingId, userId: $userId)")
-            return@withContext
+            return@withTracingContext
         }
 
         val meeting = transactionTemplate.execute {
@@ -66,7 +66,7 @@ class SendMeetingResultNotificationService(
 
         if (validTokens.isEmpty()) {
             logger.debug("모임 결과 알림을 보낼 유효한 FCM 토큰이 없습니다. (meetingId: $meetingId, userId: $userId)")
-            return@withContext
+            return@withTracingContext
         }
 
         // 2. 알림 내용 생성 ({모임이름}, {장소})

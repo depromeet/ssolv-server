@@ -113,7 +113,7 @@ class GetSurveyListService(
     }
 
     suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withTracingContext() {
-        if (meetingIds.isEmpty()) return@withContext emptyMap()
+        if (meetingIds.isEmpty()) return@withTracingContext emptyMap()
 
         // 1. 모든 미팅의 참가자 일괄 조회
         val allAttendees = meetingAttendeeRepository.findByMeetingIdIn(meetingIds)
