@@ -1,6 +1,6 @@
 package org.depromeet.team3.surveycategory.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
@@ -16,7 +16,7 @@ class UpdateSurveyCategoryService(
 ) {
 
     suspend operator fun invoke(id: Long, request: UpdateSurveyCategoryRequest): Unit =
-        withContext(Dispatchers.IO) {
+        withTracingContext() {
             transactionTemplate.execute {
                 // 1. 기존 카테고리 조회 (삭제된 것 제외)
                 val existingEntity = surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)

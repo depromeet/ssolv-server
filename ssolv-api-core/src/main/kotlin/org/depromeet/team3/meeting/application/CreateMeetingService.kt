@@ -1,6 +1,6 @@
 package org.depromeet.team3.meeting.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingEntity
@@ -33,7 +33,7 @@ class CreateMeetingService(
 ) {
 
     suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse =
-        withContext(Dispatchers.IO) {
+        withTracingContext() {
             val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
             if (request.endAt != null && request.endAt.isBefore(now)) {
                 throw MeetingException(

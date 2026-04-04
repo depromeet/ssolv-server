@@ -137,6 +137,8 @@ subprojects {
             add("implementation", "io.micrometer:micrometer-registry-prometheus")
             add("implementation", "io.sentry:sentry-spring-boot-starter-jakarta:${rootProject.extra["sentryVersion"]}")
             add("implementation", "io.sentry:sentry-logback:${rootProject.extra["sentryVersion"]}")
+            add("implementation", "io.opentelemetry:opentelemetry-extension-kotlin")
+            add("implementation", "net.logstash.logback:logstash-logback-encoder:8.0")
         }
     }
 }

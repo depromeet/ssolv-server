@@ -1,4 +1,5 @@
 package org.depromeet.team3.notification.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.exception.UserException
@@ -11,7 +12,6 @@ import org.depromeet.team3.notification.dto.RegisterDeviceTokenRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import kotlinx.coroutines.withContext
 
 @Service
 class RegisterDeviceTokenService(
@@ -20,7 +20,7 @@ class RegisterDeviceTokenService(
     private val userQueryRepository: UserQueryRepository
 ) {
     @Transactional
-    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withContext(Dispatchers.IO) {
+    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withTracingContext() {
         // 사용자 존재 여부 확인
         userQueryRepository.findById(userId) ?: throw UserException(ErrorCode.USER_NOT_FOUND)
 

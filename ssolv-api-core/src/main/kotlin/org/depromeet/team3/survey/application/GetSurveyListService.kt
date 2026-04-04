@@ -1,6 +1,6 @@
 package org.depromeet.team3.survey.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendee
@@ -23,7 +23,7 @@ class GetSurveyListService(
 ) {
     private val logger = LoggerFactory.getLogger(GetSurveyListService::class.java)
 
-    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withContext(Dispatchers.IO) {
+    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withTracingContext() {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)) {
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
@@ -98,7 +98,7 @@ class GetSurveyListService(
         )
     }
 
-    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withContext(Dispatchers.IO) {
+    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withTracingContext() {
         // 모든 참가자를 한 번에 조회 (N+1 문제 해결)
         val attendeeList = meetingAttendeeRepository.findByMeetingId(meetingId)
         val attendeeMap = attendeeList.associateBy { it.userId }
@@ -112,7 +112,7 @@ class GetSurveyListService(
             .map { attendee -> attendee.toGetRespondents() }
     }
 
-    suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withContext(Dispatchers.IO) {
+    suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withTracingContext() {
         if (meetingIds.isEmpty()) return@withContext emptyMap()
 
         // 1. 모든 미팅의 참가자 일괄 조회

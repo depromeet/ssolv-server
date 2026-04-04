@@ -1,6 +1,6 @@
 package org.depromeet.team3.meeting.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.ContextConstants.API_VERSION_V1
 import org.depromeet.team3.common.ContextConstants.BASE_DOMAIN
 import org.depromeet.team3.common.ContextConstants.HTTPS_PROTOCOL
@@ -26,7 +26,7 @@ class InviteTokenService(
         const val SEPARATOR = ":"
     }
 
-    suspend fun generateInviteToken(meetingId: Long): String = withContext(Dispatchers.IO) {
+    suspend fun generateInviteToken(meetingId: Long): String = withTracingContext() {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw IllegalArgumentException("Not Found meeting ID: $meetingId")
 
@@ -46,7 +46,7 @@ class InviteTokenService(
         return DataEncoder.encodeWithSeparator(SEPARATOR, meeting.id.toString(), endAtTimestamp.toString())
     }
 
-    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withContext(Dispatchers.IO) {
+    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withTracingContext() {
         val (meetingId, expiryTimestamp) = parseTokenData(token)
 
         if (System.currentTimeMillis() > expiryTimestamp) {

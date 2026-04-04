@@ -1,6 +1,6 @@
 package org.depromeet.team3.auth.application.common
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.exception.AuthException
@@ -18,7 +18,7 @@ class LogoutService(
     private val userJpaRepository: UserRepository,
     private val transactionTemplate: TransactionTemplate,
 ) {
-    suspend fun logout(userId: Long): Unit = withContext(Dispatchers.IO) {
+    suspend fun logout(userId: Long): Unit = withTracingContext() {
         transactionTemplate.execute {
             val entity = userJpaRepository.findByIdOrNull(userId)
                 ?: throw AuthException(ErrorCode.USER_NOT_FOUND)

@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- 콘솔 출력 설정 -->
+    <!-- JSON 구조화 로깅 (Loki/Grafana 연동) -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>[%d{yyyy-MM-dd HH:mm:ss}:%-3relative] [%thread] [request_id=%X{request_id:-startup}] [user_id=%X{user_id:-anonymous}] [trace_id=%X{traceId:-none}] %-5level %logger{36} - %msg%n</pattern>
-            <charset>UTF-8</charset>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeCallerData>false</includeCallerData>
+            <customFields>{"app":"ssolv"}</customFields>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <message>message</message>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <level>level</level>
+            </fieldNames>
+            <!-- MDC 필드를 최상위 JSON 필드로 포함 -->
+            <includeMdcKeyName>request_id</includeMdcKeyName>
+            <includeMdcKeyName>user_id</includeMdcKeyName>
+            <includeMdcKeyName>meeting_id</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
         </encoder>
     </appender>
 
@@ -19,7 +32,7 @@
     <logger name="org.depromeet.team3" level="INFO"/>
     <logger name="org.springframework" level="INFO"/>
     <logger name="org.hibernate" level="WARN"/>
-    
+
     <!-- Root 로거 -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

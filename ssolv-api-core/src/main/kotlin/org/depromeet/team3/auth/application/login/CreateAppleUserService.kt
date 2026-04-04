@@ -1,6 +1,6 @@
 package org.depromeet.team3.auth.application.login
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
@@ -28,7 +28,7 @@ class CreateAppleUserService(
         nickname: String,
         profileImage: String?,
         socialId: String
-    ): LoginResponse = withContext(Dispatchers.IO) {
+    ): LoginResponse = withTracingContext() {
         transactionTemplate.execute {
             // 1. 소셜 ID로 기존 회원 확인
             val existingBySocial = userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)

@@ -1,9 +1,12 @@
 package org.depromeet.team3.notification.application
- 
-import org.depromeet.team3.common.constants.RedisStreamConstants
+
+import io.opentelemetry.context.Context
+import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.slf4j.MDCContext
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -15,7 +18,7 @@ class MeetingNotificationConsumer(
     private val sendMeetingResultNotificationService: SendMeetingResultNotificationService,
     private val stringRedisTemplate: StringRedisTemplate,
 ) : StreamListener<String, MapRecord<String, String, String>> {
-    
+
     private val logger = LoggerFactory.getLogger(MeetingNotificationConsumer::class.java)
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -25,11 +28,13 @@ class MeetingNotificationConsumer(
 
         val requestId = message.value["requestId"] ?: java.util.UUID.randomUUID().toString().substring(0, 8)
         org.slf4j.MDC.put(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID, requestId)
+        userId?.let { org.slf4j.MDC.put("user_id", it.toString()) }
+        meetingId?.let { org.slf4j.MDC.put("meeting_id", it.toString()) }
 
         try {
             if (meetingId != null && userId != null) {
                 logger.debug("식당 확정 알림 요청 수신 (meetingId: {}, userId: {}, messageId: {})", meetingId, userId, message.id)
-                scope.launch(Dispatchers.IO + kotlinx.coroutines.slf4j.MDCContext()) {
+                scope.launch(Dispatchers.IO + MDCContext() + Context.current().asContextElement()) {
                     try {
                         sendMeetingResultNotificationService.send(meetingId, userId)
                         // 처리 성공 시 XACK (Pending 해제)

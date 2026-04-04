@@ -1,8 +1,8 @@
 package org.depromeet.team3.place.application.execution
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import kotlin.math.ln
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.PlaceQuery
@@ -37,7 +37,7 @@ class MeetingPlaceSearchService(
         meetingId: Long, 
         result: PlacesSearchResponse,
         scores: Map<Long, Double> = emptyMap()
-    ) = withContext(Dispatchers.IO) {
+    ) = withTracingContext() {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
         // 1. 기존 모임 결과 지우고 새로 저장 (ZSET)
@@ -66,7 +66,7 @@ class MeetingPlaceSearchService(
     /**
      * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
-    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withContext(Dispatchers.IO) {
+    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withTracingContext() {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
         
         // 1. ZSET에서 점수(BaseScore)와 함께 상위 10개 ID 가져오기

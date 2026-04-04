@@ -1,6 +1,6 @@
 package org.depromeet.team3.meeting.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.MeetingInfoResponse
@@ -19,7 +19,7 @@ class GetMeetingService(
     private val inviteTokenService: InviteTokenService,
 ) {
 
-    suspend operator fun invoke(userId: Long): List<MeetingsResponse> = withContext(Dispatchers.IO) {
+    suspend operator fun invoke(userId: Long): List<MeetingsResponse> = withTracingContext() {
         withTimeout(10000L) { // 10초 타임아웃 설정
             // 1. 호스트로 등록된 모임 조회
             val hostMeetings = meetingRepository.findMeetingsByUserId(userId)

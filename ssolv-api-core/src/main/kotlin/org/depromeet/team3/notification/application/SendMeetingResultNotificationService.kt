@@ -1,4 +1,5 @@
 package org.depromeet.team3.notification.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 
 import org.depromeet.team3.meeting.MeetingRepository
@@ -10,7 +11,6 @@ import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.station.StationRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import org.springframework.data.redis.core.StringRedisTemplate
 
@@ -39,7 +39,7 @@ class SendMeetingResultNotificationService(
         private val IDEMPOTENCY_TTL = java.time.Duration.ofHours(1)
     }
 
-    suspend fun send(meetingId: Long, userId: Long) = withContext(Dispatchers.IO) {
+    suspend fun send(meetingId: Long, userId: Long) = withTracingContext() {
         // 0. 멱등성 체크 (중복 발송 방지)
         val idempotencyKey = "$IDEMPOTENCY_KEY_PREFIX:$meetingId:$userId"
         val isNew = stringRedisTemplate.opsForValue()

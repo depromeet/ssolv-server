@@ -1,6 +1,6 @@
 package org.depromeet.team3.meeting.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meeting.MeetingJpaRepository
@@ -38,7 +38,7 @@ class GetMeetingDetailService(
         meetingId: Long,
         userId: Long,
         allowClosed: Boolean = false
-    ): MeetingDetailResponse = withContext(Dispatchers.IO) {
+    ): MeetingDetailResponse = withTracingContext() {
         transactionTemplate.execute {
             // 모임 조회 및 endAt 기반 자동 종료 처리 (blocking)
             val meetingEntity = meetingJpaRepository.findByIdOrNull(meetingId)

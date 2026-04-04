@@ -1,6 +1,6 @@
 package org.depromeet.team3.meetingattendee.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
@@ -19,7 +19,7 @@ class UpdateAttendeeService(
         meetingId: Long,
         attendeeNickname: String,
         color: String?
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withTracingContext() {
         transactionTemplate.execute {
             val entity = meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
                 ?: throw MeetingAttendeeException(

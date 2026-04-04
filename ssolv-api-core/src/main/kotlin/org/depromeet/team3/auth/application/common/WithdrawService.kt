@@ -1,4 +1,5 @@
 package org.depromeet.team3.auth.application.common
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
@@ -17,7 +18,6 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * 회원 탈퇴 Service
@@ -39,7 +39,7 @@ class WithdrawService(
      * 2. 로컬 데이터 삭제
      * 3. 소셜 플랫폼 연동 해제 (트랜잭션 커밋 후 비동기)
      */
-    suspend fun withdraw(userId: Long): Unit = withContext(Dispatchers.IO) {
+    suspend fun withdraw(userId: Long): Unit = withTracingContext() {
         transactionTemplate.execute {
             val entity = userJpaRepository.findByIdOrNull(userId)
                 ?: throw AuthException(ErrorCode.USER_NOT_FOUND)

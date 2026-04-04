@@ -1,7 +1,7 @@
 package org.depromeet.team3.auth.application.token
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.UserCommandRepository
 import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.command.RefreshTokenCommand
@@ -24,7 +24,7 @@ class UpdateTokenService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withContext(Dispatchers.IO) {
+    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withTracingContext() {
         transactionTemplate.execute {
             val refreshToken = command.refreshToken
             

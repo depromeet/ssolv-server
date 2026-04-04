@@ -1,4 +1,5 @@
 package org.depromeet.team3.meeting.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingRepository
@@ -12,7 +13,6 @@ import org.depromeet.team3.util.DataEncoder
 import org.depromeet.team3.auth.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 
 @Service
@@ -26,7 +26,7 @@ class JoinMeetingService(
     suspend operator fun invoke(
         userId: Long,
         token: String,
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withTracingContext() {
         transactionTemplate.execute {
             val meetingId = parseTokenId(token)
             runBlocking { validateMeeting(meetingId, userId) }

@@ -1,6 +1,6 @@
 package org.depromeet.team3.surveycategory.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.surveycategory.SurveyCategoryEntity
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
@@ -17,7 +17,7 @@ class CreateSurveyCategoryService(
 ) {
 
     suspend operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse =
-        withContext(Dispatchers.IO) {
+        withTracingContext() {
             transactionTemplate.execute {
                 // sortOrder 중복 검증 (JPA 메서드 직접 호출, blocking)
                 val sortOrderExists = if (request.parentId == null) {

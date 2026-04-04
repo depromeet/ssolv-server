@@ -1,7 +1,7 @@
 package org.depromeet.team3.placelike.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
 import org.depromeet.team3.meeting.MeetingQuery
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -51,7 +51,7 @@ class PlaceLikeService(
         return {isLiked, count}
     """.trimIndent(), List::class.java)
 
-    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withContext(Dispatchers.IO) {
+    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withTracingContext() {
         logger.debug("Toggle Like Request (Atomic Lua) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
         
         val likeKey = searchService.getLikeKey(meetingId, placeId)

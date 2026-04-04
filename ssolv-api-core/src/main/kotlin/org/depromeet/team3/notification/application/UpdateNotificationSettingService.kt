@@ -1,4 +1,5 @@
 package org.depromeet.team3.notification.application
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 
 import org.depromeet.team3.auth.UserCommandRepository
@@ -8,7 +9,6 @@ import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.notification.dto.UpdateNotificationSettingRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 
 /*
@@ -20,7 +20,7 @@ class UpdateNotificationSettingService(
     private val userCommandRepository: UserCommandRepository,
     private val transactionTemplate: TransactionTemplate,
 ) {
-    suspend fun execute(userId: Long, request: UpdateNotificationSettingRequest) = withContext(Dispatchers.IO) {
+    suspend fun execute(userId: Long, request: UpdateNotificationSettingRequest) = withTracingContext() {
         transactionTemplate.execute {
             runBlocking {
                 val user = userQueryRepository.findById(userId) ?: throw UserException(ErrorCode.USER_NOT_FOUND)

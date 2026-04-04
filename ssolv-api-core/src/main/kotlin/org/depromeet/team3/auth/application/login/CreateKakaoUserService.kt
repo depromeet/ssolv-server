@@ -1,6 +1,6 @@
 package org.depromeet.team3.auth.application.login
+import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.depromeet.team3.auth.AuthProvider
 import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
@@ -25,7 +25,7 @@ class CreateKakaoUserService(
         nickname: String,
         profileImage: String?,
         socialId: String
-    ): LoginResponse = withContext(Dispatchers.IO) {
+    ): LoginResponse = withTracingContext() {
         val userEmail = email ?: "kakao_${socialId}@kakao.com"
 
         transactionTemplate.execute {
