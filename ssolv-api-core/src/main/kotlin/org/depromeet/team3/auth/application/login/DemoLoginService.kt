@@ -5,9 +5,7 @@ import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
-import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.properties.DemoProperties
-import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
@@ -21,11 +19,7 @@ class DemoLoginService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend fun login(email: String, password: String): LoginResponse = withTracingContext() {
-        if (email != demoProperties.email || password != demoProperties.password) {
-            throw AuthException(errorCode = ErrorCode.DEMO_INVALID_CREDENTIALS)
-        }
-
+    suspend fun login(): LoginResponse = withTracingContext() {
         transactionTemplate.execute {
             val userEntity = userJpaRepository.findByProviderAndSocialId(AuthProvider.DEMO, "demo")
                 ?: userJpaRepository.save(

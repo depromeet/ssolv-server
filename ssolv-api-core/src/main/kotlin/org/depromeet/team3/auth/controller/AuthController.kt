@@ -117,20 +117,12 @@ class AuthController(
 
     @Operation(
         summary = "앱스토어 심사용 데모 로그인 API",
-        description = "소셜 로그인 없이 데모 계정으로 로그인합니다. 앱스토어 심사 전용 엔드포인트입니다."
+        description = "소셜 로그인 없이 데모 계정으로 즉시 로그인합니다. 앱스토어 심사 전용 엔드포인트입니다."
     )
-    @ApiResponses(
-        ApiResponse(responseCode = "200", description = "로그인 성공"),
-        ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치 (O020)")
-    )
+    @ApiResponse(responseCode = "200", description = "로그인 성공")
     @PostMapping("/demo-login")
-    suspend fun demoLogin(
-        @Parameter(description = "데모 계정 이메일", required = true)
-        @RequestParam("email") email: String,
-        @Parameter(description = "데모 계정 비밀번호", required = true)
-        @RequestParam("password") password: String
-    ): DpmApiResponse<LoginResponse> {
-        val result = demoLoginService.login(email, password)
+    suspend fun demoLogin(): DpmApiResponse<LoginResponse> {
+        val result = demoLoginService.login()
         return DpmApiResponse.ok(result)
     }
 
