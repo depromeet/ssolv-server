@@ -1,7 +1,5 @@
 package org.depromeet.team3.auth.application.login
 
-import org.depromeet.team3.auth.AuthProvider
-import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
@@ -21,17 +19,8 @@ class DemoLoginService(
 
     suspend fun login(): LoginResponse = withTracingContext() {
         transactionTemplate.execute {
-            val userEntity = userJpaRepository.findByProviderAndSocialId(AuthProvider.DEMO, "demo")
-                ?: userJpaRepository.save(
-                    UserEntity(
-                        provider = AuthProvider.DEMO,
-                        socialId = "demo",
-                        email = demoProperties.email,
-                        nickname = demoProperties.nickname,
-                        profileImage = null,
-                        refreshToken = null
-                    )
-                )
+            val userEntity = userJpaRepository.findByEmail(demoProperties.email)
+                ?: throw IllegalStateException("Demo user not found: ${demoProperties.email}")
 
             val userId = userEntity.id!!
             val accessToken = jwtTokenProvider.generateAccessToken(userId, userEntity.email)
