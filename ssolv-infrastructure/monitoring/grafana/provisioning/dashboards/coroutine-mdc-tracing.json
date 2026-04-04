@@ -155,7 +155,7 @@
         "derivedFields": [
           {
             "datasourceUid": "${DS_TEMPO}",
-            "matcherRegex": "trace_id=([a-f0-9]{32})",
+            "matcherRegex": "\"traceId\":\"([a-f0-9]{32})\"",
             "name": "TraceID",
             "url": "${__value.raw}",
             "urlDisplayLabel": "Tempo로 이동"
@@ -164,7 +164,7 @@
       },
       "targets": [
         {
-          "expr": "{container=~\"app-server.*\"} |= \"request_id=startup\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <_> - <message>`",
+          "expr": "{container=~\"app-server.*\"} | json | request_id = \"startup\"",
           "legendFormat": "MDC 손실 로그"
         }
       ]
@@ -185,7 +185,7 @@
         "derivedFields": [
           {
             "datasourceUid": "${DS_TEMPO}",
-            "matcherRegex": "trace_id=([a-f0-9]{32})",
+            "matcherRegex": "\"traceId\":\"([a-f0-9]{32})\"",
             "name": "TraceID",
             "url": "${__value.raw}",
             "urlDisplayLabel": "Tempo로 이동"
@@ -194,7 +194,7 @@
       },
       "targets": [
         {
-          "expr": "{container=~\"app-server.*\"} |= \"${request_id}\" |= \"${user_id}\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <logger> - <message>`",
+          "expr": "{container=~\"app-server.*\"} |= \"${request_id}\" |= \"${user_id}\" | json",
           "legendFormat": ""
         }
       ]
@@ -214,7 +214,7 @@
         "derivedFields": [
           {
             "datasourceUid": "${DS_TEMPO}",
-            "matcherRegex": "trace_id=([a-f0-9]{32})",
+            "matcherRegex": "\"traceId\":\"([a-f0-9]{32})\"",
             "name": "TraceID",
             "url": "${__value.raw}",
             "urlDisplayLabel": "Tempo로 이동"
@@ -223,7 +223,7 @@
       },
       "targets": [
         {
-          "expr": "{container=~\"app-server.*\"} |= \"ERROR\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <logger> - <message>`",
+          "expr": "{container=~\"app-server.*\"} | json | level = \"ERROR\"",
           "legendFormat": ""
         }
       ]
@@ -301,7 +301,7 @@
         "derivedFields": [
           {
             "datasourceUid": "${DS_TEMPO}",
-            "matcherRegex": "trace_id=([a-f0-9]{32})",
+            "matcherRegex": "\"traceId\":\"([a-f0-9]{32})\"",
             "name": "TraceID",
             "url": "${__value.raw}",
             "urlDisplayLabel": "Tempo로 이동"
@@ -310,7 +310,7 @@
       },
       "targets": [
         {
-          "expr": "{container=~\"app-server.*\", instance=~\"$instance\"} |= \"HTTP Request Completed\" |= \"${user_id}\" | pattern `[<_>] [<thread>] [request_id=<request_id>] [user_id=<user_id>] <level> <_> - HTTP Request Completed - status=<status> method=<method> uri=<uri> duration=<duration>`",
+          "expr": "{container=~\"app-server.*\", instance=~\"$instance\"} |= \"HTTP Request Completed\" |= \"${user_id}\" | json",
           "legendFormat": ""
         }
       ]
@@ -327,7 +327,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (user_id) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" | logfmt | user_id != \"anonymous\" [1h])))",
+          "expr": "topk(10, sum by (user_id) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" | json | user_id != \"\" [1h])))",
           "legendFormat": "{{user_id}}"
         }
       ]
@@ -342,7 +342,7 @@
       "options": { "legend": { "displayMode": "table", "placement": "right" } },
       "targets": [
         {
-          "expr": "sum by (uri) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" |= \"[user_id=${user_id}]\" | pattern `<_> uri=<uri> <_>` [24h]))",
+          "expr": "sum by (uri) (count_over_time({container=~\"app-server.*\"} |= \"HTTP Request Completed\" |= \"${user_id}\" | json [24h]))",
           "legendFormat": "{{uri}}"
         }
       ]
@@ -363,7 +363,7 @@
         "derivedFields": [
           {
             "datasourceUid": "${DS_TEMPO}",
-            "matcherRegex": "trace_id=([a-f0-9]{32})",
+            "matcherRegex": "\"traceId\":\"([a-f0-9]{32})\"",
             "name": "TraceID",
             "url": "${__value.raw}",
             "urlDisplayLabel": "Tempo로 이동"

@@ -1,12 +1,12 @@
 package org.depromeet.team3.notification.application
 
-import io.opentelemetry.context.Context
 import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import org.depromeet.team3.common.constants.RedisStreamConstants
+import org.depromeet.team3.common.util.extractParentContext
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -34,7 +34,8 @@ class MeetingNotificationConsumer(
         try {
             if (meetingId != null && userId != null) {
                 logger.debug("식당 확정 알림 요청 수신 (meetingId: {}, userId: {}, messageId: {})", meetingId, userId, message.id)
-                scope.launch(Dispatchers.IO + MDCContext() + Context.current().asContextElement()) {
+                val parentContext = extractParentContext(message.value)
+                scope.launch(Dispatchers.IO + MDCContext() + parentContext.asContextElement()) {
                     try {
                         sendMeetingResultNotificationService.send(meetingId, userId)
                         // 처리 성공 시 XACK (Pending 해제)

@@ -30,18 +30,31 @@ loki.source.docker "logs" {
 loki.process "labels" {
   stage.docker { }
 
-  // app-server MDC 필드 추출 → structured metadata
+  // app-server MDC 필드 추출 → structured metadata (JSON 로그 파싱)
   stage.match {
     selector = "{container=\"app-server\"}"
 
+    // 1단계: JSON 최상위 필드 추출 (LogstashEncoder 출력)
+    stage.json {
+      expressions = {
+        request_id  = "request_id",
+        user_id     = "user_id",
+        trace_id    = "traceId",
+        log_message = "message",
+      }
+    }
+
+    // 2단계: message 필드에서 HTTP 요청 메타데이터 추출
     stage.regex {
-      expression = `\[request_id=(?P<request_id>[^\]]+)\] \[user_id=(?P<user_id>[^\]]+)\] \S+ \S+ - (?:HTTP Request Completed - )?(?:status=(?P<status>\d+) )?(?:method=(?P<method>\w+) )?(?:uri=(?P<uri>[^ ]+))?`
+      expression = `HTTP Request Completed - status=(?P<status>\d+) method=(?P<method>\w+) uri=(?P<uri>[^ ]+)`
+      source     = "log_message"
     }
 
     stage.structured_metadata {
       values = {
         request_id = "request_id",
         user_id    = "user_id",
+        trace_id   = "trace_id",
         method     = "method",
         uri        = "uri",
         status     = "status",

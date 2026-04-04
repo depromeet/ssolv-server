@@ -1,4 +1,7 @@
 package org.depromeet.team3.survey.application
+import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.context.Context
+import io.opentelemetry.context.propagation.TextMapSetter
 import org.depromeet.team3.common.util.withTracingContext
 import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
@@ -122,12 +125,22 @@ class CreateSurveyService(
                     
                     val requestId = org.slf4j.MDC.get(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID) ?: java.util.UUID.randomUUID().toString().substring(0, 8)
 
+                    // 현재 OTEL 컨텍스트의 traceparent를 메시지에 포함하여 컨슈머에서 child span 생성 가능하게 함
+                    val traceCarrier = mutableMapOf<String, String>()
+                    GlobalOpenTelemetry.getPropagators().textMapPropagator.inject(
+                        Context.current(),
+                        traceCarrier,
+                        TextMapSetter { carrier, key, value -> carrier?.set(key, value) }
+                    )
+
                     // 1. 식당 검색 추천 요청 발행
                     // 부하가 걸릴 수 있는 검색 로직을 별도 워커나 비동기 리스너에서 처리하도록 큐에 적재합니다.
                     val calcRecord = MapRecord.create(
                         RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>(
                             "meetingId" to meetingId.toString(),
-                            "requestId" to requestId
+                            "requestId" to requestId,
+                            "traceparent" to (traceCarrier["traceparent"] ?: ""),
+                            "tracestate" to (traceCarrier["tracestate"] ?: "")
                         )
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
@@ -141,7 +154,9 @@ class CreateSurveyService(
                             mapOf(
                                 "meetingId" to meetingId.toString(),
                                 "userId" to attendee.user.id.toString(),
-                                "requestId" to requestId
+                                "requestId" to requestId,
+                                "traceparent" to (traceCarrier["traceparent"] ?: ""),
+                                "tracestate" to (traceCarrier["tracestate"] ?: "")
                             )
                         )
                         stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
