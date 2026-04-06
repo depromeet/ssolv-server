@@ -64,6 +64,7 @@ kakao:
     - https://ec01-58-29-179-24.ngrok-free.app/auth/callback
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
+  logout-redirect-uri: https://www.ssolv.site/login
 
 # 애플 OAuth 설정
 apple:

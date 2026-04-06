@@ -106,6 +106,9 @@ class KakaoOAuthClient(
         }
     }
 
+    fun getLogoutUrl(): String =
+        "https://kauth.kakao.com/oauth/logout?client_id=${kakaoProperties.clientId}&logout_redirect_uri=${kakaoProperties.logoutRedirectUri}"
+
     suspend fun unlink(socialId: String) {
         try {
             withTimeout(apiTimeoutMillis) {

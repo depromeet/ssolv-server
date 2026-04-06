@@ -16,6 +16,7 @@ import org.depromeet.team3.auth.command.AppleLoginCommand
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.LoginResponse
+import org.depromeet.team3.auth.dto.LogoutResponse
 import org.depromeet.team3.auth.dto.RefreshTokenRequest
 import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.common.ContextConstants
@@ -148,16 +149,16 @@ class AuthController(
 
     @Operation(
         summary = "로그아웃 API",
-        description = "현재 로그인된 사용자의 리프레시 토큰을 무효화합니다."
+        description = "리프레시 토큰을 무효화합니다. 카카오 로그인 사용자는 응답의 kakaoLogoutUrl로 이동하면 카카오 계정도 로그아웃됩니다."
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "로그아웃 성공"),
         ApiResponse(responseCode = "401", description = "인증 실패")
     )
     @PostMapping("/logout")
-    suspend fun logout(@UserId userId: Long): DpmApiResponse<Unit> {
-        logoutService.logout(userId)
-        return DpmApiResponse.ok()
+    suspend fun logout(@UserId userId: Long): DpmApiResponse<LogoutResponse> {
+        val result = logoutService.logout(userId)
+        return DpmApiResponse.ok(result)
     }
 
     @Operation(
