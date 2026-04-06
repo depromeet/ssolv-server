@@ -1,3 +1,7 @@
+
+<img width="3072" height="1500" alt="image" src="https://github.com/user-attachments/assets/b721f491-c663-4ec4-88a2-37292b326327" />
+
+
 ## Tech Stack
 
 | Category | Stack |
