@@ -20,8 +20,11 @@
 
 
 ## Infrastructure
-
-<img width="647" height="310" alt="image" src="https://github.com/user-attachments/assets/6204dec0-64fb-4bba-b2e6-a9e99b8f5c09" />
+<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+  <div style="workbench.iconTheme": "material-icon-theme">
+    <img width="1996" height="970" alt="스크린샷 2026-04-07 오전 1 05 51" src="https://github.com/user-attachments/assets/7c6a6f0c-e5c3-42ec-818c-9830010502bb" />
+  </div>
+</div>
 
 
 ```
