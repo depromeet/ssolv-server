@@ -105,4 +105,4 @@ jobs:
           comment_mode: always
           report_individual_runs: true
           deduplicate_classes_by_file_name: false
-          check_run_annotations: false
+          check_run_annotations: none
