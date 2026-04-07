@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [ dev ]
     types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -60,7 +61,6 @@ jobs:
           TZ: Asia/Seoul
       
       - name: SonarQube Analysis
-        if: false
         continue-on-error: true
         run: ./gradlew sonar -Dsonar.gradle.skipCompile=true --info
         env:

@@ -146,9 +146,9 @@ subprojects {
 // SonarQube 설정
 sonar {
     properties {
-        property("sonar.projectKey", "depromeet-1_17th-team3-server")
+        property("sonar.projectKey", "parkmineum_17th-team3-server")
         property("sonar.projectName", "17th-team3-Server")
-        property("sonar.organization", "depromeet-1")
+        property("sonar.organization", "parkmineum")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.gradle.skipCompile", "true")
         
