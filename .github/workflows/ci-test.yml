@@ -64,7 +64,7 @@ jobs:
       
       - name: SonarQube Analysis
         continue-on-error: true
-        run: ./gradlew sonar -Dsonar.gradle.skipCompile=true -Dsonar.branch.name=${GITHUB_REF_NAME} --info
+        run: ./gradlew sonar -Dsonar.gradle.skipCompile=true --info
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
