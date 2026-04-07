@@ -9,6 +9,7 @@ import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.LoginResponse
+import org.depromeet.team3.auth.dto.LogoutResponse
 import org.depromeet.team3.auth.dto.RefreshTokenRequest
 import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.dto.UserProfileResponse
@@ -271,7 +272,7 @@ class AuthControllerTest {
             val userId = 1L
             testUserIdArgumentResolver.setTestUserId(userId)
             logoutService.stub {
-                onBlocking { logout(userId) }.doAnswer { }
+                onBlocking { logout(userId) }.thenReturn(LogoutResponse(kakaoLogoutUrl = null))
             }
 
             // when & then

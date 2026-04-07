@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.application.common.LogoutService
+import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.TestEntityFactory
@@ -25,6 +26,9 @@ class LogoutServiceTest {
     @Mock
     private lateinit var userJpaRepository: UserRepository
 
+    @Mock
+    private lateinit var kakaoOAuthClient: KakaoOAuthClient
+
     private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var logoutService: LogoutService
 
@@ -35,7 +39,7 @@ class LogoutServiceTest {
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
             callback.doInTransaction(mock())
         }
-        logoutService = LogoutService(userJpaRepository, transactionTemplate)
+        logoutService = LogoutService(userJpaRepository, kakaoOAuthClient, transactionTemplate)
     }
 
     @Test
