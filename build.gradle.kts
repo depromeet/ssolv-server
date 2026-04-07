@@ -187,6 +187,9 @@ sonar {
         
         // Java 버전
         property("sonar.java.source", "21")
+
+        // dev, main 을 long-lived branch로 인식
+        property("sonar.branch.longLivedBranchesRegex", "(main|dev)")
     }
 }
 
