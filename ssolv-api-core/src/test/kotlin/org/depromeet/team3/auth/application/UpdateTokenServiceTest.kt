@@ -33,7 +33,7 @@ class UpdateTokenServiceTest {
 
     @BeforeEach
     fun setUp() {
-        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+        whenever(transactionTemplate.execute(any<TransactionCallback<Any>>())).thenAnswer { invocation ->
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
             callback.doInTransaction(mock())
         }

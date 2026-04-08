@@ -38,9 +38,9 @@ class WithdrawServiceTest {
     @BeforeEach
     fun setUp() {
         transactionTemplate = mock()
-        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+        whenever(transactionTemplate.execute(any<TransactionCallback<Any>>())).thenAnswer { invocation ->
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
-            callback.doInTransaction(mock()) ?: Unit
+            callback.doInTransaction(mock())
         }
         withdrawService = WithdrawService(
             userJpaRepository, kakaoOAuthClient,

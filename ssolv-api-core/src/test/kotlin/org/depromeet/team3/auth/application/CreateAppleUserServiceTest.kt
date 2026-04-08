@@ -27,7 +27,7 @@ class CreateAppleUserServiceTest {
     @BeforeEach
     fun setUp() {
         transactionTemplate = mock()
-        whenever(transactionTemplate.execute<Any>(any())).thenAnswer { invocation ->
+        whenever(transactionTemplate.execute(any<TransactionCallback<Any>>())).thenAnswer { invocation ->
             val callback = invocation.getArgument<TransactionCallback<Any>>(0)
             callback.doInTransaction(mock())
         }
@@ -44,9 +44,10 @@ class CreateAppleUserServiceTest {
             id = 1L, provider = AuthProvider.APPLE, socialId = socialId, email = email, nickname = nickname
         )
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
+        whenever(userJpaRepository.findByNickname(any())).thenReturn(null)
         whenever(userJpaRepository.findByEmail(email)).thenReturn(null)
         whenever(userJpaRepository.save(any())).thenReturn(userEntity)
-        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull())).thenReturn("access-token")
+        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
 
         // when
@@ -69,7 +70,7 @@ class CreateAppleUserServiceTest {
             id = 1L, provider = AuthProvider.APPLE, socialId = socialId, email = email
         )
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(existingUser)
-        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull())).thenReturn("access-token")
+        whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
         whenever(userJpaRepository.save(any())).thenReturn(existingUser)
 

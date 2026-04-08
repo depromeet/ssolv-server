@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.annotation.UnitTest
 import org.depromeet.team3.auth.application.login.AppleOAuthService
+import org.depromeet.team3.auth.application.login.DemoLoginService
 import org.depromeet.team3.auth.application.login.KakaoLoginService
 import org.depromeet.team3.auth.application.token.UpdateTokenService
 import org.depromeet.team3.auth.application.common.LogoutService
@@ -34,6 +35,7 @@ class AuthControllerTest {
 
     @Mock private lateinit var kakaoLoginService: KakaoLoginService
     @Mock private lateinit var appleOAuthService: AppleOAuthService
+    @Mock private lateinit var demoLoginService: DemoLoginService
     @Mock private lateinit var updateTokenService: UpdateTokenService
     @Mock private lateinit var logoutService: LogoutService
     @Mock private lateinit var withdrawService: WithdrawService
