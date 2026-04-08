@@ -48,7 +48,7 @@ class UpdateSurveyCategoryServiceTest {
         whenever(surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(entity)
         whenever(surveyCategoryJpaRepository.existsByNameAndParentIsNullAndIsDeletedFalseAndIdNot("전통한식", categoryId)).thenReturn(false)
         whenever(surveyCategoryJpaRepository.existsBySortOrderAndParentIsNullAndIsDeletedFalseAndIdNot(2, categoryId)).thenReturn(false)
-        whenever(surveyCategoryJpaRepository.save(any())).thenReturn(entity)
+        doReturn(entity).whenever(surveyCategoryJpaRepository).save(any())
 
         // when
         updateSurveyCategoryService(categoryId, updateRequest)

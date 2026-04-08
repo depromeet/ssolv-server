@@ -56,7 +56,7 @@ class WithdrawServiceTest {
         val userEntity = UserFixture.createEntity(id = userId, provider = AuthProvider.KAKAO, socialId = "kakao-123")
         whenever(userJpaRepository.findById(userId)).thenReturn(Optional.of(userEntity))
         whenever(meetingJpaRepository.findByHostUserId(userId)).thenReturn(emptyList())
-        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
+        doReturn(userEntity).whenever(userJpaRepository).save(any())
 
         // when
         withdrawService.withdraw(userId)
@@ -72,7 +72,7 @@ class WithdrawServiceTest {
         val userEntity = UserFixture.createEntity(id = userId, provider = AuthProvider.APPLE)
         whenever(userJpaRepository.findById(userId)).thenReturn(Optional.of(userEntity))
         whenever(meetingJpaRepository.findByHostUserId(userId)).thenReturn(emptyList())
-        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
+        doReturn(userEntity).whenever(userJpaRepository).save(any())
 
         // when
         withdrawService.withdraw(userId)

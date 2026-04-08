@@ -46,7 +46,7 @@ class CreateAppleUserServiceTest {
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
         whenever(userJpaRepository.findByNickname(any())).thenReturn(null)
         whenever(userJpaRepository.findByEmail(email)).thenReturn(null)
-        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
+        doReturn(userEntity).whenever(userJpaRepository).save(any())
         whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
 
@@ -72,7 +72,7 @@ class CreateAppleUserServiceTest {
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(existingUser)
         whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")
         whenever(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token")
-        whenever(userJpaRepository.save(any())).thenReturn(existingUser)
+        doReturn(existingUser).whenever(userJpaRepository).save(any())
 
         // when
         val result = createAppleUserService.saveUserAndGenerateTokens(email, "NewNickname", null, socialId)

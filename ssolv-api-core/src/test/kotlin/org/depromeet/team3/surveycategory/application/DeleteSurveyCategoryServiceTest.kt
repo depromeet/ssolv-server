@@ -44,7 +44,7 @@ class DeleteSurveyCategoryServiceTest {
         val entity = SurveyCategoryFixture.createEntity(id = categoryId, name = "김치찌개")
         whenever(surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(categoryId)).thenReturn(entity)
         whenever(surveyCategoryJpaRepository.existsByParentIdAndIsDeletedFalse(categoryId)).thenReturn(false)
-        whenever(surveyCategoryJpaRepository.save(any())).thenReturn(entity)
+        doReturn(entity).whenever(surveyCategoryJpaRepository).save(any())
 
         // when
         deleteSurveyCategoryService(categoryId)

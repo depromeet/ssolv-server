@@ -43,7 +43,7 @@ class LogoutServiceTest {
         val userId = 1L
         val userEntity = UserFixture.createEntity(id = userId, refreshToken = "existing-token")
         whenever(userJpaRepository.findById(userId)).thenReturn(Optional.of(userEntity))
-        whenever(userJpaRepository.save(any())).thenReturn(userEntity)
+        doReturn(userEntity).whenever(userJpaRepository).save(any())
 
         // when
         logoutService.logout(userId)
