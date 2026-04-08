@@ -7,14 +7,20 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
-import org.depromeet.team3.CoreApiApplication
+import org.depromeet.team3.annotation.IntegrationTest
 import org.depromeet.team3.auth.UserRepository
-import org.depromeet.team3.common.util.TestEntityFactory
+import org.depromeet.team3.common.constants.RedisStreamConstants
+import org.depromeet.team3.fixture.MeetingFixture
+import org.depromeet.team3.fixture.StationFixture
+import org.depromeet.team3.fixture.UserFixture
 import org.depromeet.team3.meeting.MeetingJpaRepository
+import org.depromeet.team3.meeting.application.MeetingExpirationListener
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
+import org.depromeet.team3.notification.domain.DevicePlatform
 import org.depromeet.team3.notification.domain.FcmClient
-import org.depromeet.team3.meeting.application.MeetingExpirationListener
+import org.depromeet.team3.notification.infrastructure.DeviceTokenEntity
+import org.depromeet.team3.notification.infrastructure.DeviceTokenJpaRepository
 import org.depromeet.team3.placelike.application.PlaceLikeSseService
 import org.depromeet.team3.station.StationJpaRepository
 import org.depromeet.team3.survey.SurveyJpaRepository
@@ -24,90 +30,54 @@ import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
-import org.depromeet.team3.common.constants.RedisStreamConstants
-import org.springframework.test.context.ActiveProfiles
 
-@SpringBootTest(classes = [CoreApiApplication::class])
-@ActiveProfiles("test")
+@IntegrationTest
 class NotificationIntegrationTest {
 
-    @Autowired
-    private lateinit var createSurveyService: CreateSurveyService
+    @Autowired private lateinit var createSurveyService: CreateSurveyService
+    @Autowired private lateinit var meetingNotificationConsumer: MeetingNotificationConsumer
 
-    @Autowired
-    private lateinit var meetingNotificationConsumer: MeetingNotificationConsumer
+    @MockkBean private lateinit var stringRedisTemplate: StringRedisTemplate
+    @MockkBean private lateinit var fcmClient: FcmClient
+    @MockkBean private lateinit var meetingExpirationListener: MeetingExpirationListener
+    @MockkBean private lateinit var placeLikeSseService: PlaceLikeSseService
 
-    @MockkBean
-    private lateinit var stringRedisTemplate: StringRedisTemplate
-
-    @MockkBean
-    private lateinit var fcmClient: FcmClient
-
-    @MockkBean
-    private lateinit var meetingExpirationListener: MeetingExpirationListener
-
-    @MockkBean
-    private lateinit var placeLikeSseService: PlaceLikeSseService
-
-    @Autowired
-    private lateinit var meetingJpaRepository: MeetingJpaRepository
-
-    @Autowired
-    private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var stationJpaRepository: StationJpaRepository
-
-    @Autowired
-    private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
-
-    @Autowired
-    private lateinit var surveyJpaRepository: SurveyJpaRepository
-
-    @Autowired
-    private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
-
-    @Autowired
-    private lateinit var deviceTokenJpaRepository: org.depromeet.team3.notification.infrastructure.DeviceTokenJpaRepository
+    @Autowired private lateinit var meetingJpaRepository: MeetingJpaRepository
+    @Autowired private lateinit var userRepository: UserRepository
+    @Autowired private lateinit var stationJpaRepository: StationJpaRepository
+    @Autowired private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
+    @Autowired private lateinit var surveyJpaRepository: SurveyJpaRepository
+    @Autowired private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
+    @Autowired private lateinit var deviceTokenJpaRepository: DeviceTokenJpaRepository
 
     @Test
     @DisplayName("7명의 참여자 중 마지막 인원이 설문을 완료하면 알림 스트림이 발행되고, FCM이 발송된다")
     fun `7명 전원 설문 완료 시 알림 발송 메인 흐름 검증`() = runBlocking {
-        // 1. 초기 데이터 설정 (7명 모임)
+        // given — 7명 모임 구성
         val participantsCount = 7
         val users = (1..participantsCount).map { i ->
-            userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "user-$i", email = "user$i@test.com", nickname = "user-$i"))
+            userRepository.save(UserFixture.createEntityWithoutId(socialId = "user-$i", email = "user$i@test.com", nickname = "user-$i"))
         }
-        
-        // 모든 유저의 디바이스 토큰 등록
         users.forEach { user ->
-            deviceTokenJpaRepository.save(org.depromeet.team3.notification.infrastructure.DeviceTokenEntity(
-                userId = user.id!!, fcmToken = "token-${user.id}", platform = org.depromeet.team3.notification.domain.DevicePlatform.IOS
-            ))
+            deviceTokenJpaRepository.save(DeviceTokenEntity(userId = user.id!!, fcmToken = "token-${user.id}", platform = DevicePlatform.IOS))
         }
-
-        val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
-        val host = users[0]
-        
-        val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(
-            id = null, hostUser = host, station = station, attendeeCount = participantsCount
-        ))
-        
-        // 모든 참여자 등록
+        val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
+        val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(attendeeCount = participantsCount, hostUser = users[0], station = station))
         users.forEach { user ->
-            meetingAttendeeJpaRepository.save(TestEntityFactory.createMeetingAttendeeEntity(id = null, meeting = meeting, user = user))
+            meetingAttendeeJpaRepository.save(
+                org.depromeet.team3.fixture.MeetingAttendeeFixture.createEntityWithoutId(meeting = meeting, user = user)
+            )
         }
+        val cat = surveyCategoryJpaRepository.save(
+            org.depromeet.team3.fixture.SurveyCategoryFixture.createEntityWithoutId()
+        )
 
-        // 2. 카테고리 설정
-        val cat = surveyCategoryJpaRepository.save(TestEntityFactory.createSurveyCategoryEntity(id = null))
-
-        // 3. Redis Mock 설정
+        // given — Redis mock 설정
         val streamOps = mockk<StreamOperations<String, String, String>>()
         val valueOps = mockk<ValueOperations<String, String>>()
         every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
@@ -115,53 +85,41 @@ class NotificationIntegrationTest {
         every { valueOps.setIfAbsent(any(), any(), any()) } returns true
         every { streamOps.add(any<MapRecord<String, String, String>>()) } returns RecordId.of("123-0")
         every { streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) } returns 1L
-        every { stringRedisTemplate.delete(any<String>()) } returns true  // cancelExpiration 호출 시 만료 키 삭제
+        every { stringRedisTemplate.delete(any<String>()) } returns true
 
-        // 4. 1번째부터 6번째 유저까지 설문 완료 (알림 안 울려야 함)
+        // when — 1~6번째 유저 설문 완료 (알림 미발행)
         for (i in 0 until participantsCount - 1) {
             createSurveyService.invoke(meeting.id!!, users[i].id!!, SurveyCreateRequest(listOf(cat.id!!)))
-            
-            // then: 아직 전원이 아니므로 알림 스트림이 발행되지 않아야 함
-            verify(exactly = 0) { 
-                streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM }) 
+            verify(exactly = 0) {
+                streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM })
             }
         }
 
-        // 5. 마지막 7번째 유저 설문 완료 (알림 울려야 함)
+        // when — 마지막(7번째) 유저 설문 완료
         createSurveyService.invoke(meeting.id!!, users.last().id!!, SurveyCreateRequest(listOf(cat.id!!)))
 
-        // then: 마지막 7번째 유저 제출 시 알림 스트림(7명분)과 계산 스트림(1회)이 발행되었는지 확인
-        verify(exactly = participantsCount) { 
-            streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM }) 
+        // then — 알림 스트림 7회 + 계산 스트림 1회 발행
+        verify(exactly = participantsCount) {
+            streamOps.add(match { it.stream == RedisStreamConstants.MEETING_NOTIFICATION_STREAM })
         }
         verify(exactly = 1) {
             streamOps.add(match { it.stream == RedisStreamConstants.MEETING_CALCULATION_STREAM })
         }
 
-        // 6. 리스너(Subscriber) 동작 및 FCM 발송 검증
+        // then — FCM 발송 검증
         coEvery { fcmClient.sendMulticast(any(), any(), any(), any()) } returns Unit
-
-        // 각 유저별로 발행된 메시지를 수신하는 시뮬레이션
         users.forEach { user ->
             val mockRecord = MapRecord.create(
-                RedisStreamConstants.MEETING_NOTIFICATION_STREAM, 
-                mapOf(
-                    "meetingId" to meeting.id.toString(),
-                    "userId" to user.id.toString()
-                )
+                RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
+                mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
             ).withId(RecordId.of("123-${user.id}"))
-
             meetingNotificationConsumer.onMessage(mockRecord)
         }
-
-        // 최종 검증: 각 참여자별로 알림이 발송되었는가?
         users.forEach { user ->
-            coVerify(timeout = 5000) { 
+            coVerify(timeout = 5000) {
                 fcmClient.sendMulticast(
                     tokens = match { it.contains("token-${user.id}") && it.size == 1 },
-                    title = any(),
-                    body = any(),
-                    data = any()
+                    title = any(), body = any(), data = any()
                 )
             }
         }
@@ -170,51 +128,35 @@ class NotificationIntegrationTest {
     @Test
     @DisplayName("이미 전송된 동일한 유저/모임의 알림 메시지가 수신되면 FCM 발송이 중복되지 않는다")
     fun `중복 메시지 멱등성 검증`() = runBlocking {
-        // setup
-        val meetingId = 1L
-        val userId = 100L
+        // given
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf(
-                "meetingId" to meetingId.toString(),
-                "userId" to userId.toString()
-            )
+            mapOf("meetingId" to "1", "userId" to "100")
         ).withId(RecordId.of("999-0"))
 
         val valueOps = mockk<ValueOperations<String, String>>()
         every { stringRedisTemplate.opsForValue() } returns valueOps
-        
-        // Redis에 이미 키가 있다고 가정 (setIfAbsent가 false 반환)
         every { valueOps.setIfAbsent(any(), any(), any()) } returns false
 
         // when
         meetingNotificationConsumer.onMessage(mockRecord)
 
         // then
-        coVerify(exactly = 0) { 
-            fcmClient.sendMulticast(any(), any(), any(), any()) 
-        }
+        coVerify(exactly = 0) { fcmClient.sendMulticast(any(), any(), any(), any()) }
     }
 
     @Test
     @DisplayName("FCM 전송 중 예외 발생 시 acknowledge가 호출되지 않아야 한다")
     fun `FCM 전송 실패 시 재시도를 위해 ACK를 생략한다`() = runBlocking {
-        // setup
-        
-        // 유저 정보는 DB에 있어야 하므로 저장
-        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "fail-user", email = "fail@test.com", nickname = "fail-user"))
-        deviceTokenJpaRepository.save(org.depromeet.team3.notification.infrastructure.DeviceTokenEntity(
-            userId = user.id!!, fcmToken = "fail-token", platform = org.depromeet.team3.notification.domain.DevicePlatform.IOS
-        ))
-        val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
-        val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(id = null, hostUser = user, station = station))
+        // given
+        val user = userRepository.save(UserFixture.createEntityWithoutId(socialId = "fail-user", email = "fail@test.com", nickname = "fail-user"))
+        deviceTokenJpaRepository.save(DeviceTokenEntity(userId = user.id!!, fcmToken = "fail-token", platform = DevicePlatform.IOS))
+        val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
+        val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(hostUser = user, station = station))
 
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf(
-                "meetingId" to meeting.id.toString(),
-                "userId" to user.id.toString()
-            )
+            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
         ).withId(RecordId.of("888-0"))
 
         val streamOps = mockk<StreamOperations<String, String, String>>()
@@ -222,35 +164,27 @@ class NotificationIntegrationTest {
         every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
         every { stringRedisTemplate.opsForValue() } returns valueOps
         every { valueOps.setIfAbsent(any(), any(), any()) } returns true
-        
-        // FCM 발송 시 에러 발생 시뮬레이션
         coEvery { fcmClient.sendMulticast(any(), any(), any(), any()) } throws RuntimeException("FCM 서버 장애")
 
         // when
         meetingNotificationConsumer.onMessage(mockRecord)
 
-        // then: 에러가 발생했으므로 ACK가 호출되지 않아야 함 (그래야 나중에 PendingMessageScheduler가 쥠)
-        // 비동기 처리가 완료될 때까지 잠시 대기
+        // then — 에러 발생 시 ACK 미호출
         kotlinx.coroutines.delay(500)
-        verify(exactly = 0) { 
-            streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) 
-        }
+        verify(exactly = 0) { streamOps.acknowledge(any(), any<MapRecord<String, String, String>>()) }
     }
 
     @Test
     @DisplayName("토큰이 없는 유저의 경우 알림 발송은 스킵되지만 메시지는 정상 처리(ACK)되어야 한다")
     fun `토큰 부재 시 알림 스킵 및 정상 ACK 처리 검증`() = runBlocking {
-        // setup: 토큰을 등록하지 않은 유저 생성
-        val user = userRepository.save(TestEntityFactory.createUserEntity(id = null, socialId = "no-token-user", email = "notoken@test.com", nickname = "no-token-user"))
-        val station = stationJpaRepository.save(TestEntityFactory.createStationEntity(id = null))
-        val meeting = meetingJpaRepository.save(TestEntityFactory.createMeetingEntity(id = null, hostUser = user, station = station))
+        // given — 토큰 미등록 유저
+        val user = userRepository.save(UserFixture.createEntityWithoutId(socialId = "no-token-user", email = "notoken@test.com", nickname = "no-token-user"))
+        val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
+        val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(hostUser = user, station = station))
 
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf(
-                "meetingId" to meeting.id.toString(),
-                "userId" to user.id.toString()
-            )
+            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
         ).withId(RecordId.of("777-0"))
 
         val streamOps = mockk<StreamOperations<String, String, String>>()
@@ -263,12 +197,10 @@ class NotificationIntegrationTest {
         // when
         meetingNotificationConsumer.onMessage(mockRecord)
 
-        // then: 토큰이 없으므로 전송 시도는 0회, 하지만 메시지 자체는 유효하므로 ACK 호출
-        coVerify(exactly = 0) { 
-            fcmClient.sendMulticast(any(), any(), any(), any()) 
-        }
-        verify(exactly = 1, timeout = 5000) { 
-            streamOps.acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, any<MapRecord<String, String, String>>()) 
+        // then — FCM 미전송, ACK 1회 호출
+        coVerify(exactly = 0) { fcmClient.sendMulticast(any(), any(), any(), any()) }
+        verify(exactly = 1, timeout = 5000) {
+            streamOps.acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, any<MapRecord<String, String, String>>())
         }
     }
 }

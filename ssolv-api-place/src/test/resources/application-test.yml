@@ -1,24 +1,14 @@
+# datasource 설정은 TestContainerConfig가 동적으로 주입 (yml에 선언 불필요)
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  
   jpa:
     hibernate:
       ddl-auto: create-drop
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
     show-sql: false
-  
-  h2:
-    console:
-      enabled: false
 
-# Google Places API 설정 (테스트용 더미 값)
 api:
   google:
     places:
@@ -26,18 +16,15 @@ api:
       base-url: https://places.googleapis.com
       proxy-base-url: https://test-proxy.example.com
 
-# Kakao 설정 (테스트용)
 kakao:
   client-id: test-client-id
   redirect-uri: http://localhost:8080/callback
 
-# JWT 설정 (테스트용)
 jwt:
   secret: test-secret-key-for-testing-purposes-must-be-long-enough
   access-token-validity: 3600000
   refresh-token-validity: 86400000
 
-# 로깅
 logging:
   level:
     org.depromeet.team3: DEBUG
