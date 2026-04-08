@@ -63,8 +63,15 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         // Note: The service uses it in its execute logic.
         
         every { googlePlacesApiProperties.apiKey } returns "test-key"
+        every { googlePlacesApiProperties.photoFallbackBuffer } returns 5
+        every { googlePlacesApiProperties.totalFetchSize } returns 10
+        every { googlePlacesApiProperties.keywordFetchSize } returns 20
+        every { googlePlacesApiProperties.semaphoreTimeoutMs } returns 3000L
+        every { googlePlacesApiProperties.apiTimeoutMs } returns 3000L
+        every { googlePlacesApiProperties.requestSemaphoreSize } returns 5
         every { meterRegistry.counter(any<String>(), any<Iterable<io.micrometer.core.instrument.Tag>>()) } returns mockk(relaxed = true)
         every { meterRegistry.counter(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
+        every { meterRegistry.timer(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<*>>()) } returns listOf(0L, false)
         
         // Redis ValueOps 및 ObjectMapper 모킹 추가

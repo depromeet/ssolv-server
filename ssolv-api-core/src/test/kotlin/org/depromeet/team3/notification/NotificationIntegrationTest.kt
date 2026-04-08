@@ -7,8 +7,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
-import org.depromeet.team3.annotation.IntegrationTest
+import org.depromeet.team3.CoreApiApplication
 import org.depromeet.team3.auth.UserRepository
+import org.depromeet.team3.config.TestContainerConfig
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.ContextConfiguration
 import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.depromeet.team3.fixture.MeetingFixture
 import org.depromeet.team3.fixture.StationFixture
@@ -36,7 +41,10 @@ import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 
-@IntegrationTest
+@SpringBootTest(classes = [CoreApiApplication::class], webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@ContextConfiguration(initializers = [TestContainerConfig::class])
 class NotificationIntegrationTest {
 
     @Autowired private lateinit var createSurveyService: CreateSurveyService
