@@ -45,6 +45,10 @@ dependencies {
     testFixturesImplementation("org.springframework.security:spring-security-test")
     testFixturesImplementation("io.mockk:mockk:1.13.9")
     testFixturesImplementation("com.ninja-squad:springmockk:4.0.2")
+    testFixturesImplementation("org.testcontainers:testcontainers:1.19.8")
+    testFixturesImplementation("org.testcontainers:mysql:1.19.8")
+    testFixturesImplementation("org.testcontainers:junit-jupiter:1.19.8")
+    testFixturesRuntimeOnly("com.mysql:mysql-connector-j")
 }
 
 tasks {

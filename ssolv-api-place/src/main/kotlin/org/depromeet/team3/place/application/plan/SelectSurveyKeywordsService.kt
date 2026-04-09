@@ -137,8 +137,6 @@ class SelectSurveyKeywordsService {
         }
 
         return filteredKeywords
-            .groupBy { it.branchName ?: it.keyword }
-            .map { (_, candidates) -> candidates.maxBy { it.weight } }
             .sortedByDescending { it.weight }
             .take(maxKeywordCount)
     }

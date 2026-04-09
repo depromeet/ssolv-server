@@ -15,7 +15,7 @@ dependencies {
     testImplementation("io.micrometer:micrometer-registry-prometheus")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation(project(":ssolv-api-core"))
-    testRuntimeOnly("com.h2database:h2")
+    testImplementation(testFixtures(project(":ssolv-api-common")))
     runtimeOnly("com.mysql:mysql-connector-j")
 }
 

@@ -1,155 +1,96 @@
 package org.depromeet.team3.meeting.application
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import org.depromeet.team3.annotation.UnitTest
+import org.depromeet.team3.fixture.MeetingFixture
 import org.depromeet.team3.meeting.MeetingRepository
-import org.depromeet.team3.meeting.util.MeetingTestDataFactory
+import org.depromeet.team3.meeting.exception.InvalidInviteTokenException
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.Mock
-import org.mockito.MockitoAnnotations
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.whenever
-import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.any
+import org.mockito.kotlin.*
 import java.time.LocalDateTime
 
+@UnitTest
 class InviteTokenServiceTest {
 
-    @Mock
-    private lateinit var meetingRepository: MeetingRepository
-
-
-    @Mock
-    lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
+    @Mock private lateinit var meetingRepository: MeetingRepository
+    @Mock private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
     private lateinit var inviteTokenService: InviteTokenService
 
     @BeforeEach
     fun setUp() {
-        MockitoAnnotations.openMocks(this)
         inviteTokenService = InviteTokenService(meetingRepository, meetingAttendeeRepository)
     }
 
     @Test
-    fun `초대 토큰 생성 성공 테스트`() = runBlocking {
-        // Given
+    fun `초대 토큰 생성 성공`() = runTest {
+        // given
         val meetingId = 1L
-        val meeting = MeetingTestDataFactory.createMeeting(
-            id = meetingId,
-            name = "테스트 미팅",
-            hostUserId = 1L,
-            attendeeCount = 5,
-            isClosed = false,
-            stationId = 1L,
-            endAt = LocalDateTime.now().plusHours(2)
-        )
+        val meeting = MeetingFixture.create(id = meetingId, isClosed = false, endAt = LocalDateTime.now().plusHours(2))
+        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
 
-        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
-
-        // When
+        // when
         val result = inviteTokenService.generateInviteToken(meetingId)
 
-        // Then
+        // then
         assertNotNull(result)
         assertTrue(result.contains("token="))
         assertTrue(result.contains("validate-invite"))
     }
 
     @Test
-    fun `존재하지 않는 모임으로 초대 토큰 생성 시 예외 발생`() = runBlocking {
-        // Given
-        val meetingId = 999L
+    fun `존재하지 않는 모임으로 초대 토큰 생성 시 예외 발생`() = runTest {
+        // given
+        whenever(meetingRepository.findById(999L)).thenReturn(null)
 
-        whenever(meetingRepository.findById(meetingId)).doAnswer { null }
-
-        // When & Then
+        // when & then
         assertThrows<IllegalArgumentException> {
-            inviteTokenService.generateInviteToken(meetingId)
+            inviteTokenService.generateInviteToken(999L)
         }
     }
 
     @Test
-    fun `종료된 모임으로 초대 토큰 생성 시 예외 발생`() = runBlocking {
-        // Given
+    fun `종료된 모임으로 초대 토큰 생성 시 예외 발생`() = runTest {
+        // given
         val meetingId = 1L
-        val meeting = MeetingTestDataFactory.createMeeting(
-            id = meetingId,
-            name = "종료된 미팅",
-            hostUserId = 1L,
-            attendeeCount = 5,
-            isClosed = true,
-            stationId = 1L,
-            endAt = LocalDateTime.now().minusHours(1)
-        )
+        val meeting = MeetingFixture.create(id = meetingId, isClosed = true, endAt = LocalDateTime.now().minusHours(1))
+        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
 
-        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
-
-        // When & Then
+        // when & then
         assertThrows<IllegalStateException> {
             inviteTokenService.generateInviteToken(meetingId)
         }
     }
 
     @Test
-    fun `유효한 토큰 검증 성공 테스트`() = runBlocking {
-        // Given
+    fun `유효한 토큰 검증 성공`() = runTest {
+        // given
         val meetingId = 1L
-        val meeting = MeetingTestDataFactory.createMeeting(
-            id = meetingId,
-            name = "테스트 미팅",
-            hostUserId = 1L,
-            attendeeCount = 5,
-            isClosed = false,
-            stationId = 1L,
-            endAt = LocalDateTime.now().plusHours(2)
-        )
-
         val userId = 42L
-        whenever(meetingRepository.findById(meetingId)).doAnswer { meeting }
+        val meeting = MeetingFixture.create(id = meetingId, isClosed = false, endAt = LocalDateTime.now().plusHours(2))
+        whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
         whenever(meetingAttendeeRepository.existsByMeetingIdAndUserId(meetingId, userId)).thenReturn(false)
 
         val tokenUrl = inviteTokenService.generateInviteToken(meetingId)
         val token = tokenUrl.substringAfter("token=")
 
-        // When
+        // when
         val result = inviteTokenService.validateInviteToken(userId, token)
 
-        // Then
+        // then
         assertNotNull(result)
         assertEquals(meetingId, result.meetingId)
     }
 
     @Test
-    fun `잘못된 토큰 검증 실패 테스트`() = runBlocking {
-        // Given
-        val invalidToken = "invalid_token"
-
-        // When & Then
-        assertThrows<org.depromeet.team3.meeting.exception.InvalidInviteTokenException> {
-            inviteTokenService.validateInviteToken(1L, invalidToken)
-        }
-    }
-
-    @Test
-    fun `존재하지 않는 모임 ID로 토큰 검증 실패 테스트`() = runBlocking {
-        // Given
-        val meetingId = 999L
-
-        whenever(meetingRepository.findById(meetingId)).doAnswer { null }
-
-        assertThrows<IllegalArgumentException> {
-            inviteTokenService.generateInviteToken(meetingId)
-        }
-
-        val fakeToken = "fake_token_for_testing"
-
-        // When & Then
-        assertThrows<org.depromeet.team3.meeting.exception.InvalidInviteTokenException> {
-            inviteTokenService.validateInviteToken(1L, fakeToken)
+    fun `잘못된 토큰 검증 실패`() = runTest {
+        assertThrows<InvalidInviteTokenException> {
+            inviteTokenService.validateInviteToken(1L, "invalid_token")
         }
     }
 }

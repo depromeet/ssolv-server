@@ -32,9 +32,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
     runtimeOnly("com.mysql:mysql-connector-j")
-    
-    // 테스트용 H2 데이터베이스
-    testRuntimeOnly("com.h2database:h2")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude(group = "org.junit.vintage", module = "junit-vintage-engine")
     }
