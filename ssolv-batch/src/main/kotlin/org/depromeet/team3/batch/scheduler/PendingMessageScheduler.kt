@@ -1,117 +1,93 @@
 package org.depromeet.team3.batch.scheduler
 
+import io.sentry.Sentry
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.constants.RedisStreamConstants
+import org.depromeet.team3.common.filter.MdcLoggingFilter
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
+import org.springframework.context.annotation.Profile
 import org.springframework.data.domain.Range
-import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.time.Duration
-import kotlinx.coroutines.runBlocking
+import java.util.UUID
 
 /**
- * Redis Streams의 미처리 메시지를 감시하고 재시도하는 스케줄러 (WatchDog)
+ * Redis Streams 의 데드레터(dead-letter) 처리 스케줄러.
+ *
+ * 메시지 재처리는 각 API 모듈의 RecoveryScheduler (XCLAIM 기반) 가 담당한다.
+ * 이 스케줄러는 deliveryCount 가 MAX_DELIVERY_COUNT 를 초과한 메시지만 XACK 로 폐기한다.
+ *
+ * deliveryCount 증가 시점:
+ *   - 최초 XREADGROUP 배달: +1
+ *   - RecoveryScheduler XCLAIM 마다: +1
+ *
+ * 기본값 MAX_DELIVERY_COUNT = 4 → 최초 1회 + 복구 3회 시도 후 폐기
  */
 @Component
-@org.springframework.context.annotation.Profile("!test")
+@Profile("!test")
 class PendingMessageScheduler(
     private val stringRedisTemplate: StringRedisTemplate,
-    private val watchdogManager: CoroutineWatchdogManager
+    private val watchdogManager: CoroutineWatchdogManager,
 ) {
     private val logger = LoggerFactory.getLogger(PendingMessageScheduler::class.java)
 
     companion object {
-        private val PENDING_THRESHOLD = Duration.ofMinutes(1)
-        private const val MAX_RETRY_COUNT = 3L
+        private const val MAX_DELIVERY_COUNT = 4L
         private const val LOCK_KEY = "lock:pending:scheduler"
+        private const val BATCH_SIZE = 100L
     }
 
-    private val consumers = listOf(
+    private val streams = listOf(
         RedisStreamConstants.MEETING_NOTIFICATION_STREAM to RedisStreamConstants.MEETING_NOTIFICATION_GROUP,
-        RedisStreamConstants.MEETING_CALCULATION_STREAM to RedisStreamConstants.MEETING_CALCULATION_GROUP
+        RedisStreamConstants.MEETING_CALCULATION_STREAM to RedisStreamConstants.MEETING_CALCULATION_GROUP,
     )
 
-    @Scheduled(fixedDelay = 60000) // 1분마다 주기적으로 체크
+    @Scheduled(fixedDelay = 60_000)
     fun processPendingMessages() {
-        val requestId = "watchdog-" + java.util.UUID.randomUUID().toString().substring(0, 8)
-        org.slf4j.MDC.put(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID, requestId)
+        val requestId = "watchdog-" + UUID.randomUUID().toString().substring(0, 8)
+        MDC.put(MdcLoggingFilter.REQUEST_ID, requestId)
         try {
             runBlocking {
-                watchdogManager.executeWithLock(LOCK_KEY, 10000, 10000) {
-                    for ((streamKey, groupName) in consumers) {
-                        try {
-                            val pendingSummary = stringRedisTemplate.opsForStream<String, String>()
-                                .pending(streamKey, groupName)
-
-                            if (pendingSummary == null || pendingSummary.totalPendingMessages == 0L) {
-                                continue
-                            }
-
-                            logger.debug("스트림 {} 의 미처리 메시지 {} 건 발견", streamKey, pendingSummary.totalPendingMessages)
-
-                            val pendingMessages = stringRedisTemplate.opsForStream<String, String>()
-                                .pending(
-                                    streamKey, 
-                                    groupName, 
-                                    Range.unbounded<String>(), 
-                                    100L
-                                )
-
-                            if (pendingMessages.isEmpty()) {
-                                continue
-                            }
-
-                            for (pending in pendingMessages) {
-                                if (pending.elapsedTimeSinceLastDelivery.toMillis() > PENDING_THRESHOLD.toMillis()) {
-                                    val messageRecordList = stringRedisTemplate.opsForStream<String, String>()
-                                        .range(streamKey, Range.just(pending.idAsString))
-                                        
-                                    if (messageRecordList.isNullOrEmpty()) {
-                                        stringRedisTemplate.opsForStream<String, String>().acknowledge(streamKey, groupName, pending.id)
-                                        continue
-                                    }
-
-                                    val messageRecord = messageRecordList[0]
-                                    val currentRetryCount = messageRecord.value["retryCount"]?.toLongOrNull() ?: 0L
-
-                                    // 1. 최대 재시도 횟수 초과 여부 확인 (Poison Message 방지)
-                                    if (currentRetryCount >= MAX_RETRY_COUNT) {
-                                        logger.error("WatchDog: {} 에서 메시지 ({}) 가 {}회 이상 실패하여 폐기합니다. (retryCount: {})", 
-                                            streamKey, pending.id, MAX_RETRY_COUNT, currentRetryCount)
-                                        stringRedisTemplate.opsForStream<String, String>().acknowledge(streamKey, groupName, pending.id)
-                                        continue
-                                    }
-
-                                    logger.warn("WatchDog: {} 에서 {} 이상 정체된 메시지 ({}) 발견 (retryCount: {}). 재발행 수행", 
-                                        streamKey, PENDING_THRESHOLD, pending.id, currentRetryCount)
-
-                                    try {
-                                        val updatedValue = messageRecord.value.toMutableMap()
-                                        updatedValue["retryCount"] = (currentRetryCount + 1).toString()
-                                        // 재발행 시 requestId를 현재 WatchDog 실행 ID로 갱신하여 추적성 보장
-                                        updatedValue["requestId"] = requestId
-                                        
-                                        val reRecord = MapRecord.create(streamKey, updatedValue)
-                                        stringRedisTemplate.opsForStream<String, String>().add(reRecord)
-                                        stringRedisTemplate.opsForStream<String, String>().acknowledge(streamKey, groupName, pending.id)
-                                        logger.debug("WatchDog: 메시지 ({}) 재발행 및 기존 메시지 ACK 완료 (new retryCount: {})", 
-                                            pending.id, updatedValue["retryCount"])
-                                    } catch (e: Exception) {
-                                        logger.error("WatchDog: 메시지 ({}) 재발행 도중 오류 발생", pending.id, e)
-                                        io.sentry.Sentry.captureException(e)
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            logger.error("WatchDog: 스트림 {} 에 대한 Pending 확인 오류", streamKey, e)
-                            io.sentry.Sentry.captureException(e)
-                        }
+                watchdogManager.executeWithLock(LOCK_KEY, 10_000, 10_000) {
+                    for ((streamKey, groupName) in streams) {
+                        deadLetterExceededMessages(streamKey, groupName)
                     }
                 }
             }
         } finally {
-            org.slf4j.MDC.clear()
+            MDC.clear()
+        }
+    }
+
+    private fun deadLetterExceededMessages(streamKey: String, groupName: String) {
+        try {
+            val summary = stringRedisTemplate.opsForStream<String, String>()
+                .pending(streamKey, groupName)
+
+            if (summary == null || summary.totalPendingMessages == 0L) return
+
+            val pendingMessages = stringRedisTemplate.opsForStream<String, String>()
+                .pending(streamKey, groupName, Range.unbounded<String>(), BATCH_SIZE)
+            if (pendingMessages.isEmpty()) return
+
+            pendingMessages
+                .filter { it.totalDeliveryCount >= MAX_DELIVERY_COUNT }
+                .forEach { pending ->
+                    logger.error(
+                        "[watchdog] 최대 재시도 초과 메시지 폐기 (stream: {}, id: {}, deliveryCount: {})",
+                        streamKey, pending.id, pending.totalDeliveryCount,
+                    )
+                    stringRedisTemplate.opsForStream<String, String>()
+                        .acknowledge(streamKey, groupName, pending.id)
+                    Sentry.captureMessage(
+                        "Dead letter: stream=$streamKey, id=${pending.id}, deliveryCount=${pending.totalDeliveryCount}"
+                    )
+                }
+        } catch (e: Exception) {
+            logger.error("[watchdog] 스트림 {} 데드레터 처리 중 오류", streamKey, e)
+            Sentry.captureException(e)
         }
     }
 }
