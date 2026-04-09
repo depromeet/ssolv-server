@@ -22,6 +22,7 @@ class CoroutineWatchdogManager(
     
     companion object {
         private const val MIN_TTL_MILLIS = 5000L
+        private const val MAX_CONSECUTIVE_FAILURES = 3
     }
 
     // 1. 안전한 해제를 위한 루아 스크립트 (내가 잡은 락일 때만 해제)
@@ -81,6 +82,7 @@ class CoroutineWatchdogManager(
 
             // 3. 워치독 코루틴 실행
             val watchdogJob = launch(Dispatchers.IO) {
+                var consecutiveFailures = 0
                 while (isActive) {
                     // 남은 TTL의 절반 시점마다 연장 시도
                     delay(minOf(actualInitialTtl, actualExtensionTtl) / 2)
@@ -98,9 +100,15 @@ class CoroutineWatchdogManager(
                             actionJob.cancel()
                             break
                         }
+                        consecutiveFailures = 0
                         logger.debug("{} : Lock extended by {}ms.", lockKey, actualExtensionTtl)
                     } catch (e: Exception) {
                         logger.error("Watchdog: 락 연장 시도 중 에러 발생. 대상 키: {}", lockKey, e)
+                        if (++consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                            logger.error("{} : Watchdog consecutive failures exceeded limit. Cancelling action.", lockKey)
+                            actionJob.cancel()
+                            break
+                        }
                     }
                 }
             }
