@@ -10,7 +10,7 @@ data class PlacesTextSearchRequest(
     val textQuery: String,
     @JsonProperty("languageCode")
     val languageCode: String = "ko",
-    @JsonProperty("maxResultCount")
+    @JsonProperty("pageSize")
     val maxResultCount: Int = 10,
     @JsonProperty("locationBias")
     val locationBias: LocationBias? = null,
