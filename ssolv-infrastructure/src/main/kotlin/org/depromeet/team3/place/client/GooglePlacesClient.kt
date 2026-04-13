@@ -108,8 +108,8 @@ class GooglePlacesClient(
         ) {
             try {
                 withTimeout(apiTimeoutMillis) {
-                    val locationRestriction = if (latitude != null && longitude != null) {
-                        PlacesTextSearchRequest.LocationRestriction(
+                    val locationBias = if (latitude != null && longitude != null) {
+                        PlacesTextSearchRequest.LocationBias(
                             circle = PlacesTextSearchRequest.Circle(
                                 center = PlacesTextSearchRequest.Circle.Center(
                                     latitude = latitude,
@@ -119,12 +119,12 @@ class GooglePlacesClient(
                             )
                         )
                     } else null
-                    
+
                     val request = PlacesTextSearchRequest(
                         textQuery = query,
                         languageCode = "ko",
                         maxResultCount = maxResults,
-                        locationRestriction = locationRestriction
+                        locationBias = locationBias
                     )
 
                     httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
