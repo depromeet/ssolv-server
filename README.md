@@ -8,23 +8,21 @@
 |---|---|
 | Language | Kotlin 1.9.25, Java 21 |
 | Framework | Spring Boot 3.4.9, Spring Cloud 2024.0.1 |
-| Database | MySQL, Redis 7 |
+| Database | MySQL 8.0.43, Redis 7 |
 | ORM | Spring Data JPA / Hibernate, Kotlin-JDSL 3.8.0 |
 | Auth | JWT, OAuth2 (Kakao, Apple) |
 | HTTP Client | Ktor Client 2.3.12 |
 | Push | Firebase FCM |
 | Observability | Micrometer, OpenTelemetry, Sentry, Prometheus |
 | Build | Gradle 8 (Kotlin DSL), Jib |
+| IaC | Terraform 1.x (EC2, RDS, EIP, Route53) |
 
 ---
 
 
 ## Infrastructure
-<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
-  <div style="workbench.iconTheme": "material-icon-theme">
-    <img width="1996" height="970" alt="스크린샷 2026-04-07 오전 1 05 51" src="https://github.com/user-attachments/assets/7c6a6f0c-e5c3-42ec-818c-9830010502bb" />
-  </div>
-</div>
+
+<img width="1996" height="970" alt="infrastructure diagram" src="https://github.com/user-attachments/assets/7c6a6f0c-e5c3-42ec-818c-9830010502bb" />
 
 
 ```
@@ -40,7 +38,7 @@
   └── alloy + node/nginx/redis-exporter
 
 [ RDS ] MySQL 8.0.43 / db.t3.micro / private subnet
-[ Route53 ] api.ssolv.site — Multivalue Answer + 헬스체크 기반 failover
+[ Route53 ] api.ssolv.site — Multivalue Answer + health-check based failover
 ```
 
 **IaC**: Terraform (`terraform/`) — `app_instance_count` 변수로 단일↔멀티 서버 전환
@@ -52,6 +50,28 @@ terraform apply
 ```
 
 > 인프라 설계 배경 및 의사결정: `.claude/infra/DECISIONS.md`
+
+---
+
+
+## CI/CD
+
+| Workflow | Trigger | Description |
+|---|---|---|
+| **CI** | PR → `dev` | Build + Test + Jacoco coverage + SonarQube |
+| **CD** | Push → `main` | Jib image build → Rolling deploy (A → B) |
+
+**배포 흐름 (무중단 롤링)**
+```
+main push
+  └── Jib build & push → registry.ssolv.site
+        └── Deploy Instance A
+              └── health check 통과 확인
+                    └── Deploy Instance B
+```
+
+> Instance A를 먼저 배포하고 healthy 상태 확인 후 B를 배포합니다.
+> Route53 Multivalue Answer가 A 헬스체크 실패를 감지하는 동안 B가 트래픽을 처리합니다.
 
 ---
 
@@ -72,8 +92,6 @@ ssolv-server
 **의존 방향**
 ```
 ssolv-api-core  ──┐
-                  ├──▶ ssolv-api-common ──▶ ssolv-domain ──▶ ssolv-global-utils
-ssolv-api-place ──┘                     ──▶ ssolv-infrastructure
+                  ├──▶ ssolv-api-common ──▶ ssolv-domain        ──▶ ssolv-global-utils
+ssolv-api-place ──┘                     ──▶ ssolv-infrastructure ──▶ ssolv-domain
 ```
-
-
