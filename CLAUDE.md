@@ -28,6 +28,8 @@ Load relevant skills before coding:
 - `/observability` for Sentry, Micrometer, OpenTelemetry patterns
 - `/notification` for FCM push notification patterns
 - `/place` for ssolv-api-place module (Google Places, Redis ranking, SSE like)
+- `/domain-model` for Domain/Entity separation, Mapper, JDSL, ErrorCode, @ConfigurationProperties
+- `/batch` for scheduler, CoroutineWatchdogManager, dead-letter patterns
 
 ## Critical Rules
 
