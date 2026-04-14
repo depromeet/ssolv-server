@@ -90,7 +90,7 @@ else
     echo "❌ Conventional Commits 형식 위반"
     echo ""
     echo "   올바른 형식: type(scope): message"
-    echo "   유효한 타입: feat | fix | refactor | test | docs | perf | chore | build"
+    echo "   유효한 타입: feat | fix | refactor | test | docs | perf | chore | build | ci | revert"
     echo ""
     echo "   예시:"
     echo "     feat(place): implement dynamic Redis TTL based on meeting endAt"

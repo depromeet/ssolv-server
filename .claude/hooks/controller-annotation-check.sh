@@ -27,7 +27,7 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📋 Controller Swagger 어노테이션 검증: $(basename $FILE_PATH)"
+echo "📋 Controller Swagger 어노테이션 검증: $(basename "$FILE_PATH")"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 WARNINGS=0

@@ -13,16 +13,9 @@ data class PlacesTextSearchRequest(
     @JsonProperty("pageSize")
     val maxResultCount: Int = 10,
     @JsonProperty("locationBias")
-    val locationBias: LocationBias? = null,
-    @JsonProperty("locationRestriction")
-    val locationRestriction: LocationRestriction? = null
+    val locationBias: LocationBias? = null
 ) {
     data class LocationBias(
-        @JsonProperty("circle")
-        val circle: Circle
-    )
-
-    data class LocationRestriction(
         @JsonProperty("circle")
         val circle: Circle
     )

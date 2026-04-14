@@ -22,7 +22,7 @@
 ### Instance A (t3.micro — nginx + app-server)
 
 ```bash
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "
+ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "
   cd ~/17th-team3-Server
   docker compose --project-directory ~/17th-team3-Server \
     -f deploy/docker-compose.instance-a.yml \

@@ -108,12 +108,12 @@ class SomeService(
 ## 로그 수준 가이드
 
 ```kotlin
-private val logger = LoggerFactory.getLogger(this::class.java)
+private val logger = KotlinLogging.logger { }
 
-logger.debug("...")   // 개발 디버깅용, 운영에서는 출력 안 됨
-logger.info("...")    // 주요 비즈니스 이벤트 (서비스 시작, 초기화)
-logger.warn("...")    // 예상 가능한 오류 (비즈니스 예외, 검증 실패)
-logger.error("...")   // 예상치 못한 오류 (GlobalExceptionHandler의 catch-all)
+logger.debug { "..." }   // 개발 디버깅용, 운영에서는 출력 안 됨
+logger.info { "..." }    // 주요 비즈니스 이벤트 (서비스 시작, 초기화)
+logger.warn { "..." }    // 예상 가능한 오류 (비즈니스 예외, 검증 실패)
+logger.error { "..." }   // 예상치 못한 오류 (GlobalExceptionHandler의 catch-all)
 ```
 
 **주의**: Redis Stream Consumer의 예외는 `catch` 후 `Sentry.captureException(e)`로 처리하고,

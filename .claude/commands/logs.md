@@ -2,7 +2,7 @@
 
 ## 사용법
 
-```
+```text
 /logs <service> [instance] [options]
 ```
 

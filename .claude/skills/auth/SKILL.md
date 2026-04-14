@@ -30,7 +30,7 @@ suspend fun getMeeting(@MeetingId meetingId: Long): DpmApiResponse<MeetingRespon
 
 ## JWT 토큰 구조
 
-```
+```text
 accessToken  — Authorization: Bearer {token}
 refreshToken — 요청 바디 (RefreshTokenRequest.refreshToken)
 ```

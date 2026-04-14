@@ -11,7 +11,7 @@
 
 ## 장소 추천 흐름 (핵심)
 
-```
+```text
 설문 완료 → Redis Stream(meeting_calculation_stream) 발행
 → PlaceSearchConsumer 소비
 → ExecutePlaceSearchService.execute(meetingId)
