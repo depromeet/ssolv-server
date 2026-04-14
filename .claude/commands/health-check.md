@@ -50,11 +50,11 @@ ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostK
 ```bash
 # Instance A app-server 에러 로그
 ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostKeyChecking=no ubuntu@3.34.32.206 \
-  "docker logs app-server-a --tail 50 2>&1 | grep -E 'ERROR|WARN|Exception'"
+  "docker logs app-server --tail 50 2>&1 | grep -E 'ERROR|WARN|Exception'"
 
 # Instance B app-server 에러 로그
 ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostKeyChecking=no ubuntu@52.79.62.33 \
-  "docker logs app-server-b --tail 50 2>&1 | grep -E 'ERROR|WARN|Exception'"
+  "docker logs app-server --tail 50 2>&1 | grep -E 'ERROR|WARN|Exception'"
 ```
 
 ### 4. Route53 DNS 상태 확인 (선택)

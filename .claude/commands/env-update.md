@@ -81,19 +81,29 @@ ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostK
 
 | 변경 키 | 재시작 서비스 | 인스턴스 |
 |---|---|---|
-| `JWT_SECRET` | `app-server-a`, `app-server-b` | A, B |
-| `GOOGLE_PLACES_API_KEY` | `app-server-b` (place 모듈) | B |
-| `KAKAO_*`, `APPLE_*` | `app-server-a`, `app-server-b` | A, B |
-| `PROD_DB_*` | `app-server-a`, `app-server-b` | A, B |
+| `JWT_SECRET` | `app-server` | A, B |
+| `GOOGLE_PLACES_API_KEY` | `app-server` (place 모듈) | B |
+| `KAKAO_*`, `APPLE_*` | `app-server` | A, B |
+| `PROD_DB_*` | `app-server` | A, B |
+| `INSTANCE_B_PRIVATE_IP` | `app-server` | A (연결 대상 변경 시) |
+| `REDIS_*` | `redis` | B |
 | `REGISTRY_*` | 재시작 불필요 (pull 시에만 사용) | — |
 
 ```bash
-# 재시작 예시 (app-server-a)
+# 재시작 예시 (Instance A — app-server)
 ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "
   cd ~/17th-team3-Server
   docker compose --project-directory ~/17th-team3-Server \
     -f deploy/docker-compose.instance-a.yml \
-    up -d --no-deps --force-recreate app-server-a
+    up -d --no-deps --force-recreate app-server
+"
+
+# 재시작 예시 (Instance B — redis)
+ssh -i "${SSH_KEY_PATH:-/Users/parkmineum/.ssh/gdg-cicd-key.pem}" -o StrictHostKeyChecking=no ubuntu@52.79.62.33 "
+  cd ~/17th-team3-Server
+  docker compose --project-directory ~/17th-team3-Server \
+    -f deploy/docker-compose.instance-b.yml \
+    up -d --no-deps --force-recreate redis
 "
 ```
 

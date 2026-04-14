@@ -46,10 +46,11 @@ if [[ "$FILE_PATH" == */ssolv-api-core/* ]]; then
     fi
 fi
 
-# 2. ssolv-api-place 파일이 ssolv-api-core 전용 패키지를 import하는 경우
+# 2. ssolv-api-place 파일이 ssolv-api-core 전용 서브패키지를 import하는 경우
+# ssolv-infrastructure의 최상위 클래스(MeetingQuery 등)는 허용, api-core의 dto/controller/application은 금지
 if [[ "$FILE_PATH" == */ssolv-api-place/* ]]; then
-    if grep -qE '^import org\.depromeet\.team3\.(meeting|auth|survey|surveycategory|station|meetingattendee|notification)\.' "$FILE_PATH" 2>/dev/null; then
-        MESSAGES+=("ssolv-api-place에서 ssolv-api-core 전용 패키지 import 금지")
+    if grep -qE '^import org\.depromeet\.team3\.(meeting|auth|survey|surveycategory|station|meetingattendee|notification)\.(dto|controller|application|command|presentation|exception|validation)\.' "$FILE_PATH" 2>/dev/null; then
+        MESSAGES+=("ssolv-api-place에서 ssolv-api-core 전용 패키지 import 금지 (dto/controller/application 서브패키지)")
         VIOLATIONS=$((VIOLATIONS + 1))
     fi
 fi
