@@ -43,7 +43,7 @@ refreshToken — 요청 바디 (RefreshTokenRequest.refreshToken)
 
 ### Kakao
 
-```
+```text
 프론트엔드 → 카카오 인가코드 획득
 → GET /api/v1/auth/kakao-login?code={code}&redirect_uri={uri}
 → KakaoLoginService.login(KakaoLoginCommand)
@@ -53,7 +53,7 @@ refreshToken — 요청 바디 (RefreshTokenRequest.refreshToken)
 
 ### Apple
 
-```
+```text
 프론트엔드 → 애플 인가코드 + user(JSON) 획득
 → POST /api/v1/auth/apple-login?code={code}&user={userJson}
 → AppleOAuthService.login(AppleLoginCommand)

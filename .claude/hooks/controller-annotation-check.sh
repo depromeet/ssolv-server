@@ -33,13 +33,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 WARNINGS=0
 
 # 1. 클래스 레벨 @Tag 확인
-if ! grep -q "@Tag(" "$FILE_PATH"; then
+if ! grep -Eq '^[[:space:]]*@Tag\(' "$FILE_PATH"; then
     echo "⚠️  @Tag(name = \"...\", description = \"...\") 누락 — 클래스 레벨 필수"
     WARNINGS=$((WARNINGS + 1))
 fi
 
 # 2. @Operation 확인 (최소 1개 이상)
-if ! grep -q "@Operation(" "$FILE_PATH"; then
+if ! grep -Eq '^[[:space:]]*@Operation\(' "$FILE_PATH"; then
     echo "⚠️  @Operation(summary = \"...\") 누락 — 각 엔드포인트 메서드에 필요"
     WARNINGS=$((WARNINGS + 1))
 fi
@@ -50,9 +50,9 @@ if grep -q "@AuthenticationPrincipal" "$FILE_PATH"; then
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# 4. DpmApiResponse 래핑 확인
-MAPPING_COUNT=$(grep -cE "@(Get|Post|Put|Delete|Patch)Mapping" "$FILE_PATH" 2>/dev/null || echo 0)
-RESPONSE_COUNT=$(grep -c "DpmApiResponse" "$FILE_PATH" 2>/dev/null || echo 0)
+# 4. DpmApiResponse 래핑 확인 (반환 타입 기준)
+MAPPING_COUNT=$(grep -cE '^[[:space:]]*@(Get|Post|Put|Delete|Patch)Mapping' "$FILE_PATH" 2>/dev/null || echo 0)
+RESPONSE_COUNT=$(grep -cE ':[[:space:]]*DpmApiResponse<[^>]+>' "$FILE_PATH" 2>/dev/null || echo 0)
 if [[ "$MAPPING_COUNT" -gt 0 && "$RESPONSE_COUNT" -eq 0 ]]; then
     echo "⚠️  DpmApiResponse 래핑 없음 — 모든 응답은 DpmApiResponse<T>로 감싸야 함"
     WARNINGS=$((WARNINGS + 1))

@@ -15,13 +15,32 @@ except:
     print('')
 " 2>/dev/null)
 
+# 명령어를 토큰 단위로 파싱하여 git commit 여부와 --no-verify 플래그를 정확히 판별
+PARSED=$(echo "$COMMAND" | python3 -c "
+import sys, shlex
+cmd = sys.stdin.read().strip()
+try:
+    tokens = shlex.split(cmd)
+except ValueError:
+    tokens = cmd.split()
+# git commit 이 실제 argv[0..1]에 있는지 확인
+is_commit = len(tokens) >= 2 and tokens[0] == 'git' and tokens[1] == 'commit'
+# --no-verify 가 실제 플래그로 존재하는지 확인 (메시지 본문 제외)
+has_no_verify = '--no-verify' in tokens
+print('commit' if is_commit else 'skip')
+print('no-verify' if has_no_verify else 'ok')
+" 2>/dev/null)
+
+IS_COMMIT=$(echo "$PARSED" | sed -n '1p')
+HAS_NO_VERIFY=$(echo "$PARSED" | sed -n '2p')
+
 # git commit 명령이 아니면 종료
-if ! echo "$COMMAND" | grep -q "git commit"; then
+if [[ "$IS_COMMIT" != "commit" ]]; then
     exit 0
 fi
 
 # --no-verify 플래그가 있으면 건너뜀 (사용자가 명시적으로 우회 요청)
-if echo "$COMMAND" | grep -q "\-\-no-verify"; then
+if [[ "$HAS_NO_VERIFY" == "no-verify" ]]; then
     exit 0
 fi
 
