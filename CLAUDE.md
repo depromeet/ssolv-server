@@ -24,6 +24,10 @@ Load relevant skills before coding:
 - `/testing` for writing or modifying tests
 - `/async-processing` for Redis Stream or async task work
 - `/git-conventions` for commits, branches, PRs, and issues
+- `/auth` for JWT, OAuth, @UserId patterns
+- `/observability` for Sentry, Micrometer, OpenTelemetry patterns
+- `/notification` for FCM push notification patterns
+- `/place` for ssolv-api-place module (Google Places, Redis ranking, SSE like)
 
 ## Critical Rules
 

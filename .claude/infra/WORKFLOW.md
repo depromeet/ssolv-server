@@ -141,8 +141,8 @@ Security Group (rds):
 - [x] Route53 `api.ssolv.site` Multivalue Answer registered (A + B)
 - [x] Route53 health checks for A/B both Healthy
 - [x] `dig api.ssolv.site` — both IPs responding correctly
-- [ ] Delete CloudFront (old account — manual action required)
-- [ ] Terminate old EC2 (`13.125.182.175`) (old account — manual action required)
+- [x] Delete CloudFront (old account — completed, ADR-002)
+- [x] Terminate old EC2 (`13.125.182.175`) (old account — completed)
 - [x] Monitoring confirmed working (Grafana, Sentry)
 
 ---
