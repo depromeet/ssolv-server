@@ -1,0 +1,193 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_TEMPO",
+      "label": "Tempo",
+      "description": "Grafana Cloud Tempo",
+      "type": "datasource",
+      "pluginId": "tempo",
+      "pluginName": "Tempo"
+    },
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Grafana Cloud Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "tempo", "name": "Tempo", "version": "1.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "title": "Google Places API — Tracing",
+  "uid": "google-places-tracing",
+  "tags": ["ssolv", "google", "places", "tracing"],
+  "timezone": "Asia/Seoul",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "slow_threshold_ms",
+        "type": "custom",
+        "label": "Slow Threshold (ms)",
+        "query": "500,1000,2000,3000,5000",
+        "current": { "text": "1000", "value": "1000" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Trace Explore (Tempo)",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Slow Traces — google.places.textSearch",
+      "description": "duration > ${slow_threshold_ms}ms 인 호출 TraceID 목록. 행 클릭 → Tempo 탐색으로 이동",
+      "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" },
+      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ name=\"google.places.textSearch\" && duration > ${slow_threshold_ms}ms } | select(span.google.places.query, span.http.status_code, span.google.places.result_count)",
+          "limit": 50,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Retry Events — 재시도 발생 trace",
+      "description": "재시도가 발생한 호출들. event.retry.reason / event.retry.attempt 확인",
+      "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" },
+      "gridPos": { "x": 0, "y": 11, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ name=\"google.places.textSearch\" && event.name=\"retry\" }",
+          "limit": 50,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Error Traces — 4xx / 5xx 응답",
+      "description": "HTTP 4xx/5xx 를 받은 Google API 호출",
+      "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" },
+      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ name=\"google.places.textSearch\" && span.http.status_code >= 400 }",
+          "limit": 50,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Fan-out — 키워드 5개 병렬 호출",
+      "description": "모임 단위 place.google.fan_out span. keyword/selected/fallback 개수 한눈에 확인",
+      "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" },
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ name=\"place.google.fan_out\" } | select(span.place.keyword.count, span.place.selected.count, span.place.fallback.count, span.place.applied_keywords.count)",
+          "limit": 50,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Span Metrics (Tempo → Prometheus)",
+      "gridPos": { "x": 0, "y": 41, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency P95 — google.places.textSearch",
+      "description": "Grafana Cloud Tempo 의 span metrics generator 로부터 산출. HTTP/2 전환 전/후 비교용 baseline",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 42, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
+          "legendFormat": "p99"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Call Rate by status_code",
+      "description": "HTTP 응답 코드별 호출 비율",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 42, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (status_code) (rate(traces_spanmetrics_calls_total{span_name=\"google.places.textSearch\"}[5m]))",
+          "legendFormat": "{{status_code}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency P95 — place.google.fetch (Semaphore 포함)",
+      "description": "세마포어 대기 + Google 호출 전체 시간. semaphore.wait_ms attribute 와 교차 확인",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 50, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fetch\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fetch\"}[5m])))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency P95 — place.google.fan_out (Fan-out 전체)",
+      "description": "키워드 5개 병렬 처리 전체 시간. 꼬리 지연(tail latency)은 여기서 드러남",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 50, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fan_out\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fan_out\"}[5m])))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

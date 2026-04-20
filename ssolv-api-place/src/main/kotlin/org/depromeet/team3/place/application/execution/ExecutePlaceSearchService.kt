@@ -17,6 +17,11 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.slf4j.MDCContext
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
+import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.trace.SpanKind
+import io.opentelemetry.api.trace.StatusCode
+import io.opentelemetry.context.Context
+import io.opentelemetry.extension.kotlin.asContextElement
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.meeting.MeetingQuery
@@ -53,6 +58,7 @@ class ExecutePlaceSearchService(
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
+    private val tracer = GlobalOpenTelemetry.getTracer("ssolv.place.search", "1.0.0")
     private val totalFetchSize get() = googlePlacesApiProperties.totalFetchSize
     private val photoFallbackBuffer get() = googlePlacesApiProperties.photoFallbackBuffer
     private val keywordFetchSize get() = googlePlacesApiProperties.keywordFetchSize
@@ -273,23 +279,31 @@ class ExecutePlaceSearchService(
         plan: PlaceSearchPlan.Automatic,
         fallbackLimit: Int,
         dispatcher: CoroutineDispatcher
-    ): KeywordSearchResult = supervisorScope {
-        val requestSemaphore = Semaphore(googlePlacesApiProperties.requestSemaphoreSize)
-        val parentContext = currentCoroutineContext()
-        val deferredResponses = plan.keywords.map { candidate ->
-            async(parentContext + dispatcher) {
-                ensureActive()
-                runCatching {
-                    candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
-                }.onFailure { e ->
-                    // 부모 코루틴 취소(구조화된 동시성)는 삼키지 않고 재전파
-                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
-                    logger.warn("키워드 [${candidate.keyword}] 검색 중 오류 발생: ${e.message}")
-                }.getOrNull()
-            }
-        }
+    ): KeywordSearchResult {
+        val fanOutSpan = tracer.spanBuilder("place.google.fan_out")
+            .setAttribute("place.keyword.count", plan.keywords.size.toLong())
+            .setAttribute("place.fallback.limit", fallbackLimit.toLong())
+            .startSpan()
 
-        val results = deferredResponses.awaitAll().filterNotNull()
+        return try {
+            withContext(Context.current().with(fanOutSpan).asContextElement()) {
+                supervisorScope {
+                    val requestSemaphore = Semaphore(googlePlacesApiProperties.requestSemaphoreSize)
+                    val parentContext = currentCoroutineContext()
+                    val deferredResponses = plan.keywords.map { candidate ->
+                        async(parentContext + dispatcher) {
+                            ensureActive()
+                            runCatching {
+                                candidate to fetchPlacesFromGoogle(candidate.keyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                            }.onFailure { e ->
+                                // 부모 코루틴 취소(구조화된 동시성)는 삼키지 않고 재전파
+                                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                                logger.warn("키워드 [${candidate.keyword}] 검색 중 오류 발생: ${e.message}")
+                            }.getOrNull()
+                        }
+                    }
+
+                    val results = deferredResponses.awaitAll().filterNotNull()
 
         val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
 
@@ -347,12 +361,25 @@ class ExecutePlaceSearchService(
             throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
         }
 
-        val finalPlaces = selectedPlaces.sortedWith(
-            compareByDescending<PlacesTextSearchResponse.Place> { placeWeights[it.id] ?: 0.0 }
-                .thenByDescending { it.rating ?: 0.0 }
-        ).take(totalFetchSize)
+                    val finalPlaces = selectedPlaces.sortedWith(
+                        compareByDescending<PlacesTextSearchResponse.Place> { placeWeights[it.id] ?: 0.0 }
+                            .thenByDescending { it.rating ?: 0.0 }
+                    ).take(totalFetchSize)
 
-        KeywordSearchResult(finalPlaces, fallbackCandidates.take(fallbackLimit), placeWeights, appliedKeywords.toList())
+                    fanOutSpan.setAttribute("place.selected.count", finalPlaces.size.toLong())
+                    fanOutSpan.setAttribute("place.fallback.count", fallbackCandidates.size.toLong())
+                    fanOutSpan.setAttribute("place.applied_keywords.count", appliedKeywords.size.toLong())
+
+                    KeywordSearchResult(finalPlaces, fallbackCandidates.take(fallbackLimit), placeWeights, appliedKeywords.toList())
+                }
+            }
+        } catch (e: Exception) {
+            fanOutSpan.recordException(e)
+            fanOutSpan.setStatus(StatusCode.ERROR, e.message ?: e.javaClass.simpleName)
+            throw e
+        } finally {
+            fanOutSpan.end()
+        }
     }
 
     private fun filterPlacesByKeyword(places: List<PlacesTextSearchResponse.Place>, candidate: CreateSurveyKeywordService.KeywordCandidate, overrideKeywords: Set<String>? = null): List<PlacesTextSearchResponse.Place> {
@@ -387,6 +414,12 @@ class ExecutePlaceSearchService(
         val sanitizedQuery = CreateSurveyKeywordService.normalizeKeyword(query)
         if (sanitizedQuery.isBlank()) throw PlaceSearchException(ErrorCode.PLACE_INVALID_QUERY)
 
+        val fetchSpan = tracer.spanBuilder("place.google.fetch")
+            .setSpanKind(SpanKind.INTERNAL)
+            .setAttribute("place.google.query", query)
+            .setAttribute("place.google.has_coordinates", stationCoordinates != null)
+            .startSpan()
+
         /**
          * 2-tier Semaphore 중첩 적용
          *
@@ -394,16 +427,29 @@ class ExecutePlaceSearchService(
          * [내부] globalApiSemaphore: 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
          *
          * 중첩 순서: 모임별(외부) → 전역(내부)
-         * 이유: 모임방 내부 쿼터에 당첨된 요청만 전역 슬롯을 요청하도록 하여 
+         * 이유: 모임방 내부 쿼터에 당첨된 요청만 전역 슬롯을 요청하도록 하여
          *       전역 자원 기아 현상(Starvation)을 방지함.
          */
-        return withTimeout(semaphoreTimeoutMs) {
-            requestSemaphore.withPermit {
-                val semaphoreWaitStart = System.nanoTime()
-                globalApiSemaphore.withPermit {
-                    meterRegistry.timer("google.api.semaphore.wait")
-                        .record(System.nanoTime() - semaphoreWaitStart, java.util.concurrent.TimeUnit.NANOSECONDS)
-                    withContext(dispatcher) {
+        return try {
+            withContext(Context.current().with(fetchSpan).asContextElement()) {
+                withTimeout(semaphoreTimeoutMs) {
+                    val requestWaitStart = System.nanoTime()
+                    requestSemaphore.withPermit {
+                        val requestWaitNanos = System.nanoTime() - requestWaitStart
+                        meterRegistry.timer("google.api.semaphore.request.wait")
+                            .record(requestWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+                        fetchSpan.setAttribute("semaphore.request.wait_ms", requestWaitNanos / 1_000_000L)
+
+                        val globalWaitStart = System.nanoTime()
+                        globalApiSemaphore.withPermit {
+                            val globalWaitNanos = System.nanoTime() - globalWaitStart
+                            meterRegistry.timer("google.api.semaphore.wait")
+                                .record(globalWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+                            // per-request 세마포어 대기 시간을 span attribute로 기록 — aggregate metric만으로는
+                            // 어떤 특정 trace가 병목이었는지 알 수 없으므로 per-trace로도 남김
+                            fetchSpan.setAttribute("semaphore.wait_ms", globalWaitNanos / 1_000_000L)
+                            fetchSpan.setAttribute("semaphore.global.available", globalApiSemaphore.availablePermits.toLong())
+                            withContext(dispatcher) {
                         try {
                             logger.info("Google API 검색 실행: query={}, coords=({}, {})", query, stationCoordinates?.latitude, stationCoordinates?.longitude)
                             val apiStart = System.nanoTime()
@@ -444,7 +490,15 @@ class ExecutePlaceSearchService(
             }
         }
     }
-}
+            }
+        } catch (e: Exception) {
+            fetchSpan.recordException(e)
+            fetchSpan.setStatus(StatusCode.ERROR, e.message ?: e.javaClass.simpleName)
+            throw e
+        } finally {
+            fetchSpan.end()
+        }
+    }
 
     private fun recordMetric(result: String) {
         meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
