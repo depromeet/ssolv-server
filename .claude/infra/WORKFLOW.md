@@ -101,7 +101,7 @@ Security Group (rds):
 - [x] `modules/compute` — EC2 A (t3.micro) + B (t3.small), EIP, key pair
 - [x] `modules/database` — RDS MySQL 8.0.43
 - [x] `modules/dns` — Route53 Hosted Zone + Multivalue Answer + health checks
-- [x] `deploy/terraform/main.tf`, `variables.tf`, `outputs.tf`
+- [x] `terraform/main.tf`, `variables.tf`, `outputs.tf`
 - [x] `terraform plan` passes — no errors
 - [x] `docker-compose.instance-a.yml` — nginx (HTTPS) + app-server (Xmx400m)
 - [x] `docker-compose.instance-b.yml` — app-server + redis + registry + nginx + monitoring
@@ -157,7 +157,7 @@ The following automated tasks are active in production. No manual intervention n
 | 2 | Health check + auto-restart | `health-recovery.sh` via crontab | Every 5 min | Instance A + B |
 | 3 | Memory monitoring (t3.micro) | `memory-check.sh` via crontab | Every 5 min | Instance A only |
 | 4 | Sentry issue analysis | Claude scheduled task | Daily 09:00 | ssolv Sentry project |
-| 5 | Terraform drift detection | Claude scheduled task | Every Monday 10:00 | deploy/terraform/ |
+| 5 | Terraform drift detection | Claude scheduled task | Every Monday 10:00 | terraform/ |
 
 ### Log locations (on instances)
 - `/var/log/ssolv-health-recovery.log` — health check events and restarts

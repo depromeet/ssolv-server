@@ -41,10 +41,10 @@
 [ Route53 ] api.ssolv.site — Multivalue Answer + health-check based failover
 ```
 
-**IaC**: Terraform (`deploy/terraform/`) — `app_instance_count` 변수로 단일↔멀티 서버 전환
+**IaC**: Terraform (`terraform/`) — `app_instance_count` 변수로 단일↔멀티 서버 전환
 
 ```bash
-cd deploy/terraform
+cd terraform
 terraform plan
 terraform apply
 ```

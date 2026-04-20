@@ -105,7 +105,7 @@ ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubunt
 ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "docker logs app-server --tail 100"
 ```
 
-> If IPs have changed, run `cd deploy/terraform && terraform output` to get the latest values first.
+> If IPs have changed, run `cd terraform && terraform output` to get the latest values first.
 
 ## Ongoing Work
 

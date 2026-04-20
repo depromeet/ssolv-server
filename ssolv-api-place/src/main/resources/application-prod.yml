@@ -20,6 +20,11 @@ spring:
 app:
   env: prod
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
 sentry:
   dsn: ${SENTRY_DSN:}
   traces-sample-rate: 0.5
