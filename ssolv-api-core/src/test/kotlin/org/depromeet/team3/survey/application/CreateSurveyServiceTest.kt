@@ -67,7 +67,8 @@ class CreateSurveyServiceTest {
         createSurveyService = CreateSurveyService(
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
             meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate,
-            stringRedisTemplate, meetingExpirationSchedulerService
+            stringRedisTemplate, meetingExpirationSchedulerService,
+            io.opentelemetry.api.OpenTelemetry.noop()
         )
     }
 

@@ -37,7 +37,8 @@ class GooglePlacesClientTest {
         googlePlacesClient = GooglePlacesClient(
             httpClient = mock(),
             googlePlacesApiProperties = googlePlacesApiProperties,
-            meterRegistry = mock()
+            meterRegistry = mock(),
+            openTelemetry = io.opentelemetry.api.OpenTelemetry.noop()
         )
     }
 

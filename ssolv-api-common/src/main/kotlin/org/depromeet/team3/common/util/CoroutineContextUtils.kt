@@ -1,6 +1,6 @@
 package org.depromeet.team3.common.util
 
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.TextMapGetter
 import io.opentelemetry.extension.kotlin.asContextElement
@@ -31,9 +31,9 @@ private val mapGetter = object : TextMapGetter<Map<String, String>> {
     override fun get(carrier: Map<String, String>?, key: String) = carrier?.get(key)
 }
 
-fun extractParentContext(messagePayload: Map<String, String>): Context {
+fun extractParentContext(openTelemetry: OpenTelemetry, messagePayload: Map<String, String>): Context {
     val traceparent = messagePayload["traceparent"] ?: ""
     if (traceparent.isBlank()) return Context.current()
-    return GlobalOpenTelemetry.getPropagators().textMapPropagator
+    return openTelemetry.propagators.textMapPropagator
         .extract(Context.current(), messagePayload, mapGetter)
 }

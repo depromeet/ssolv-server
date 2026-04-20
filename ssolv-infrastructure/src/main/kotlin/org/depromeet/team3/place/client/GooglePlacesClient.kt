@@ -2,7 +2,7 @@ package org.depromeet.team3.place.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.core.instrument.MeterRegistry
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
@@ -34,10 +34,11 @@ class GooglePlacesClient(
     private val httpClient: HttpClient,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val meterRegistry: MeterRegistry,
+    openTelemetry: OpenTelemetry,
 ) {
 
     private val logger = KotlinLogging.logger { GooglePlacesClient::class.java.name }
-    private val tracer = GlobalOpenTelemetry.getTracer("ssolv.place.google", "1.0.0")
+    private val tracer = openTelemetry.getTracer("ssolv.place.google", "1.0.0")
 
     // API 호출 타임아웃 설정 (5초)
     private val apiTimeoutMillis = 5_000L

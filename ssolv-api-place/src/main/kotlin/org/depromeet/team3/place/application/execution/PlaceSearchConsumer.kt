@@ -1,5 +1,6 @@
 package org.depromeet.team3.place.application.execution
 
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component
 class PlaceSearchConsumer(
     private val executePlaceSearchService: ExecutePlaceSearchService,
     private val stringRedisTemplate: StringRedisTemplate,
+    private val openTelemetry: OpenTelemetry,
 ) : StreamListener<String, MapRecord<String, String, String>> {
 
     private val logger = LoggerFactory.getLogger(PlaceSearchConsumer::class.java)
@@ -35,7 +37,7 @@ class PlaceSearchConsumer(
         try {
             if (meetingId != null) {
                 logger.info("모임 {} 의 식당 검색 및 도출 요청 수신 (messageId: {})", meetingId, message.id)
-                val parentContext = extractParentContext(message.value)
+                val parentContext = extractParentContext(openTelemetry, message.value)
                 scope.launch(Dispatchers.IO + MDCContext() + parentContext.asContextElement()) {
                     try {
                         // 식당 검색 및 결과 추천 실행

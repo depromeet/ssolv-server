@@ -17,7 +17,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.slf4j.MDCContext
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.context.Context
@@ -55,10 +55,11 @@ class ExecutePlaceSearchService(
     private val meterRegistry: MeterRegistry,
     private val lockService: DistributedLockService,
     private val objectMapper: ObjectMapper,
+    openTelemetry: OpenTelemetry,
 ) {
 
     private val logger = LoggerFactory.getLogger(ExecutePlaceSearchService::class.java)
-    private val tracer = GlobalOpenTelemetry.getTracer("ssolv.place.search", "1.0.0")
+    private val tracer = openTelemetry.getTracer("ssolv.place.search", "1.0.0")
     private val totalFetchSize get() = googlePlacesApiProperties.totalFetchSize
     private val photoFallbackBuffer get() = googlePlacesApiProperties.photoFallbackBuffer
     private val keywordFetchSize get() = googlePlacesApiProperties.keywordFetchSize

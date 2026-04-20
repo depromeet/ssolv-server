@@ -1,5 +1,5 @@
 package org.depromeet.team3.survey.application
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.TextMapSetter
 import org.depromeet.team3.common.util.withTracingContext
@@ -35,7 +35,8 @@ class CreateSurveyService(
     private val meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository,
     private val transactionTemplate: TransactionTemplate,
     private val stringRedisTemplate: StringRedisTemplate,
-    private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService
+    private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService,
+    private val openTelemetry: OpenTelemetry,
 ) {
 
     suspend fun invoke(meetingId: Long, userId: Long, request: SurveyCreateRequest): SurveyCreateResponse =
@@ -127,7 +128,7 @@ class CreateSurveyService(
 
                     // 현재 OTEL 컨텍스트의 traceparent를 메시지에 포함하여 컨슈머에서 child span 생성 가능하게 함
                     val traceCarrier = mutableMapOf<String, String>()
-                    GlobalOpenTelemetry.getPropagators().textMapPropagator.inject(
+                    openTelemetry.propagators.textMapPropagator.inject(
                         Context.current(),
                         traceCarrier,
                         TextMapSetter { carrier, key, value -> carrier?.set(key, value) }

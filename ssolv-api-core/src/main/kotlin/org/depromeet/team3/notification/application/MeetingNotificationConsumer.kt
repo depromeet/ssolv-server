@@ -1,5 +1,6 @@
 package org.depromeet.team3.notification.application
 
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component
 class MeetingNotificationConsumer(
     private val sendMeetingResultNotificationService: SendMeetingResultNotificationService,
     private val stringRedisTemplate: StringRedisTemplate,
+    private val openTelemetry: OpenTelemetry,
 ) : StreamListener<String, MapRecord<String, String, String>> {
 
     private val logger = LoggerFactory.getLogger(MeetingNotificationConsumer::class.java)
@@ -34,7 +36,7 @@ class MeetingNotificationConsumer(
         try {
             if (meetingId != null && userId != null) {
                 logger.debug("식당 확정 알림 요청 수신 (meetingId: {}, userId: {}, messageId: {})", meetingId, userId, message.id)
-                val parentContext = extractParentContext(message.value)
+                val parentContext = extractParentContext(openTelemetry, message.value)
                 scope.launch(Dispatchers.IO + MDCContext() + parentContext.asContextElement()) {
                     try {
                         sendMeetingResultNotificationService.send(meetingId, userId)
