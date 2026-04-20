@@ -111,81 +111,85 @@
     },
     {
       "type": "row",
-      "title": "Span Metrics (Tempo → Prometheus)",
+      "title": "Application Metrics (Micrometer → Prometheus)",
       "gridPos": { "x": 0, "y": 41, "w": 24, "h": 1 },
       "collapsed": false
     },
     {
       "type": "timeseries",
-      "title": "Latency P95 — google.places.textSearch",
-      "description": "Grafana Cloud Tempo 의 span metrics generator 로부터 산출. HTTP/2 전환 전/후 비교용 baseline",
+      "title": "Google API Latency — avg & max (by result)",
+      "description": "Micrometer Timer 기반. Timer 히스토그램 버킷이 꺼져 있어 p95 대신 평균(sum/count) + max 로 표시. result 별로 success / timeout / api_error / business_error / unknown_error 분리",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "x": 0, "y": 42, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
-          "legendFormat": "p95"
+          "expr": "sum by (result) (rate(google_api_response_latency_seconds_sum[5m])) / sum by (result) (rate(google_api_response_latency_seconds_count[5m]))",
+          "legendFormat": "{{result}} avg"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
-          "legendFormat": "p99"
-        },
-        {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"google.places.textSearch\"}[5m])))",
-          "legendFormat": "p50"
+          "expr": "max by (result) (google_api_response_latency_seconds_max)",
+          "legendFormat": "{{result}} max"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
       "type": "timeseries",
-      "title": "Call Rate by status_code",
-      "description": "HTTP 응답 코드별 호출 비율",
+      "title": "Call Rate by result",
+      "description": "Google API 호출 결과 분포. success 외의 선이 급증하면 장애 징후",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "x": 12, "y": 42, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "sum by (status_code) (rate(traces_spanmetrics_calls_total{span_name=\"google.places.textSearch\"}[5m]))",
-          "legendFormat": "{{status_code}}"
+          "expr": "sum by (result) (rate(google_api_call_count_total[5m]))",
+          "legendFormat": "{{result}}"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
     {
       "type": "timeseries",
-      "title": "Latency P95 — place.google.fetch (Semaphore 포함)",
-      "description": "세마포어 대기 + Google 호출 전체 시간. semaphore.wait_ms attribute 와 교차 확인",
+      "title": "Semaphore Wait — Global vs Per-Meeting",
+      "description": "globalApiSemaphore(서버 전체 QPS 상한) 와 requestSemaphore(모임 단위 fan-out 상한) 대기 시간 비교. global 이 튀면 QPS 상한 도달, per-meeting 만 튀면 단일 모임 fan-out 병목",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "x": 0, "y": 50, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fetch\"}[5m])))",
-          "legendFormat": "p95"
+          "expr": "rate(google_api_semaphore_wait_seconds_sum[5m]) / rate(google_api_semaphore_wait_seconds_count[5m])",
+          "legendFormat": "global avg"
         },
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fetch\"}[5m])))",
-          "legendFormat": "p50"
+          "expr": "google_api_semaphore_wait_seconds_max",
+          "legendFormat": "global max"
+        },
+        {
+          "expr": "rate(google_api_semaphore_request_wait_seconds_sum[5m]) / rate(google_api_semaphore_request_wait_seconds_count[5m])",
+          "legendFormat": "per-meeting avg"
+        },
+        {
+          "expr": "google_api_semaphore_request_wait_seconds_max",
+          "legendFormat": "per-meeting max"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
       "type": "timeseries",
-      "title": "Latency P95 — place.google.fan_out (Fan-out 전체)",
-      "description": "키워드 5개 병렬 처리 전체 시간. 꼬리 지연(tail latency)은 여기서 드러남",
+      "title": "Semaphore Utilization & Cache Hit Ratio",
+      "description": "global semaphore 사용률(used / capacity) + 결과 캐시 히트율. 사용률 1 근처 장기 지속 시 globalApiSemaphore 크기 상향 검토",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "x": 12, "y": 50, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fan_out\"}[5m])))",
-          "legendFormat": "p95"
+          "expr": "google_api_semaphore_used / (google_api_semaphore_used + google_api_semaphore_available)",
+          "legendFormat": "semaphore utilization"
         },
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=\"place.google.fan_out\"}[5m])))",
-          "legendFormat": "p50"
+          "expr": "sum(rate(google_api_cache_hit_total[5m])) / (sum(rate(google_api_cache_hit_total[5m])) + sum(rate(google_api_cache_miss_total[5m])))",
+          "legendFormat": "cache hit ratio"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" } }
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
     }
   ],
   "schemaVersion": 39,
