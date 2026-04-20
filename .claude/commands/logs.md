@@ -83,5 +83,5 @@ ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubunt
 
 IP가 바뀐 경우 먼저 확인 후 실행:
 ```bash
-cd /Users/parkmineum/17th-team3-Server/terraform && terraform output
+cd /Users/parkmineum/17th-team3-Server/deploy/terraform && terraform output
 ```
