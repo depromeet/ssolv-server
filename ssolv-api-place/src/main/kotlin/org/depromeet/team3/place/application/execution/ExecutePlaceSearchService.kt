@@ -96,7 +96,7 @@ class ExecutePlaceSearchService(
         dispatcher: CoroutineDispatcher? = null
     ): PlacesSearchResponse {
         val actualDispatcher = dispatcher ?: Dispatchers.IO
-        return withContext(MDCContext() + actualDispatcher) {
+        return withContext(MDCContext() + Context.current().asContextElement() + actualDispatcher) {
             supervisorScope {
                 val meetingId = request.meetingId ?: throw IllegalArgumentException("Meeting ID is required")
 
