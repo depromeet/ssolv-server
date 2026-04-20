@@ -433,15 +433,21 @@ class ExecutePlaceSearchService(
         return try {
             withContext(Context.current().with(fetchSpan).asContextElement()) {
                 withTimeout(semaphoreTimeoutMs) {
+                    val requestWaitStart = System.nanoTime()
                     requestSemaphore.withPermit {
-                        val semaphoreWaitStart = System.nanoTime()
+                        val requestWaitNanos = System.nanoTime() - requestWaitStart
+                        meterRegistry.timer("google.api.semaphore.request.wait")
+                            .record(requestWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+                        fetchSpan.setAttribute("semaphore.request.wait_ms", requestWaitNanos / 1_000_000L)
+
+                        val globalWaitStart = System.nanoTime()
                         globalApiSemaphore.withPermit {
-                            val semaphoreWaitNanos = System.nanoTime() - semaphoreWaitStart
+                            val globalWaitNanos = System.nanoTime() - globalWaitStart
                             meterRegistry.timer("google.api.semaphore.wait")
-                                .record(semaphoreWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+                                .record(globalWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
                             // per-request 세마포어 대기 시간을 span attribute로 기록 — aggregate metric만으로는
                             // 어떤 특정 trace가 병목이었는지 알 수 없으므로 per-trace로도 남김
-                            fetchSpan.setAttribute("semaphore.wait_ms", semaphoreWaitNanos / 1_000_000L)
+                            fetchSpan.setAttribute("semaphore.wait_ms", globalWaitNanos / 1_000_000L)
                             fetchSpan.setAttribute("semaphore.global.available", globalApiSemaphore.availablePermits.toLong())
                             withContext(dispatcher) {
                         try {

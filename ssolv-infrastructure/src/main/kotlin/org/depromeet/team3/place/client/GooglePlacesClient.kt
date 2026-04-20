@@ -136,59 +136,60 @@ class GooglePlacesClient(
                     operation = "텍스트 검색",
                     operationDetail = "query=$query"
                 ) {
-                    try {
-                        withTimeout(apiTimeoutMillis) {
-                            val locationBias = if (latitude != null && longitude != null) {
-                                PlacesTextSearchRequest.LocationBias(
-                                    circle = PlacesTextSearchRequest.Circle(
-                                        center = PlacesTextSearchRequest.Circle.Center(
-                                            latitude = latitude,
-                                            longitude = longitude
-                                        ),
-                                        radius = radius
-                                    )
+                    // raw 예외(ResponseException / TimeoutCancellationException 등)를 그대로 전파해야
+                    // retryWithExponentialBackoff 가 5xx/429/타임아웃을 retryable 로 판정할 수 있음.
+                    // PlaceSearchException 변환은 retry 루프가 끝난 뒤 바깥 catch 에서 수행.
+                    withTimeout(apiTimeoutMillis) {
+                        val locationBias = if (latitude != null && longitude != null) {
+                            PlacesTextSearchRequest.LocationBias(
+                                circle = PlacesTextSearchRequest.Circle(
+                                    center = PlacesTextSearchRequest.Circle.Center(
+                                        latitude = latitude,
+                                        longitude = longitude
+                                    ),
+                                    radius = radius
                                 )
-                            } else null
-
-                            val request = PlacesTextSearchRequest(
-                                textQuery = query,
-                                languageCode = "ko",
-                                maxResultCount = maxResults,
-                                locationBias = locationBias
                             )
+                        } else null
 
-                            val response = httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
-                                header("X-Goog-Api-Key", googlePlacesApiProperties.apiKey)
-                                header("X-Goog-FieldMask", buildTextSearchFieldMask())
-                                contentType(ContentType.Application.Json)
-                                setBody(request)
-                            }
-                            span.setAttribute("http.status_code", response.status.value.toLong())
-                            span.setAttribute("http.protocol", response.version.toString())
-                            response.body<PlacesTextSearchResponse>().also { parsed ->
-                                span.setAttribute("google.places.result_count", (parsed.places?.size ?: 0).toLong())
-                            }
-                        }
-                    } catch (e: TimeoutCancellationException) {
-                        logger.error(e) { "Google Places API 텍스트 검색 타임아웃: query=$query" }
-                        throw PlaceSearchException(
-                            ErrorCode.PLACE_API_ERROR,
-                            detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)")
+                        val request = PlacesTextSearchRequest(
+                            textQuery = query,
+                            languageCode = "ko",
+                            maxResultCount = maxResults,
+                            locationBias = locationBias
                         )
-                    } catch (e: Exception) {
-                        if (e is ResponseException) {
-                            val body = e.response.body<String>()
-                            logger.error { "Google Places API 오류 (${e.response.status}): $body" }
-                            throw PlaceSearchException(
-                                ErrorCode.PLACE_API_ERROR,
-                                detail = mapOf("statusCode" to e.response.status.value, "body" to body)
-                            )
+
+                        val response = httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
+                            header("X-Goog-Api-Key", googlePlacesApiProperties.apiKey)
+                            header("X-Goog-FieldMask", buildTextSearchFieldMask())
+                            contentType(ContentType.Application.Json)
+                            setBody(request)
                         }
-                        if (e is PlaceSearchException) throw e
-                        throw e
+                        span.setAttribute("http.status_code", response.status.value.toLong())
+                        span.setAttribute("http.protocol", response.version.toString())
+                        response.body<PlacesTextSearchResponse>().also { parsed ->
+                            span.setAttribute("google.places.result_count", (parsed.places?.size ?: 0).toLong())
+                        }
                     }
                 }
             }
+        } catch (e: TimeoutCancellationException) {
+            span.recordException(e)
+            span.setStatus(StatusCode.ERROR, "timeout")
+            logger.error(e) { "Google Places API 텍스트 검색 타임아웃: query=$query" }
+            throw PlaceSearchException(
+                ErrorCode.PLACE_API_ERROR,
+                detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)")
+            )
+        } catch (e: ResponseException) {
+            val body = e.response.body<String>()
+            span.recordException(e)
+            span.setStatus(StatusCode.ERROR, "http ${e.response.status.value}")
+            logger.error { "Google Places API 오류 (${e.response.status}): $body" }
+            throw PlaceSearchException(
+                ErrorCode.PLACE_API_ERROR,
+                detail = mapOf("statusCode" to e.response.status.value, "body" to body)
+            )
         } catch (e: Exception) {
             span.recordException(e)
             span.setStatus(StatusCode.ERROR, e.message ?: e.javaClass.simpleName)
