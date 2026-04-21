@@ -26,25 +26,22 @@ data class PlaceDetailsResponse(
     val addressDescriptor: AddressDescriptor? = null,
     val location: Location? = null,
     @JsonProperty("googleMapsUri")
-    val googleMapsUri: String? = null
+    val googleMapsUri: String? = null,
 ) {
-    data class DisplayName(
-        val text: String,
-        val languageCode: String? = null
-    )
-    
+    data class DisplayName(val text: String, val languageCode: String? = null)
+
     data class CurrentOpeningHours(
         @JsonProperty("openNow")
         val openNow: Boolean? = null,
         @JsonProperty("weekdayDescriptions")
-        val weekdayDescriptions: List<String>? = null
+        val weekdayDescriptions: List<String>? = null,
     )
-    
+
     data class OpeningHours(
         @JsonProperty("weekdayDescriptions")
-        val weekdayDescriptions: List<String>? = null
+        val weekdayDescriptions: List<String>? = null,
     )
-    
+
     data class Review(
         @JsonProperty("authorAttribution")
         val authorAttribution: AuthorAttribution? = null,
@@ -52,73 +49,58 @@ data class PlaceDetailsResponse(
         @JsonProperty("relativePublishTimeDescription")
         val relativePublishTimeDescription: String? = null,
         @JsonProperty("text")
-        val text: TextContent? = null
+        val text: TextContent? = null,
     ) {
         data class AuthorAttribution(
             @JsonProperty("displayName")
-            val displayName: String? = null
+            val displayName: String? = null,
         )
-        
-        data class TextContent(
-            val text: String = "",
-            val languageCode: String? = null
-        )
+
+        data class TextContent(val text: String = "", val languageCode: String? = null)
     }
-    
+
     data class Photo(
         val name: String,
         @JsonProperty("widthPx")
         val widthPx: Int,
         @JsonProperty("heightPx")
-        val heightPx: Int
+        val heightPx: Int,
     )
-    
+
     data class PriceRange(
         @JsonProperty("startPrice")
         val startPrice: Money? = null,
         @JsonProperty("endPrice")
-        val endPrice: Money? = null
+        val endPrice: Money? = null,
     ) {
         data class Money(
             @JsonProperty("currencyCode")
             val currencyCode: String,
             val units: String? = null,
-            val nanos: Int? = null
+            val nanos: Int? = null,
         )
     }
-    
-    data class AddressDescriptor(
-        val areas: List<Area>? = null,
-        val landmarks: List<Landmark>? = null
-    ) {
+
+    data class AddressDescriptor(val areas: List<Area>? = null, val landmarks: List<Landmark>? = null) {
         data class Area(
             val name: String,
             @JsonProperty("displayName")
-            val displayName: TextContent? = null
+            val displayName: TextContent? = null,
         ) {
-            data class TextContent(
-                val text: String,
-                val languageCode: String? = null
-            )
+            data class TextContent(val text: String, val languageCode: String? = null)
         }
-        
+
         data class Landmark(
             val name: String,
             @JsonProperty("displayName")
             val displayName: TextContent? = null,
             val types: List<String>? = null,
             @JsonProperty("straightLineDistanceMeters")
-            val straightLineDistanceMeters: Double? = null
+            val straightLineDistanceMeters: Double? = null,
         ) {
-            data class TextContent(
-                val text: String,
-                val languageCode: String? = null
-            )
+            data class TextContent(val text: String, val languageCode: String? = null)
         }
     }
-    
-    data class Location(
-        val latitude: Double,
-        val longitude: Double
-    )
+
+    data class Location(val latitude: Double, val longitude: Double)
 }

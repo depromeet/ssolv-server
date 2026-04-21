@@ -17,7 +17,7 @@ class DemoLoginService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend fun login(): LoginResponse = withTracingContext() {
+    suspend fun login(): LoginResponse = withTracingContext {
         transactionTemplate.execute {
             val userEntity = userJpaRepository.findByEmail(demoProperties.email)
                 ?: throw IllegalStateException("Demo user not found: ${demoProperties.email}")
@@ -34,8 +34,8 @@ class DemoLoginService(
                 userProfile = UserProfileResponse(
                     email = userEntity.email,
                     nickname = userEntity.nickname,
-                    profileImage = userEntity.profileImage
-                )
+                    profileImage = userEntity.profileImage,
+                ),
             )
         }!!
     }

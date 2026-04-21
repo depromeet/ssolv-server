@@ -5,7 +5,6 @@ import org.depromeet.team3.place.application.model.PlaceSurveySummary
 import org.depromeet.team3.surveycategory.SurveyCategory
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.junit.jupiter.api.Test
-import org.depromeet.team3.place.application.plan.SelectSurveyKeywordsService
 import java.time.LocalDateTime
 
 /**
@@ -23,13 +22,13 @@ class PlaceSearchIntegrationTest {
             stationName = "강남역",
             totalRespondents = 5,
             leafVotes = mapOf(
-                101L to 4,  // 이탈리안 80%
-                102L to 3   // 파스타 60%
+                101L to 4, // 이탈리안 80%
+                102L to 3, // 파스타 60%
             ),
             leafCategories = mapOf(
                 101L to createCategory(101L, "이탈리안", SurveyCategoryLevel.LEAF),
-                102L to createCategory(102L, "파스타", SurveyCategoryLevel.LEAF)
-            )
+                102L to createCategory(102L, "파스타", SurveyCategoryLevel.LEAF),
+            ),
         )
 
         // when
@@ -49,10 +48,10 @@ class PlaceSearchIntegrationTest {
         val summary = createMockSurveySummary(
             stationName = "강남역",
             totalRespondents = 5,
-            leafVotes = mapOf(101L to 5),  // 전원 선택
+            leafVotes = mapOf(101L to 5), // 전원 선택
             leafCategories = mapOf(
-                101L to createCategory(101L, "이탈리안", SurveyCategoryLevel.LEAF)
-            )
+                101L to createCategory(101L, "이탈리안", SurveyCategoryLevel.LEAF),
+            ),
         )
 
         // when
@@ -72,13 +71,13 @@ class PlaceSearchIntegrationTest {
             totalRespondents = 5,
             leafVotes = emptyMap(),
             branchVotes = mapOf(
-                201L to 3,  // 양식 60%
-                202L to 2   // 아시안 40% - 제외
+                201L to 3, // 양식 60%
+                202L to 2, // 아시안 40% - 제외
             ),
             branchCategories = mapOf(
                 201L to createCategory(201L, "양식", SurveyCategoryLevel.BRANCH),
-                202L to createCategory(202L, "아시안", SurveyCategoryLevel.BRANCH)
-            )
+                202L to createCategory(202L, "아시안", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -97,21 +96,21 @@ class PlaceSearchIntegrationTest {
             stationCoordinates = null,
             totalRespondents = 20,
             leafVotes = mapOf(
-                101L to 1,  // 5%
-                102L to 1   // 5%
+                101L to 1, // 5%
+                102L to 1, // 5%
             ),
             branchVotes = mapOf(
-                10L to 1,   // 5%
-                20L to 1    // 5%
+                10L to 1, // 5%
+                20L to 1, // 5%
             ),
             leafCategories = mapOf(
                 101L to createLeafCategory(101L, "파스타", 10L),
-                102L to createLeafCategory(102L, "초밥", 20L)
+                102L to createLeafCategory(102L, "초밥", 20L),
             ),
             branchCategories = mapOf(
                 10L to createCategory(10L, "양식", SurveyCategoryLevel.BRANCH),
-                20L to createCategory(20L, "일식", SurveyCategoryLevel.BRANCH)
-            )
+                20L to createCategory(20L, "일식", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -129,53 +128,42 @@ class PlaceSearchIntegrationTest {
         leafVotes: Map<Long, Int> = emptyMap(),
         branchVotes: Map<Long, Int> = emptyMap(),
         leafCategories: Map<Long, SurveyCategory> = emptyMap(),
-        branchCategories: Map<Long, SurveyCategory> = emptyMap()
-    ): PlaceSurveySummary {
-        return PlaceSurveySummary(
-            stationName = stationName,
-            stationCoordinates = org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.498, 127.028),
-            totalRespondents = totalRespondents,
-            leafVotes = leafVotes,
-            branchVotes = branchVotes,
-            leafCategories = leafCategories,
-            branchCategories = branchCategories
-        )
-    }
+        branchCategories: Map<Long, SurveyCategory> = emptyMap(),
+    ): PlaceSurveySummary = PlaceSurveySummary(
+        stationName = stationName,
+        stationCoordinates = org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.498, 127.028),
+        totalRespondents = totalRespondents,
+        leafVotes = leafVotes,
+        branchVotes = branchVotes,
+        leafCategories = leafCategories,
+        branchCategories = branchCategories,
+    )
 
-    private fun createLeafCategory(
-        id: Long,
-        name: String,
-        parentId: Long,
-        sortOrder: Int = 0
-    ): SurveyCategory {
-        return SurveyCategory(
-            id = id,
-            parentId = parentId,
-            level = SurveyCategoryLevel.LEAF,
-            name = name,
-            sortOrder = sortOrder,
-            isDeleted = false,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-    }
+    private fun createLeafCategory(id: Long, name: String, parentId: Long, sortOrder: Int = 0): SurveyCategory = SurveyCategory(
+        id = id,
+        parentId = parentId,
+        level = SurveyCategoryLevel.LEAF,
+        name = name,
+        sortOrder = sortOrder,
+        isDeleted = false,
+        createdAt = LocalDateTime.now(),
+        updatedAt = LocalDateTime.now(),
+    )
 
     private fun createCategory(
         id: Long,
         name: String,
         level: SurveyCategoryLevel,
         parentId: Long? = null,
-        sortOrder: Int = 0
-    ): SurveyCategory {
-        return SurveyCategory(
-            id = id,
-            parentId = parentId,
-            level = level,
-            name = name,
-            sortOrder = sortOrder,
-            isDeleted = false,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-    }
+        sortOrder: Int = 0,
+    ): SurveyCategory = SurveyCategory(
+        id = id,
+        parentId = parentId,
+        level = level,
+        name = name,
+        sortOrder = sortOrder,
+        isDeleted = false,
+        createdAt = LocalDateTime.now(),
+        updatedAt = LocalDateTime.now(),
+    )
 }

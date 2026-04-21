@@ -1,3 +1,8 @@
+---
+name: domain-model
+description: Use when creating or modifying domain data classes (in ssolv-domain) vs JPA entities (in ssolv-infrastructure) and their Mappers. Covers Kotlin-JDSL 3.8.0 complex queries, `ErrorCode` enum patterns, `@ConfigurationProperties` groups (never `@Value` direct injection), and keeping domain logic free of Spring/JPA imports. Trigger on any `*Entity.kt`, `*Mapper.kt`, `*Query.kt`, domain data class, or new `@ConfigurationProperties` class.
+---
+
 # Domain Model Patterns
 
 > 이 프로젝트는 **도메인 모델과 JPA 엔티티를 완전히 분리**한다.

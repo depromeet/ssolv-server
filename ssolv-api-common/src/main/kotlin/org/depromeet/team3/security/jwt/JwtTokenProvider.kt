@@ -14,22 +14,14 @@ import java.util.*
 import javax.crypto.SecretKey
 
 @Component
-class JwtTokenProvider(
-    private val jwtProperties: JwtProperties
-) {
+class JwtTokenProvider(private val jwtProperties: JwtProperties) {
 
-    private fun getSigningKey(): SecretKey {
-        return Keys.hmacShaKeyFor(jwtProperties.secretKey.toByteArray(StandardCharsets.UTF_8))
-    }
+    private fun getSigningKey(): SecretKey = Keys.hmacShaKeyFor(jwtProperties.secretKey.toByteArray(StandardCharsets.UTF_8))
 
     /**
      * Access Token 생성
      */
-    fun generateAccessToken(
-        userId: Long,
-        email: String? = null,
-        authorities: Collection<String> = listOf("ROLE_USER")
-    ): String {
+    fun generateAccessToken(userId: Long, email: String? = null, authorities: Collection<String> = listOf("ROLE_USER")): String {
         val now = Date()
         val expiryDate = Date(now.time + jwtProperties.accessTokenExpiration)
 
@@ -77,39 +69,33 @@ class JwtTokenProvider(
     /**
      * Refresh Token 유효성 검증
      */
-    fun validateRefreshToken(token: String): Boolean {
-        return try {
-            val claims = getClaims(token)
-            val tokenType = claims.get("tokenType", String::class.java)
-            tokenType == "REFRESH" && claims.expiration.after(Date())
-        } catch (e: Exception) {
-            false
-        }
+    fun validateRefreshToken(token: String): Boolean = try {
+        val claims = getClaims(token)
+        val tokenType = claims.get("tokenType", String::class.java)
+        tokenType == "REFRESH" && claims.expiration.after(Date())
+    } catch (e: Exception) {
+        false
     }
 
     /**
      * JWT 토큰에서 사용자 ID 추출
      */
-    fun getUserIdFromToken(token: String): String? {
-        return try {
-            val claims = getClaims(token)
-            claims.subject
-        } catch (e: Exception) {
-            null
-        }
+    fun getUserIdFromToken(token: String): String? = try {
+        val claims = getClaims(token)
+        claims.subject
+    } catch (e: Exception) {
+        null
     }
 
     /**
      * Access Token 유효성 검증
      */
-    fun validateAccessToken(token: String): Boolean {
-        return try {
-            val claims = getClaims(token)
-            val tokenType = claims.get("tokenType", String::class.java)
-            tokenType == "ACCESS" && claims.expiration.after(Date())
-        } catch (e: Exception) {
-            false
-        }
+    fun validateAccessToken(token: String): Boolean = try {
+        val claims = getClaims(token)
+        val tokenType = claims.get("tokenType", String::class.java)
+        tokenType == "ACCESS" && claims.expiration.after(Date())
+    } catch (e: Exception) {
+        false
     }
 
     // === 추후 확장용 메서드들 ===
@@ -117,13 +103,11 @@ class JwtTokenProvider(
     /**
      * 토큰에서 이메일 추출 (추후 사용 예정)
      */
-    fun getEmailFromToken(token: String): String? {
-        return try {
-            val claims = getClaims(token)
-            claims.get("email", String::class.java)
-        } catch (e: Exception) {
-            null
-        }
+    fun getEmailFromToken(token: String): String? = try {
+        val claims = getClaims(token)
+        claims.get("email", String::class.java)
+    } catch (e: Exception) {
+        null
     }
 
     /**
@@ -132,26 +116,22 @@ class JwtTokenProvider(
     fun getAuthentication(token: String): Authentication? {
         val userId = getUserIdFromToken(token) ?: return null
         val authorities = getAuthoritiesFromToken(token).map { SimpleGrantedAuthority(it) }
-        
+
         val principal = User(userId, "", authorities)
         return UsernamePasswordAuthenticationToken(principal, token, authorities)
     }
 
-    private fun getAuthoritiesFromToken(token: String): Collection<String> {
-        return try {
-            val claims = getClaims(token)
-            val authoritiesString = claims.get("authorities", String::class.java)
-            authoritiesString?.split(",") ?: listOf("ROLE_USER")
-        } catch (e: Exception) {
-            listOf("ROLE_USER")
-        }
+    private fun getAuthoritiesFromToken(token: String): Collection<String> = try {
+        val claims = getClaims(token)
+        val authoritiesString = claims.get("authorities", String::class.java)
+        authoritiesString?.split(",") ?: listOf("ROLE_USER")
+    } catch (e: Exception) {
+        listOf("ROLE_USER")
     }
 
-    private fun getClaims(token: String): Claims {
-        return Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
-            .parseSignedClaims(token)
-            .payload
-    }
+    private fun getClaims(token: String): Claims = Jwts.parser()
+        .verifyWith(getSigningKey())
+        .build()
+        .parseSignedClaims(token)
+        .payload
 }

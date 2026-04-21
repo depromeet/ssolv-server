@@ -5,9 +5,9 @@ import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.TestAuthHelper
 import org.depromeet.team3.config.SecurityTestConfig
-import org.depromeet.team3.survey.fixture.SurveyRequestFixture
 import org.depromeet.team3.survey.application.CreateSurveyService
 import org.depromeet.team3.survey.exception.SurveyException
+import org.depromeet.team3.survey.fixture.SurveyRequestFixture
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -32,7 +32,9 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 class SurveyControllerTest {
 
     @Autowired private lateinit var mockMvc: MockMvc
+
     @Autowired private lateinit var objectMapper: ObjectMapper
+
     @MockitoBean private lateinit var createSurveyService: CreateSurveyService
 
     @BeforeEach
@@ -54,7 +56,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/$meetingId/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -70,7 +72,9 @@ class SurveyControllerTest {
         // given
         val meetingId = 999L
         createSurveyService.stub {
-            onBlocking { invoke(any(), any(), any()) }.doThrow(SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId)))
+            onBlocking {
+                invoke(any(), any(), any())
+            }.doThrow(SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId)))
         }
 
         // when
@@ -78,7 +82,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/$meetingId/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createMinimalRequest()))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -92,7 +96,14 @@ class SurveyControllerTest {
     fun `중복 설문 제출 시 409 에러가 발생한다`() = runTest {
         // given
         createSurveyService.stub {
-            onBlocking { invoke(any(), any(), any()) }.doThrow(SurveyException(ErrorCode.SURVEY_ALREADY_SUBMITTED, mapOf("participantId" to 1L)))
+            onBlocking { invoke(any(), any(), any()) }.doThrow(
+                SurveyException(
+                    ErrorCode.SURVEY_ALREADY_SUBMITTED,
+                    mapOf(
+                        "participantId" to 1L,
+                    ),
+                ),
+            )
         }
 
         // when
@@ -100,7 +111,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/1/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createMinimalRequest()))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -116,7 +127,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/1/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createEmptyRequest()))
-                .with(csrf())
+                .with(csrf()),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").exists())
@@ -135,7 +146,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/1/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createRequest()))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -149,7 +160,14 @@ class SurveyControllerTest {
     fun `존재하지 않는 설문 카테고리로 설문 생성 시 404 에러가 발생한다`() = runTest {
         // given
         createSurveyService.stub {
-            onBlocking { invoke(any(), any(), any()) }.doThrow(SurveyException(ErrorCode.SURVEY_CATEGORY_NOT_FOUND, mapOf("categoryId" to 999L)))
+            onBlocking { invoke(any(), any(), any()) }.doThrow(
+                SurveyException(
+                    ErrorCode.SURVEY_CATEGORY_NOT_FOUND,
+                    mapOf(
+                        "categoryId" to 999L,
+                    ),
+                ),
+            )
         }
 
         // when
@@ -157,7 +175,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/1/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createRequest(selectedCategoryList = listOf(999L))))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -171,9 +189,16 @@ class SurveyControllerTest {
     fun `LEAF 카테고리만 선택하고 BRANCH 카테고리를 선택하지 않은 경우 400 에러가 발생한다`() = runTest {
         // given
         createSurveyService.stub {
-            onBlocking { invoke(any(), any(), any()) }.doThrow(SurveyException(ErrorCode.SURVEY_BRANCH_CATEGORY_REQUIRED, mapOf(
-                "leafCategoryId" to 2L, "leafCategoryName" to "한식", "requiredBranchCategoryId" to 1L
-            )))
+            onBlocking { invoke(any(), any(), any()) }.doThrow(
+                SurveyException(
+                    ErrorCode.SURVEY_BRANCH_CATEGORY_REQUIRED,
+                    mapOf(
+                        "leafCategoryId" to 2L,
+                        "leafCategoryName" to "한식",
+                        "requiredBranchCategoryId" to 1L,
+                    ),
+                ),
+            )
         }
 
         // when
@@ -181,7 +206,7 @@ class SurveyControllerTest {
             post("/api/v1/meetings/1/surveys")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SurveyRequestFixture.createRequest(selectedCategoryList = listOf(2L))))
-                .with(csrf())
+                .with(csrf()),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then

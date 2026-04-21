@@ -19,18 +19,18 @@ class SemaphoreSimulationTest {
 
         val timeStart = System.currentTimeMillis()
         // 1번의 요청(모임)당 검색되어야 할 키워드가 6개라고 가정 (기본 5개 + Fallback 1개)
-        val keywords = listOf("한식 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "강남역 맛집", "Fallback 맛집") 
+        val keywords = listOf("한식 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "강남역 맛집", "Fallback 맛집")
 
-        keywords.map { 
+        keywords.map {
             async(Dispatchers.Default) {
                 val current = concurrentRequests.incrementAndGet()
                 synchronized(this@SemaphoreSimulationTest) {
                     if (current > maxConcurrent) maxConcurrent = current
                 }
-                
+
                 // Google API Latency 모킹 (100ms 지연)
-                delay(100) 
-                
+                delay(100)
+
                 concurrentRequests.decrementAndGet()
             }
         }.awaitAll()
@@ -49,17 +49,17 @@ class SemaphoreSimulationTest {
         val timeStart = System.currentTimeMillis()
         val keywords = listOf("한식 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "강남역 맛집", "Fallback 맛집")
 
-        keywords.map { 
+        keywords.map {
             async(Dispatchers.Default) {
                 semaphore.withPermit {
                     val current = concurrentRequests.incrementAndGet()
                     synchronized(this@SemaphoreSimulationTest) {
                         if (current > maxConcurrent) maxConcurrent = current
                     }
-                    
+
                     // Google API Latency 모킹 (100ms 지연)
-                    delay(100) 
-                    
+                    delay(100)
+
                     concurrentRequests.decrementAndGet()
                 }
             }

@@ -1,3 +1,8 @@
+---
+name: batch
+description: Use when working in the ssolv-batch module — periodic schedulers, `CoroutineWatchdogManager` for watchdog-protected long-running jobs, Redis Streams dead-letter reprocessing, and place data cleanup tasks. Independent from API modules. Trigger on files under ssolv-batch/ or when adding a new scheduled/batch task.
+---
+
 # Batch / Scheduler Patterns
 
 > `ssolv-batch` 모듈: 주기적 배경 작업 담당.

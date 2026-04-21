@@ -11,5 +11,5 @@ data class GetRespondents(
     val attendeeNickname: String,
 
     @Schema(description = "캐릭터 색상", example = "blackpink")
-    val color: String
+    val color: String,
 )

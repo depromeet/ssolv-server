@@ -1,16 +1,15 @@
 package org.depromeet.team3.survey.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendee
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.survey.SurveyRepository
 import org.depromeet.team3.survey.dto.GetRespondents
-import org.depromeet.team3.surveyresult.SurveyResultRepository
 import org.depromeet.team3.survey.dto.response.SurveyItemResponse
 import org.depromeet.team3.survey.dto.response.SurveyListResponse
 import org.depromeet.team3.survey.exception.SurveyException
+import org.depromeet.team3.surveyresult.SurveyResultRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -23,7 +22,7 @@ class GetSurveyListService(
 ) {
     private val logger = LoggerFactory.getLogger(GetSurveyListService::class.java)
 
-    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withTracingContext() {
+    suspend fun invoke(meetingId: Long, userId: Long): SurveyListResponse = withTracingContext {
         // 모임 존재 확인
         if (!meetingJpaRepository.existsById(meetingId)) {
             throw SurveyException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
@@ -87,32 +86,32 @@ class GetSurveyListService(
             SurveyItemResponse(
                 participantId = survey.participantId,
                 attendeeNickname = participant.attendeeNickname,
-                selectedCategoryList = selectedCategoryList
+                selectedCategoryList = selectedCategoryList,
             )
         }
 
         SurveyListResponse(
             surveys = surveyItems,
             participationRate = participationRate,
-            isCompleted = isCompleted
+            isCompleted = isCompleted,
         )
     }
 
-    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withTracingContext() {
+    suspend fun getRespondents(meetingId: Long): List<GetRespondents> = withTracingContext {
         // 모든 참가자를 한 번에 조회 (N+1 문제 해결)
         val attendeeList = meetingAttendeeRepository.findByMeetingId(meetingId)
         val attendeeMap = attendeeList.associateBy { it.userId }
-        
+
         // 설문 작성자 ID 목록 조회
         val participantIdList = surveyRepository.findByMeetingId(meetingId)
             .map { it.participantId }
-        
+
         participantIdList
             .mapNotNull { id -> attendeeMap[id] }
             .map { attendee -> attendee.toGetRespondents() }
     }
 
-    suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withTracingContext() {
+    suspend fun getRespondentsMap(meetingIds: List<Long>): Map<Long, List<GetRespondents>> = withTracingContext {
         if (meetingIds.isEmpty()) return@withTracingContext emptyMap()
 
         // 1. 모든 미팅의 참가자 일괄 조회
@@ -133,11 +132,9 @@ class GetSurveyListService(
         }
     }
 
-    private fun MeetingAttendee.toGetRespondents(): GetRespondents {
-        return GetRespondents(
-            userId = this.userId,
-            attendeeNickname = this.attendeeNickname ?: "",
-            color = this.muzziColor.name
-        )
-    }
+    private fun MeetingAttendee.toGetRespondents(): GetRespondents = GetRespondents(
+        userId = this.userId,
+        attendeeNickname = this.attendeeNickname ?: "",
+        color = this.muzziColor.name,
+    )
 }

@@ -29,7 +29,7 @@ class PlaceSearchConsumer(
     override fun onMessage(message: MapRecord<String, String, String>) {
         val meetingIdStr = message.value["meetingId"]
         val meetingId = meetingIdStr?.toLongOrNull()
-        
+
         val requestId = message.value["requestId"] ?: java.util.UUID.randomUUID().toString().substring(0, 8)
         org.slf4j.MDC.put(org.depromeet.team3.common.filter.MdcLoggingFilter.REQUEST_ID, requestId)
         meetingId?.let { org.slf4j.MDC.put("meeting_id", it.toString()) }
@@ -42,11 +42,11 @@ class PlaceSearchConsumer(
                     try {
                         // 식당 검색 및 결과 추천 실행
                         executePlaceSearchService.execute(meetingId)
-                        
+
                         // 성공 완료 후 ACK
                         val ackCount = stringRedisTemplate.opsForStream<String, String>()
                             .acknowledge("meeting_calculation_group", message)
-                            
+
                         if (ackCount != null && ackCount > 0) {
                             logger.info("모임 {} 의 식당 검색 추천 및 ACK 완료", meetingId)
                         }

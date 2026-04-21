@@ -86,7 +86,7 @@ class GlobalExceptionHandler {
                     "field" to path,
                     "value" to cause.value?.toString(),
                     "message" to message,
-                    "expectedType" to cause.targetType.simpleName
+                    "expectedType" to cause.targetType.simpleName,
                 )
             }
             else -> null

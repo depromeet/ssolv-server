@@ -13,8 +13,8 @@ import java.time.LocalDateTime
     name = "tb_users",
     uniqueConstraints = [
         UniqueConstraint(name = "uk_user_social", columnNames = ["provider", "social_id"]),
-        UniqueConstraint(name = "uk_user_nickname", columnNames = ["nickname"])
-    ]
+        UniqueConstraint(name = "uk_user_nickname", columnNames = ["nickname"]),
+    ],
 )
 class UserEntity(
     @Id
@@ -50,5 +50,5 @@ class UserEntity(
     val meetingAttendances: MutableList<MeetingAttendeeEntity> = mutableListOf(),
 
     @Column(name = "deleted_at")
-    var deletedAt: LocalDateTime? = null
+    var deletedAt: LocalDateTime? = null,
 ) : BaseTimeEntity()

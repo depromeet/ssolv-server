@@ -14,5 +14,5 @@ data class GooglePlacesApiProperties(
     var photoFallbackBuffer: Int = 5,
     var keywordFetchSize: Int = 20,
     var apiTimeoutMs: Long = 3000,
-    var semaphoreTimeoutMs: Long = 3000
+    var semaphoreTimeoutMs: Long = 3000,
 )

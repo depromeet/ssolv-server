@@ -1,7 +1,6 @@
 package org.depromeet.team3.meeting.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.dto.response.MeetingDetailResponse
@@ -34,11 +33,7 @@ class GetMeetingDetailService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend operator fun invoke(
-        meetingId: Long,
-        userId: Long,
-        allowClosed: Boolean = false
-    ): MeetingDetailResponse = withTracingContext() {
+    suspend operator fun invoke(meetingId: Long, userId: Long, allowClosed: Boolean = false): MeetingDetailResponse = withTracingContext {
         transactionTemplate.execute {
             // 모임 조회 및 endAt 기반 자동 종료 처리 (blocking)
             val meetingEntity = meetingJpaRepository.findByIdOrNull(meetingId)
@@ -58,16 +53,18 @@ class GetMeetingDetailService(
                         isClosed = true,
                         endAt = meetingEntity.endAt,
                         hostUser = meetingEntity.hostUser,
-                        station = meetingEntity.station
-                    )
+                        station = meetingEntity.station,
+                    ),
                 )
-            } else meetingEntity
+            } else {
+                meetingEntity
+            }
 
             // 종료 모임 검증
             if (resolvedEntity.isClosed && !allowClosed) {
                 throw MeetingException(
                     ErrorCode.MEETING_ALREADY_CLOSED,
-                    mapOf("meetingId" to meetingId, "userId" to userId)
+                    mapOf("meetingId" to meetingId, "userId" to userId),
                 )
             }
 
@@ -97,9 +94,9 @@ class GetMeetingDetailService(
                         stationId = resolvedEntity.station.id!!,
                         endAt = resolvedEntity.endAt,
                         createdAt = resolvedEntity.createdAt,
-                        updatedAt = resolvedEntity.updatedAt
-                    )
-                )
+                        updatedAt = resolvedEntity.updatedAt,
+                    ),
+                ),
             )
 
             // 참가자 목록 조회
@@ -110,8 +107,11 @@ class GetMeetingDetailService(
             val surveyIds = surveyEntities.mapNotNull { it.id }
 
             // 설문 결과 조회 (survey, surveyCategory fetch join 적용됨)
-            val allSurveyResults = if (surveyIds.isEmpty()) emptyList()
-            else surveyResultJpaRepository.findBySurveyIdIn(surveyIds)
+            val allSurveyResults = if (surveyIds.isEmpty()) {
+                emptyList()
+            } else {
+                surveyResultJpaRepository.findBySurveyIdIn(surveyIds)
+            }
             val surveyResultsMap = allSurveyResults.groupBy { it.survey.id }
 
             // 카테고리 정보 일괄 조회 (N+1 해결)
@@ -129,14 +129,14 @@ class GetMeetingDetailService(
                     val selectedCategoryList = buildParticipantSelectedCategories(
                         survey.id,
                         surveyResultsMap,
-                        allCategoryMap
+                        allCategoryMap,
                     )
 
                     MeetingParticipantInfo(
                         userId = attendeeEntity.user.id!!,
                         attendeeNickname = attendeeEntity.attendeeNickname ?: "알 수 없음",
                         color = attendeeEntity.muzziColor.name.lowercase(),
-                        selectedCategories = selectedCategoryList
+                        selectedCategories = selectedCategoryList,
                     )
                 }
                 .sortedByDescending { it.userId == userId }
@@ -144,7 +144,7 @@ class GetMeetingDetailService(
             MeetingDetailResponse(
                 currentUserId = userId,
                 meetingInfo = meetingInfo,
-                participantList = participantList
+                participantList = participantList,
             )
         }!!
     }
@@ -152,7 +152,7 @@ class GetMeetingDetailService(
     private fun buildParticipantSelectedCategories(
         surveyId: Long?,
         surveyResultsMap: Map<Long?, List<SurveyResultEntity>>,
-        allCategoryMap: Map<Long?, org.depromeet.team3.surveycategory.SurveyCategoryEntity>
+        allCategoryMap: Map<Long?, org.depromeet.team3.surveycategory.SurveyCategoryEntity>,
     ): List<ParticipantSelectedCategory> {
         val surveyResults = surveyResultsMap[surveyId] ?: emptyList()
         if (surveyResults.isEmpty()) return emptyList()
@@ -173,5 +173,4 @@ class GetMeetingDetailService(
             ParticipantSelectedCategory(id = branchId, name = branch.name, leafCategoryList = leaves)
         }
     }
-
 }

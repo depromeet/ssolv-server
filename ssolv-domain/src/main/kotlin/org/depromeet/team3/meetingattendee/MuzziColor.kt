@@ -11,19 +11,17 @@ enum class MuzziColor {
     PAPRIKA,
     PEAR,
     TOMATO,
-    TURNIP
+    TURNIP,
     ;
 
     companion object {
-        fun getOrDefault(name: String?): MuzziColor {
-            return if (name.isNullOrBlank()) {
+        fun getOrDefault(name: String?): MuzziColor = if (name.isNullOrBlank()) {
+            NONE
+        } else {
+            try {
+                valueOf(name.uppercase())
+            } catch (e: IllegalArgumentException) {
                 NONE
-            } else {
-                try {
-                    valueOf(name.uppercase())
-                } catch (e: IllegalArgumentException) {
-                    NONE
-                }
             }
         }
     }

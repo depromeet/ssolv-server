@@ -1,7 +1,6 @@
 package org.depromeet.team3.surveycategory.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.surveycategory.SurveyCategoryEntity
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.dto.request.CreateSurveyCategoryRequest
@@ -16,51 +15,51 @@ class CreateSurveyCategoryService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse =
-        withTracingContext() {
-            transactionTemplate.execute {
-                // sortOrder 중복 검증 (JPA 메서드 직접 호출, blocking)
-                val sortOrderExists = if (request.parentId == null) {
-                    surveyCategoryJpaRepository.existsBySortOrderAndParentIsNullAndIsDeletedFalse(request.sortOrder)
-                } else {
-                    surveyCategoryJpaRepository.existsBySortOrderAndParentIdIsAndIsDeletedFalse(
-                        request.sortOrder, request.parentId
+    suspend operator fun invoke(request: CreateSurveyCategoryRequest): CreateSurveyCategoryResponse = withTracingContext {
+        transactionTemplate.execute {
+            // sortOrder 중복 검증 (JPA 메서드 직접 호출, blocking)
+            val sortOrderExists = if (request.parentId == null) {
+                surveyCategoryJpaRepository.existsBySortOrderAndParentIsNullAndIsDeletedFalse(request.sortOrder)
+            } else {
+                surveyCategoryJpaRepository.existsBySortOrderAndParentIdIsAndIsDeletedFalse(
+                    request.sortOrder,
+                    request.parentId,
+                )
+            }
+
+            if (sortOrderExists) {
+                throw SurveyCategoryException(
+                    errorCode = ErrorCode.DUPLICATE_CATEGORY_ORDER,
+                    detail = mapOf("sortOrder" to request.sortOrder, "parentId" to request.parentId),
+                )
+            }
+
+            val parentEntity: SurveyCategoryEntity? = request.parentId?.let {
+                surveyCategoryJpaRepository.findById(it).orElseThrow {
+                    SurveyCategoryException(
+                        errorCode = ErrorCode.PARENT_CATEGORY_NOT_FOUND,
+                        detail = mapOf("parentCategoryId" to it),
                     )
                 }
+            }
 
-                if (sortOrderExists) {
-                    throw SurveyCategoryException(
-                        errorCode = ErrorCode.DUPLICATE_CATEGORY_ORDER,
-                        detail = mapOf("sortOrder" to request.sortOrder, "parentId" to request.parentId)
-                    )
-                }
+            val entity = SurveyCategoryEntity(
+                parent = parentEntity,
+                level = request.level,
+                name = request.name,
+                sortOrder = request.sortOrder,
+                isDeleted = false,
+            )
 
-                val parentEntity: SurveyCategoryEntity? = request.parentId?.let {
-                    surveyCategoryJpaRepository.findById(it).orElseThrow {
-                        SurveyCategoryException(
-                            errorCode = ErrorCode.PARENT_CATEGORY_NOT_FOUND,
-                            detail = mapOf("parentCategoryId" to it)
-                        )
-                    }
-                }
+            val saved = surveyCategoryJpaRepository.save(entity)
 
-                val entity = SurveyCategoryEntity(
-                    parent = parentEntity,
-                    level = request.level,
-                    name = request.name,
-                    sortOrder = request.sortOrder,
-                    isDeleted = false
-                )
-
-                val saved = surveyCategoryJpaRepository.save(entity)
-
-                CreateSurveyCategoryResponse(
-                    id = saved.id!!,
-                    parentId = saved.parent?.id,
-                    level = saved.level,
-                    name = saved.name,
-                    sortOrder = saved.sortOrder
-                )
-            }!!
-        }
+            CreateSurveyCategoryResponse(
+                id = saved.id!!,
+                parentId = saved.parent?.id,
+                level = saved.level,
+                name = saved.name,
+                sortOrder = saved.sortOrder,
+            )
+        }!!
+    }
 }

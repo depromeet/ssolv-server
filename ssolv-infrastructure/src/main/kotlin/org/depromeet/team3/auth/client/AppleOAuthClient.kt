@@ -2,18 +2,20 @@ package org.depromeet.team3.auth.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.jsonwebtoken.Jwts
-import org.depromeet.team3.auth.exception.AuthException
-import org.depromeet.team3.auth.model.AppleResponse
-import org.depromeet.team3.auth.properties.AppleProperties
-import org.depromeet.team3.common.exception.ErrorCode
-import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Component
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.auth.model.AppleResponse
+import org.depromeet.team3.auth.properties.AppleProperties
+import org.depromeet.team3.common.exception.ErrorCode
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.PrivateKey
@@ -22,8 +24,6 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 
 @Component
 class AppleOAuthClient(
@@ -41,7 +41,7 @@ class AppleOAuthClient(
             "http://localhost:8080/auth/callback",
             "https://api.ssolv.site/auth/callback",
             "https://www.ssolv.site/auth/callback",
-            "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
+            "https://ec01-58-29-179-24.ngrok-free.app/auth/callback",
         )
         val configUris = appleProperties.redirectUris.toSet()
         val singleUri = setOfNotNull(appleProperties.redirectUri.takeIf { it.isNotBlank() })
@@ -69,7 +69,7 @@ class AppleOAuthClient(
                         append("client_secret", clientSecret)
                         append("code", accessCode)
                         append("redirect_uri", trimmedRedirectUri)
-                    }
+                    },
                 ).body<AppleResponse.OAuthToken>()
             }
         } catch (e: Exception) {
@@ -115,14 +115,14 @@ class AppleOAuthClient(
 
             return AppleResponse.IdTokenPayload(
                 iss = claims.issuer,
-                aud = claims.audience.first(), 
+                aud = claims.audience.first(),
                 exp = claims.expiration.time / 1000,
                 iat = (claims["iat"] as? Number)?.toLong() ?: 0L,
                 sub = claims.subject,
                 email = claims["email"] as? String,
                 email_verified = claims["email_verified"]?.toString(),
                 is_private_email = claims["is_private_email"]?.toString(),
-                nonce_supported = claims["nonce_supported"] as? Boolean
+                nonce_supported = claims["nonce_supported"] as? Boolean,
             )
         } catch (e: Exception) {
             when (e) {
@@ -141,7 +141,7 @@ class AppleOAuthClient(
             withTimeout(apiTimeoutMillis) {
                 val response = httpClient.get("https://appleid.apple.com/auth/keys")
                     .body<AppleResponse.PublicKeys>()
-                
+
                 response.keys.forEach { key ->
                     val publicKey = generatePublicKey(key.n, key.e)
                     publicKeyCache[key.kid] = publicKey
@@ -167,22 +167,20 @@ class AppleOAuthClient(
         return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
-    private fun generateClientSecret(): String {
-        return try {
-            val now = Date()
-            Jwts.builder()
-                .header().keyId(appleProperties.keyId).and()
-                .issuer(appleProperties.teamId)
-                .issuedAt(now)
-                .expiration(Date(now.time + 3600000 * 6))
-                .audience().add("https://appleid.apple.com").and()
-                .subject(appleProperties.clientId)
-                .signWith(getPrivateKey(), Jwts.SIG.ES256)
-                .compact()
-        } catch (e: Exception) {
-            log.error("애플 Client Secret 생성 실패: {}", e.message)
-            throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
-        }
+    private fun generateClientSecret(): String = try {
+        val now = Date()
+        Jwts.builder()
+            .header().keyId(appleProperties.keyId).and()
+            .issuer(appleProperties.teamId)
+            .issuedAt(now)
+            .expiration(Date(now.time + 3600000 * 6))
+            .audience().add("https://appleid.apple.com").and()
+            .subject(appleProperties.clientId)
+            .signWith(getPrivateKey(), Jwts.SIG.ES256)
+            .compact()
+    } catch (e: Exception) {
+        log.error("애플 Client Secret 생성 실패: {}", e.message)
+        throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
     }
 
     private fun getPrivateKey(): PrivateKey {

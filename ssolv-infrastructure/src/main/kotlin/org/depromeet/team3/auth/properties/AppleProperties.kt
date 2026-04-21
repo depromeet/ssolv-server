@@ -12,5 +12,5 @@ data class AppleProperties(
     var redirectUri: String = "",
     var redirectUris: List<String> = emptyList(),
     var privateKey: String = "",
-    var tokenUri: String = "https://appleid.apple.com/auth/token"
+    var tokenUri: String = "https://appleid.apple.com/auth/token",
 )

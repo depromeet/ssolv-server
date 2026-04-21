@@ -14,49 +14,29 @@ class MeetingAttendeeQuery(
         return meetingAttendeeMapper.toDomain(meetingAttendeeJpaRepository.save(entity))
     }
 
-    override suspend fun findByMeetingId(meetingId: Long): List<MeetingAttendee> {
-        return meetingAttendeeJpaRepository.findByMeetingId(meetingId)
-            .map { meetingAttendeeMapper.toDomain(it) }
-    }
+    override suspend fun findByMeetingId(meetingId: Long): List<MeetingAttendee> = meetingAttendeeJpaRepository.findByMeetingId(meetingId)
+        .map { meetingAttendeeMapper.toDomain(it) }
 
-    override suspend fun findByMeetingIdIn(meetingIds: List<Long>): List<MeetingAttendee> {
-        return meetingAttendeeJpaRepository.findByMeetingIdIn(meetingIds)
+    override suspend fun findByMeetingIdIn(meetingIds: List<Long>): List<MeetingAttendee> =
+        meetingAttendeeJpaRepository.findByMeetingIdIn(meetingIds)
             .map { meetingAttendeeMapper.toDomain(it) }
-    }
 
-    override suspend fun findByUserId(userId: Long): List<MeetingAttendee> {
-        return meetingAttendeeJpaRepository.findByUserId(userId)
-            .map { meetingAttendeeMapper.toDomain(it) }
-    }
+    override suspend fun findByUserId(userId: Long): List<MeetingAttendee> = meetingAttendeeJpaRepository.findByUserId(userId)
+        .map { meetingAttendeeMapper.toDomain(it) }
 
-    override suspend fun findByMeetingIdAndUserId(
-        meetingId: Long,
-        userId: Long
-    ): MeetingAttendee? {
-        return meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
+    override suspend fun findByMeetingIdAndUserId(meetingId: Long, userId: Long): MeetingAttendee? =
+        meetingAttendeeJpaRepository.findByMeetingIdAndUserId(meetingId, userId)
             ?.let { meetingAttendeeMapper.toDomain(it) }
-    }
 
-    override suspend fun existsByMeetingIdAndUserId(
-        meetingId: Long,
-        userId: Long
-    ): Boolean {
-        return meetingAttendeeJpaRepository.existsByMeetingIdAndUserId(meetingId, userId)
-    }
+    override suspend fun existsByMeetingIdAndUserId(meetingId: Long, userId: Long): Boolean =
+        meetingAttendeeJpaRepository.existsByMeetingIdAndUserId(meetingId, userId)
 
-    override suspend fun existsByMeetingIdAndNormalizedNickname(
-        meetingId: Long,
-        nickname: String,
-        excludeUserId: Long
-    ): Boolean {
-        return meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(meetingId, nickname, excludeUserId)
-    }
+    override suspend fun existsByMeetingIdAndNormalizedNickname(meetingId: Long, nickname: String, excludeUserId: Long): Boolean =
+        meetingAttendeeJpaRepository.existsByMeetingIdAndNickname(meetingId, nickname, excludeUserId)
 
-    override suspend fun countByMeetingId(meetingId: Long): Int {
-        return meetingAttendeeJpaRepository.countByMeetingId(meetingId)
-    }
+    override suspend fun countByMeetingId(meetingId: Long): Int = meetingAttendeeJpaRepository.countByMeetingId(meetingId)
 
-    override suspend fun deleteById(id: Long): Unit {
+    override suspend fun deleteById(id: Long) {
         meetingAttendeeJpaRepository.deleteById(id)
     }
 }

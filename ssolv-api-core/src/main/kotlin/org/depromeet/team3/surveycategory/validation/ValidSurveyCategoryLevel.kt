@@ -13,11 +13,10 @@ import kotlin.reflect.KClass
 annotation class ValidSurveyCategoryLevel(
     val message: String = "카테고리 레벨은 BRANCH 또는 LEAF만 허용됩니다",
     val groups: Array<KClass<*>> = [],
-    val payload: Array<KClass<out Payload>> = []
+    val payload: Array<KClass<out Payload>> = [],
 )
 
 class ValidSurveyCategoryLevelValidator : ConstraintValidator<ValidSurveyCategoryLevel, SurveyCategoryLevel> {
-    override fun isValid(value: SurveyCategoryLevel?, context: ConstraintValidatorContext?): Boolean {
-        return value == null || value == SurveyCategoryLevel.BRANCH || value == SurveyCategoryLevel.LEAF
-    }
+    override fun isValid(value: SurveyCategoryLevel?, context: ConstraintValidatorContext?): Boolean =
+        value == null || value == SurveyCategoryLevel.BRANCH || value == SurveyCategoryLevel.LEAF
 }

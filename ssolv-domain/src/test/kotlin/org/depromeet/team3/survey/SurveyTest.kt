@@ -18,7 +18,7 @@ class SurveyTest {
         // when
         val survey = Survey(
             meetingId = meetingId,
-            participantId = participantId
+            participantId = participantId,
         )
 
         // then

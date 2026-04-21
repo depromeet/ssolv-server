@@ -43,7 +43,7 @@ class MeetingNotificationConsumer(
                         // 처리 성공 시 XACK (Pending 해제)
                         val ackCount = stringRedisTemplate.opsForStream<String, String>()
                             .acknowledge(RedisStreamConstants.MEETING_NOTIFICATION_GROUP, message)
-                        
+
                         if (ackCount != null && ackCount > 0) {
                             logger.debug("식당 확정 알림 처리 성공 및 ACK 완료 (meetingId: {}, userId: {})", meetingId, userId)
                         }

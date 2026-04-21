@@ -9,5 +9,5 @@ data class StationResponse(
     val id: Long,
 
     @Schema(description = "역 이름", example = "강남역")
-    val name: String
+    val name: String,
 )

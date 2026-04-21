@@ -7,11 +7,11 @@ import org.springframework.stereotype.Component
 @ConfigurationProperties(prefix = "jwt")
 data class JwtProperties(
     var secret: String = "",
-    var accessTokenValidity: Long = 3600000,   // 1시간  
-    var refreshTokenValidity: Long = 604800000   // 1주일
+    var accessTokenValidity: Long = 3600000, // 1시간
+    var refreshTokenValidity: Long = 604800000, // 1주일
 ) {
     // 기존 코드와의 호환성을 위한 alias
     val accessTokenExpiration: Long get() = accessTokenValidity
-    val refreshTokenExpiration: Long get() = refreshTokenValidity  
+    val refreshTokenExpiration: Long get() = refreshTokenValidity
     val secretKey: String get() = secret
 }

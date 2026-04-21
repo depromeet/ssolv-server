@@ -1,6 +1,4 @@
 package org.depromeet.team3.auth.application.token
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.auth.UserCommandRepository
 import org.depromeet.team3.auth.UserQueryRepository
@@ -8,6 +6,7 @@ import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.TokenResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -24,10 +23,10 @@ class UpdateTokenService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withTracingContext() {
+    suspend fun refresh(command: RefreshTokenCommand): TokenResponse = withTracingContext {
         transactionTemplate.execute {
             val refreshToken = command.refreshToken
-            
+
             if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
                 throw AuthException(ErrorCode.REFRESH_TOKEN_INVALID)
             }
@@ -44,16 +43,16 @@ class UpdateTokenService(
 
             val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
             val newRefreshToken = jwtTokenProvider.generateRefreshToken(userId)
-            
+
             val updatedUser = user.copy(
                 refreshToken = newRefreshToken,
-                updatedAt = LocalDateTime.now()
+                updatedAt = LocalDateTime.now(),
             )
             runBlocking { userCommandRepository.save(updatedUser) }
 
             TokenResponse(
                 accessToken = accessToken,
-                refreshToken = newRefreshToken
+                refreshToken = newRefreshToken,
             )
         } ?: throw IllegalStateException("Transaction result is null")
     }

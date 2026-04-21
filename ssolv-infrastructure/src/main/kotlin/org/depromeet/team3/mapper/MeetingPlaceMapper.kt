@@ -8,25 +8,17 @@ import org.springframework.stereotype.Component
 
 @Component
 class MeetingPlaceMapper {
-    fun toDomain(entity: MeetingPlaceEntity): MeetingPlace {
-        return MeetingPlace(
-            id = entity.id,
-            meetingId = entity.meeting.id!!,
-            placeId = entity.place.id!!,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
-        )
-    }
+    fun toDomain(entity: MeetingPlaceEntity): MeetingPlace = MeetingPlace(
+        id = entity.id,
+        meetingId = entity.meeting.id!!,
+        placeId = entity.place.id!!,
+        createdAt = entity.createdAt,
+        updatedAt = entity.updatedAt,
+    )
 
-    fun toEntity(
-        domain: MeetingPlace, 
-        meeting: MeetingEntity, 
-        place: PlaceEntity
-    ): MeetingPlaceEntity {
-        return MeetingPlaceEntity(
-            id = domain.id,
-            meeting = meeting,
-            place = place,
-        )
-    }
+    fun toEntity(domain: MeetingPlace, meeting: MeetingEntity, place: PlaceEntity): MeetingPlaceEntity = MeetingPlaceEntity(
+        id = domain.id,
+        meeting = meeting,
+        place = place,
+    )
 }

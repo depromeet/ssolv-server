@@ -1,3 +1,9 @@
+---
+description: Scaffold a new domain (controller + service + domain + entity + mapper + query) following ssolv conventions.
+argument-hint: "<도메인명>"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
+---
+
 # new-domain
 
 새로운 도메인을 프로젝트 컨벤션에 맞게 생성합니다.

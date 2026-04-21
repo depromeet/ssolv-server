@@ -22,6 +22,7 @@ import java.util.Optional
 class LogoutServiceTest {
 
     @Mock private lateinit var userJpaRepository: UserRepository
+
     @Mock private lateinit var kakaoOAuthClient: KakaoOAuthClient
 
     private lateinit var transactionTemplate: TransactionTemplate

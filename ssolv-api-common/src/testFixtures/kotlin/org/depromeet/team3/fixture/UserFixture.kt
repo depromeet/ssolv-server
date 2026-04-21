@@ -16,7 +16,7 @@ object UserFixture {
         nickname: String = "테스트유저",
         profileImage: String? = null,
         refreshToken: String? = null,
-        deletedAt: LocalDateTime? = null
+        deletedAt: LocalDateTime? = null,
     ) = User(
         id = id,
         provider = provider,
@@ -27,7 +27,7 @@ object UserFixture {
         refreshToken = refreshToken,
         createdAt = LocalDateTime.now(),
         updatedAt = null,
-        deletedAt = deletedAt
+        deletedAt = deletedAt,
     )
 
     fun createEntity(
@@ -38,7 +38,7 @@ object UserFixture {
         nickname: String = "테스트유저",
         profileImage: String? = null,
         refreshToken: String? = null,
-        deletedAt: LocalDateTime? = null
+        deletedAt: LocalDateTime? = null,
     ) = UserEntity(
         id = id,
         provider = provider,
@@ -47,7 +47,7 @@ object UserFixture {
         nickname = nickname,
         profileImage = profileImage,
         refreshToken = refreshToken,
-        deletedAt = deletedAt
+        deletedAt = deletedAt,
     )
 
     fun createEntityWithoutId(
@@ -56,26 +56,32 @@ object UserFixture {
         email: String = "test@example.com",
         nickname: String = "테스트유저",
         profileImage: String? = null,
-        refreshToken: String? = null
-    ) = createEntity(id = null, provider = provider, socialId = socialId, email = email, nickname = nickname, profileImage = profileImage, refreshToken = refreshToken)
+        refreshToken: String? = null,
+    ) = createEntity(
+        id = null,
+        provider = provider,
+        socialId = socialId,
+        email = email,
+        nickname = nickname,
+        profileImage = profileImage,
+        refreshToken = refreshToken,
+    )
 
     fun createKakaoProfile(
         id: Long = 12345L,
         email: String = "test@example.com",
         nickname: String = "테스트사용자",
-        profileImageUrl: String? = "http://example.com/profile.jpg"
+        profileImageUrl: String? = "http://example.com/profile.jpg",
     ) = KakaoResponse.KakaoProfile(
         id = id,
         kakao_account = KakaoResponse.KakaoAccount(
             email = email,
             profile = KakaoResponse.Profile(
                 nickname = nickname,
-                profile_image_url = profileImageUrl
-            )
-        )
+                profile_image_url = profileImageUrl,
+            ),
+        ),
     )
 
-    fun createOAuthToken(
-        accessToken: String = "test-access-token"
-    ) = KakaoResponse.OAuthToken(access_token = accessToken)
+    fun createOAuthToken(accessToken: String = "test-access-token") = KakaoResponse.OAuthToken(access_token = accessToken)
 }

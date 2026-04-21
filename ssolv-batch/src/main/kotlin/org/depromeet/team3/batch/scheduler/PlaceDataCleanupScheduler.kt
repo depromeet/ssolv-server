@@ -1,12 +1,12 @@
 package org.depromeet.team3.batch.scheduler
 
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.place.PlaceJpaRepository
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
-import kotlinx.coroutines.runBlocking
 
 /**
  * 구글 약관(ToS) 준수를 위해 오래된 장소 정보를 주기적으로 삭제하는 스케줄러
@@ -15,11 +15,11 @@ import kotlinx.coroutines.runBlocking
 class PlaceDataCleanupScheduler(
     private val placeJpaRepository: PlaceJpaRepository,
     private val watchdogManager: CoroutineWatchdogManager,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
 ) {
     private val logger = LoggerFactory.getLogger(PlaceDataCleanupScheduler::class.java)
 
-    @Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시에 실행
+    @Scheduled(cron = "0 0 3 * * *") // 매일 새벽 3시에 실행
     fun cleanupStalePlaceData() {
         val lockKey = "lock:cleanup:place-data"
 

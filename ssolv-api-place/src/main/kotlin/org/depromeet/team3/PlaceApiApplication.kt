@@ -7,8 +7,8 @@ import org.springframework.scheduling.annotation.EnableScheduling
 @EnableScheduling
 @SpringBootApplication(
     scanBasePackages = [
-        "org.depromeet.team3"
-    ]
+        "org.depromeet.team3",
+    ],
 )
 class PlaceApiApplication
 

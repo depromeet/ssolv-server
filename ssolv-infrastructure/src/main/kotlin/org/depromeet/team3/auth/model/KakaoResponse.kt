@@ -15,7 +15,7 @@ object KakaoResponse {
         val access_token: String,
 
         @JsonProperty("token_type")
-        val token_type: String = "bearer"
+        val token_type: String = "bearer",
     )
 
     /**
@@ -25,18 +25,15 @@ object KakaoResponse {
         val id: Long,
 
         @JsonProperty("kakao_account")
-        val kakao_account: KakaoAccount
+        val kakao_account: KakaoAccount,
     )
 
-    data class KakaoAccount(
-        val email: String,
-        val profile: Profile
-    )
+    data class KakaoAccount(val email: String, val profile: Profile)
 
     data class Profile(
         val nickname: String,
-        
+
         @JsonProperty("profile_image_url")
-        val profile_image_url: String?
+        val profile_image_url: String?,
     )
 }

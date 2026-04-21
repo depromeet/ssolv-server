@@ -1,11 +1,10 @@
 package org.depromeet.team3.place.application.plan
 
+import org.depromeet.team3.place.application.model.PlaceSurveySummary
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordCandidate
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService.KeywordType
-import org.depromeet.team3.place.application.model.PlaceSurveySummary
 import org.springframework.stereotype.Service
 import java.util.LinkedHashMap
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -30,7 +29,7 @@ import kotlin.math.roundToInt
 class SelectSurveyKeywordsService {
 
     private val maxKeywordCount = 5
-    private val minimalVoteThreshold = 0.1  // 10% 미만 득표는 제외
+    private val minimalVoteThreshold = 0.1 // 10% 미만 득표는 제외
     private val strongLeafSupportThreshold = 0.2 // 강한 지지 임계값
     private val branchSupportThreshold = 0.15 // 지지 임계값
     private val minimalKeywordWeight = 0.1 // 최소 키워드 가중치
@@ -58,7 +57,7 @@ class SelectSurveyKeywordsService {
                 branchName = branch?.name,
                 matchKeywords = buildMatchKeywords(leaf.name, KeywordType.LEAF),
                 fallbackKeyword = branchKeyword,
-                fallbackMatchKeywords = branchMatchKeywords
+                fallbackMatchKeywords = branchMatchKeywords,
             )
         }
 
@@ -72,7 +71,7 @@ class SelectSurveyKeywordsService {
                 type = KeywordType.BRANCH,
                 categoryName = branch.name,
                 branchName = branch.name,
-                matchKeywords = buildMatchKeywords(branch.name, KeywordType.BRANCH)
+                matchKeywords = buildMatchKeywords(branch.name, KeywordType.BRANCH),
             )
         }
 
@@ -111,7 +110,7 @@ class SelectSurveyKeywordsService {
                 .forEach { entry ->
                     val leaf = aggregate.leafCategories[entry.key] ?: return@forEach
                     val ratio = entry.value.toDouble() / total
-                     // 최소 득표율 이상인 경우만 추가
+                    // 최소 득표율 이상인 경우만 추가
                     if (ratio >= minimalVoteThreshold) {
                         addLeafCandidate(leaf, ratio)
                     }
@@ -131,7 +130,7 @@ class SelectSurveyKeywordsService {
                 type = KeywordType.GENERAL,
                 categoryName = null,
                 branchName = null,
-                matchKeywords = emptySet()
+                matchKeywords = emptySet(),
             )
             filteredKeywords = listOf(candidate)
         }
@@ -143,33 +142,33 @@ class SelectSurveyKeywordsService {
 
     /**
      * 득표율에 비례하여 키워드 슬롯을 분배
-     * 
+     *
      * 예시:
      * - ratios = [0.6, 0.2, 0.2], totalSlots = 5
      * - → [3, 1, 1]
-     * 
+     *
      * - ratios = [0.2, 0.2, 0.2, 0.2, 0.2], totalSlots = 5
      * - → [1, 1, 1, 1, 1]
      */
     private fun distributeSlotsProportionally(ratios: List<Double>, totalSlots: Int): List<Int> {
         if (ratios.isEmpty()) return emptyList()
-        
+
         // 각 카테고리에 최소 1개씩 보장
         val minSlots = ratios.map { 1 }
         var remainingSlots = totalSlots - ratios.size
-        
+
         if (remainingSlots <= 0) {
             return minSlots
         }
-        
+
         // 남은 슬롯을 득표율에 비례하여 분배
         val slots = minSlots.toMutableList()
         val additionalSlots = ratios.map { (it * remainingSlots).roundToInt() }
-        
+
         additionalSlots.forEachIndexed { index, additional ->
             slots[index] += additional
         }
-        
+
         // 반올림 오차로 인한 슬롯 조정
         val totalAssigned = slots.sum()
         if (totalAssigned < totalSlots) {
@@ -187,18 +186,15 @@ class SelectSurveyKeywordsService {
                 }
             }
         }
-        
+
         return slots
     }
 
-    private fun buildLeafKeyword(stationName: String, leafName: String): String =
-        "$stationName $leafName 맛집"
+    private fun buildLeafKeyword(stationName: String, leafName: String): String = "$stationName $leafName 맛집"
 
-    private fun buildBranchKeyword(stationName: String, branchName: String): String =
-        "$stationName $branchName 맛집"
+    private fun buildBranchKeyword(stationName: String, branchName: String): String = "$stationName $branchName 맛집"
 
-    private fun buildGeneralKeyword(stationName: String): String =
-        "$stationName 맛집"
+    private fun buildGeneralKeyword(stationName: String): String = "$stationName 맛집"
 
     private fun buildMatchKeywords(categoryName: String, type: KeywordType): Set<String> {
         val baseTokens = categoryName
@@ -229,11 +225,11 @@ class SelectSurveyKeywordsService {
         "피자" -> listOf("피자", "pizza", "이탈리안")
         "면류" -> listOf(
             "중식", "중국", "중화", "짜장", "짜장면", "짬뽕", "마라", "마라탕", "마라샹궈",
-            "noodle", "chinese", "china", "zhong"
+            "noodle", "chinese", "china", "zhong",
         )
         "튀김·볶음류" -> listOf(
             "중식", "중국", "중화", "탕수육", "깐풍", "볶음", "튀김", "마라", "꿔바로우",
-            "chinese", "china"
+            "chinese", "china",
         )
         "카페" -> listOf("카페", "커피", "cafe", "coffee", "디저트", "베이커리", "bakery")
         "디저트" -> listOf("디저트", "dessert", "케이크", "빵", "베이커리", "bakery", "cafe", "카페")
@@ -251,7 +247,7 @@ class SelectSurveyKeywordsService {
         "일식" -> listOf("일식", "스시", "초밥", "사시미", "라멘", "카츠", "japanese", "sushi", "izakaya")
         "중식" -> listOf(
             "중식", "중국", "중화", "짜장", "짬뽕", "탕수육", "깐풍", "마라",
-            "마라탕", "chinese", "china", "sichuan"
+            "마라탕", "chinese", "china", "sichuan",
         )
         "동남아 음식" -> listOf("동남아", "베트남", "태국", "타이", "아시안", "asian", "Vietnam", "Thai", "south east asian")
         "한식" -> listOf("한식", "한국", "korean", "k-food")
@@ -262,4 +258,3 @@ class SelectSurveyKeywordsService {
 
     private fun normalizeToken(token: String): String = token.lowercase().trim()
 }
-

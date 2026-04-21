@@ -1,40 +1,34 @@
 package org.depromeet.team3.auth
-import kotlinx.coroutines.Dispatchers
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.depromeet.team3.auth.exception.AuthException
-import org.depromeet.team3.auth.model.KakaoResponse
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.client.KakaoOAuthClient
+import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.auth.model.KakaoResponse
 import org.depromeet.team3.auth.properties.KakaoProperties
-import org.mockito.kotlin.mock
-import kotlinx.coroutines.runBlocking
-import org.mockito.kotlin.whenever
-import org.mockito.Mockito.lenient
-import org.mockito.quality.Strictness
-import org.mockito.junit.jupiter.MockitoSettings
-import org.mockito.junit.jupiter.MockitoExtension
-import org.junit.jupiter.api.extension.ExtendWith
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.kotlin.mock
+import org.mockito.quality.Strictness
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class KakaoOAuthClientTest {
-    
+
     private lateinit var kakaoProperties: KakaoProperties
     private lateinit var kakaoOAuthClient: KakaoOAuthClient
 
     @BeforeEach
     fun setUp() {
-        
         kakaoProperties = KakaoProperties().apply { clientId = "test-client-id" }
         kakaoOAuthClient = KakaoOAuthClient(
             kakaoProperties = kakaoProperties,
-            httpClient = mock()
+            httpClient = mock(),
         )
     }
 
@@ -84,7 +78,7 @@ class KakaoOAuthClientTest {
                     kakaoOAuthClient.requestToken(accessCode, invalidRedirectUriWithSpaces)
                 }
             }
-            
+
             assertThat(exception.errorCode.code).isEqualTo("O008")
         }
     }
@@ -94,7 +88,7 @@ class KakaoOAuthClientTest {
         runTest {
             // given
             val oAuthToken = KakaoResponse.OAuthToken(
-                access_token = "valid-access-token"
+                access_token = "valid-access-token",
             )
 
             // when & then
@@ -103,7 +97,7 @@ class KakaoOAuthClientTest {
                     kakaoOAuthClient.requestProfile(oAuthToken)
                 }
             }
-            
+
             assertThat(exception.message).doesNotContain("access_token")
         }
     }

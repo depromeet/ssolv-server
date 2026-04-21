@@ -15,6 +15,6 @@ sealed interface PlaceSearchPlan {
     data class Automatic(
         val keywords: List<CreateSurveyKeywordService.KeywordCandidate>,
         override val stationCoordinates: MeetingQuery.StationCoordinates?,
-        val fallbackKeyword: String
+        val fallbackKeyword: String,
     ) : PlaceSearchPlan
 }

@@ -13,7 +13,7 @@ class TestContainerConfig : ApplicationContextInitializer<ConfigurableApplicatio
             "spring.datasource.password=${container.password}",
             "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
             "spring.jpa.hibernate.ddl-auto=create-drop",
-            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect"
+            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect",
         ).applyTo(context.environment)
     }
 }

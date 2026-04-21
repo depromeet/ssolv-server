@@ -1,8 +1,8 @@
 package org.depromeet.team3.security.jwt
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.security.core.authority.SimpleGrantedAuthority
-import org.assertj.core.api.Assertions.assertThat
 
 class JwtAuthenticationTokenTest {
 

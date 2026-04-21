@@ -17,6 +17,9 @@ ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 # 함수 이름에 백틱(` `) 사용된 테스트 메서드 허용
 ktlint_function_naming_ignore_when_annotated_with = Test, ParameterizedTest
+# 기존 코드베이스 스타일과 일치: 와일드카드 import 허용
+# (ij_kotlin_name_count_to_use_star_import 설정과 일관)
+ktlint_standard_no-wildcard-imports = disabled
 
 [*.{yml,yaml,json,md}]
 indent_size = 2

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service
 @Service
 class GetPlacesService(
     private val createPlaceSearchPlanService: CreatePlaceSearchPlanService,
-    private val executePlaceSearchService: ExecutePlaceSearchService
+    private val executePlaceSearchService: ExecutePlaceSearchService,
 ) {
     suspend fun textSearch(request: PlacesSearchRequest): PlacesSearchResponse = withContext(MDCContext()) {
         val plan = createPlaceSearchPlanService.resolve(request)

@@ -5,10 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 /**
  *  구글 플레이스 Text Search API 응답
  */
-data class PlacesSearchResponse(
-    val results: List<PlaceResult>,
-    val status: String
-) {
+data class PlacesSearchResponse(val results: List<PlaceResult>, val status: String) {
     data class PlaceResult(
         @JsonProperty("place_id")
         val placeId: String,
@@ -21,18 +18,18 @@ data class PlacesSearchResponse(
         @JsonProperty("opening_hours")
         val openingHours: OpeningHours? = null,
         val url: String? = null,
-        val photos: List<Photo>? = null
+        val photos: List<Photo>? = null,
     ) {
         data class OpeningHours(
             @JsonProperty("open_now")
-            val openNow: Boolean? = null
+            val openNow: Boolean? = null,
         )
-        
+
         data class Photo(
             @JsonProperty("photo_reference")
             val photoReference: String,
             val height: Int,
-            val width: Int
+            val width: Int,
         )
     }
 }

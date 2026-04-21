@@ -20,6 +20,7 @@ import org.mockito.kotlin.*
 class KakaoLoginServiceTest {
 
     @Mock private lateinit var kakaoOAuthClient: KakaoOAuthClient
+
     @Mock private lateinit var createKakaoUserService: CreateKakaoUserService
 
     private lateinit var kakaoLoginService: KakaoLoginService
@@ -44,20 +45,22 @@ class KakaoLoginServiceTest {
             userProfile = UserProfileResponse(
                 email = "test@example.com",
                 nickname = "테스트사용자",
-                profileImage = "http://example.com/profile.jpg"
-            )
+                profileImage = "http://example.com/profile.jpg",
+            ),
         )
 
         kakaoOAuthClient.stub {
             onBlocking { requestToken(any(), any()) }.doReturn(oAuthToken)
             onBlocking { requestProfile(any()) }.doReturn(kakaoProfile)
         }
-        whenever(createKakaoUserService.saveUserAndGenerateTokens(
-            email = "test@example.com",
-            nickname = "테스트사용자",
-            profileImage = "http://example.com/profile.jpg",
-            socialId = "12345"
-        )).thenReturn(loginResponse)
+        whenever(
+            createKakaoUserService.saveUserAndGenerateTokens(
+                email = "test@example.com",
+                nickname = "테스트사용자",
+                profileImage = "http://example.com/profile.jpg",
+                socialId = "12345",
+            ),
+        ).thenReturn(loginResponse)
 
         // when
         val result = kakaoLoginService.login(command)
@@ -71,7 +74,7 @@ class KakaoLoginServiceTest {
             email = "test@example.com",
             nickname = "테스트사용자",
             profileImage = "http://example.com/profile.jpg",
-            socialId = "12345"
+            socialId = "12345",
         )
     }
 
@@ -87,20 +90,22 @@ class KakaoLoginServiceTest {
             userProfile = UserProfileResponse(
                 email = "test@example.com",
                 nickname = "기존사용자",
-                profileImage = "http://example.com/profile.jpg"
-            )
+                profileImage = "http://example.com/profile.jpg",
+            ),
         )
 
         kakaoOAuthClient.stub {
             onBlocking { requestToken(any(), any()) }.doReturn(oAuthToken)
             onBlocking { requestProfile(any()) }.doReturn(kakaoProfile)
         }
-        whenever(createKakaoUserService.saveUserAndGenerateTokens(
-            email = "test@example.com",
-            nickname = "테스트사용자",
-            profileImage = "http://example.com/profile.jpg",
-            socialId = "12345"
-        )).thenReturn(loginResponse)
+        whenever(
+            createKakaoUserService.saveUserAndGenerateTokens(
+                email = "test@example.com",
+                nickname = "테스트사용자",
+                profileImage = "http://example.com/profile.jpg",
+                socialId = "12345",
+            ),
+        ).thenReturn(loginResponse)
 
         // when
         val result = kakaoLoginService.login(command)
@@ -112,7 +117,7 @@ class KakaoLoginServiceTest {
             email = "test@example.com",
             nickname = "테스트사용자",
             profileImage = "http://example.com/profile.jpg",
-            socialId = "12345"
+            socialId = "12345",
         )
     }
 }

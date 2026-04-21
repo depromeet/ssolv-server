@@ -20,18 +20,16 @@ class MeetingQuery(
         return meetingMapper.toDomain(meetingJpaRepository.save(entity))
     }
 
-    override suspend fun findMeetingsByUserId(userId: Long): List<Meeting> {
-        return meetingJpaRepository.findByHostUserId(userId).map { meetingMapper.toDomain(it) }
+    override suspend fun findMeetingsByUserId(userId: Long): List<Meeting> = meetingJpaRepository.findByHostUserId(userId).map {
+        meetingMapper.toDomain(it)
     }
 
-    override suspend fun findById(id: Long): Meeting? {
-        return meetingJpaRepository.findByIdOrNull(id)?.let { meetingMapper.toDomain(it) }
+    override suspend fun findById(id: Long): Meeting? = meetingJpaRepository.findByIdOrNull(id)?.let { meetingMapper.toDomain(it) }
+
+    override suspend fun findAllById(ids: List<Long>): List<Meeting> = meetingJpaRepository.findAllById(ids).map {
+        meetingMapper.toDomain(it)
     }
 
-    override suspend fun findAllById(ids: List<Long>): List<Meeting> {
-        return meetingJpaRepository.findAllById(ids).map { meetingMapper.toDomain(it) }
-    }
-    
     /**
      * Meeting의 Station 좌표 조회
      * Meeting과 Station을 함께 조회하여 좌표를 반환
@@ -51,19 +49,18 @@ class MeetingQuery(
 
         // 좌표 유효성 검증 (한국 좌표 범위: 위도 33~43, 경도 124~132)
         if (station.locY < 33.0 || station.locY > 43.0 || station.locX < 124.0 || station.locX > 132.0) {
-            logger.warn { "Invalid station coordinates: stationId=${station.id}, name=${station.name}, locX=${station.locX}, locY=${station.locY}" }
+            logger.warn {
+                "Invalid station coordinates: stationId=${station.id}, name=${station.name}, locX=${station.locX}, locY=${station.locY}"
+            }
             return null
         }
-        
+
         // DB: loc_x는 경도(longitude), loc_y는 위도(latitude)
         return StationCoordinates(
-            latitude = station.locY,   // loc_y가 위도
-            longitude = station.locX   // loc_x가 경도
+            latitude = station.locY, // loc_y가 위도
+            longitude = station.locX, // loc_x가 경도
         )
     }
-    
-    data class StationCoordinates(
-        val latitude: Double,
-        val longitude: Double
-    )
+
+    data class StationCoordinates(val latitude: Double, val longitude: Double)
 }

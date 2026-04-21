@@ -1,3 +1,8 @@
+---
+name: architecture
+description: Use when making multi-module design decisions, adding a new domain, or deciding where code should live across ssolv-api-common / ssolv-api-core / ssolv-api-place / ssolv-batch / ssolv-domain / ssolv-infrastructure / ssolv-global-utils. Defines the module dependency graph and forbidden import directions (ssolv-api-core ↔ ssolv-api-place; ssolv-domain must not import from infrastructure or api-* modules). Trigger when crossing module boundaries or introducing a new top-level package.
+---
+
 # Architecture & Design Patterns
 
 ## 모듈 의존성 규칙

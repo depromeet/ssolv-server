@@ -6,9 +6,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class SurveyCategoryInitializer(
-    private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository
-) : ApplicationRunner {
+class SurveyCategoryInitializer(private val surveyCategoryJpaRepository: SurveyCategoryJpaRepository) : ApplicationRunner {
 
     @Transactional
     override fun run(args: ApplicationArguments?) {
@@ -58,25 +56,22 @@ class SurveyCategoryInitializer(
         saveLeaf("태국 음식", 4, asian)
     }
 
-    private fun saveBranch(name: String, sortOrder: Int): SurveyCategoryEntity {
-        return surveyCategoryJpaRepository.save(
-            SurveyCategoryEntity(
-                name = name,
-                sortOrder = sortOrder,
-                level = SurveyCategoryLevel.BRANCH,
-                parent = null
-            )
-        )
-    }
+    private fun saveBranch(name: String, sortOrder: Int): SurveyCategoryEntity = surveyCategoryJpaRepository.save(
+        SurveyCategoryEntity(
+            name = name,
+            sortOrder = sortOrder,
+            level = SurveyCategoryLevel.BRANCH,
+            parent = null,
+        ),
+    )
 
-    private fun saveLeaf(name: String, sortOrder: Int, parent: SurveyCategoryEntity): SurveyCategoryEntity {
-        return surveyCategoryJpaRepository.save(
+    private fun saveLeaf(name: String, sortOrder: Int, parent: SurveyCategoryEntity): SurveyCategoryEntity =
+        surveyCategoryJpaRepository.save(
             SurveyCategoryEntity(
                 name = name,
                 sortOrder = sortOrder,
                 level = SurveyCategoryLevel.LEAF,
-                parent = parent
-            )
+                parent = parent,
+            ),
         )
-    }
 }

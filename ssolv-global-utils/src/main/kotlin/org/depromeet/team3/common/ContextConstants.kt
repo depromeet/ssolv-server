@@ -9,5 +9,4 @@ object ContextConstants {
     const val BASE_DOMAIN = "api.ssolv.site"
     const val WWW_DOMAIN = "www.ssolv.site"
     const val HTTPS_PROTOCOL = "https://"
-
 }

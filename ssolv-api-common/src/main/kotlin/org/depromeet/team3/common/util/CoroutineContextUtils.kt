@@ -15,10 +15,8 @@ import kotlinx.coroutines.withContext
  * withContext(Dispatchers.IO) 대신 이 함수를 사용하면
  * 로그의 request_id/user_id와 Tempo 트레이스가 스레드 전환 후에도 유지됩니다.
  */
-suspend fun <T> withTracingContext(
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    block: suspend CoroutineScope.() -> T
-): T = withContext(dispatcher + MDCContext() + Context.current().asContextElement(), block)
+suspend fun <T> withTracingContext(dispatcher: CoroutineDispatcher = Dispatchers.IO, block: suspend CoroutineScope.() -> T): T =
+    withContext(dispatcher + MDCContext() + Context.current().asContextElement(), block)
 
 /**
  * Redis Stream 메시지 페이로드의 traceparent/tracestate를 복원하여 부모 OTel Context를 반환합니다.

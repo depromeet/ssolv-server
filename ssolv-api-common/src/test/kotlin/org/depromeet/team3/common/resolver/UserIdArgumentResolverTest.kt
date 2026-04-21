@@ -1,16 +1,16 @@
 package org.depromeet.team3.common.resolver
 
+import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.annotation.UserId
 import org.depromeet.team3.security.jwt.JwtAuthenticationToken
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.springframework.core.MethodParameter
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.context.request.NativeWebRequest
-import org.assertj.core.api.Assertions.assertThat
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
 
 /**
  * @UserId ArgumentResolver 핵심 기능 테스트
@@ -77,7 +77,7 @@ class UserIdArgumentResolverTest {
         val methodParameter = mock(MethodParameter::class.java)
         `when`(methodParameter.parameterType).thenReturn(Long::class.javaObjectType)
         `when`(methodParameter.parameterAnnotations).thenReturn(emptyArray())
-        
+
         SecurityContextHolder.getContext().authentication = null
 
         // when

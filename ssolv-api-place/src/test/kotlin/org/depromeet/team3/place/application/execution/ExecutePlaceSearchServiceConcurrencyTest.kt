@@ -1,7 +1,7 @@
 package org.depromeet.team3.place.application.execution
 
-import io.micrometer.core.instrument.MeterRegistry
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import io.mockk.*
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
@@ -14,19 +14,18 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import org.depromeet.team3.common.GooglePlacesApiProperties
+import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import org.depromeet.team3.common.util.DistributedLockService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.data.redis.core.StringRedisTemplate
-import java.time.Duration
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -35,22 +34,31 @@ class ExecutePlaceSearchServiceConcurrencyTest {
 
     @MockK
     lateinit var placeQuery: PlaceQuery
+
     @MockK
     lateinit var searchService: MeetingPlaceSearchService
+
     @MockK
     lateinit var createSurveyKeywordService: CreateSurveyKeywordService
+
     @MockK
     lateinit var googlePlacesApiProperties: GooglePlacesApiProperties
+
     @MockK
     lateinit var redisTemplate: StringRedisTemplate
+
     @MockK
     lateinit var meterRegistry: MeterRegistry
+
     @MockK(relaxed = true)
     lateinit var globalApiSemaphore: Semaphore
+
     @MockK
     lateinit var lockService: DistributedLockService
+
     @MockK
     lateinit var objectMapper: ObjectMapper
+
     @MockK(relaxed = true)
     lateinit var openTelemetry: OpenTelemetry
 
@@ -61,10 +69,10 @@ class ExecutePlaceSearchServiceConcurrencyTest {
     fun setUp() {
         // Mocking global objects
         MockKAnnotations.init(this)
-        
+
         // Mock globalApiSemaphore (it's internal or injected)
         // Note: The service uses it in its execute logic.
-        
+
         every { googlePlacesApiProperties.apiKey } returns "test-key"
         every { googlePlacesApiProperties.photoFallbackBuffer } returns 5
         every { googlePlacesApiProperties.totalFetchSize } returns 10
@@ -76,7 +84,7 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         every { meterRegistry.counter(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { meterRegistry.timer(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<*>>()) } returns listOf(0L, false)
-        
+
         // Redis ValueOps 및 ObjectMapper 모킹 추가
         val valueOps = mockk<org.springframework.data.redis.core.ValueOperations<String, String>>(relaxed = true)
         every { redisTemplate.opsForValue() } returns valueOps
@@ -92,9 +100,16 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         val meetingId = 123L
         val request = PlacesSearchRequest(meetingId = meetingId, userId = 1L)
         val plan = PlaceSearchPlan.Automatic(
-            keywords = listOf(CreateSurveyKeywordService.KeywordCandidate("맛집", 1.0, CreateSurveyKeywordService.KeywordType.GENERAL, matchKeywords = setOf("restaurant", "식당"))),
+            keywords = listOf(
+                CreateSurveyKeywordService.KeywordCandidate(
+                    "맛집",
+                    1.0,
+                    CreateSurveyKeywordService.KeywordType.GENERAL,
+                    matchKeywords = setOf("restaurant", "식당"),
+                ),
+            ),
             stationCoordinates = null,
-            fallbackKeyword = "강남역 맛집"
+            fallbackKeyword = "강남역 맛집",
         )
 
         // 초기 상태: 캐시 없음
@@ -127,8 +142,8 @@ class ExecutePlaceSearchServiceConcurrencyTest {
                 location = PlacesTextSearchResponse.Place.Location(37.0, 127.0),
                 rating = 4.5,
                 userRatingCount = 100,
-                types = listOf("restaurant")
-            )
+                types = listOf("restaurant"),
+            ),
         )
         val mockEntities = listOf(
             org.depromeet.team3.place.PlaceEntity(
@@ -139,14 +154,14 @@ class ExecutePlaceSearchServiceConcurrencyTest {
                 latitude = 37.0,
                 longitude = 127.0,
                 rating = 4.5,
-                userRatingsTotal = 100
-            )
+                userRatingsTotal = 100,
+            ),
         )
         coEvery { placeQuery.textSearch(any(), any(), any(), any(), any()) } returns PlacesTextSearchResponse(mockPlaces)
         coEvery { placeQuery.savePlacesFromTextSearch(any()) } returns mockEntities
         coEvery { placeQuery.findByGooglePlaceIds(any()) } returns mockEntities
-        coEvery { createSurveyKeywordService.getStationCoordinates(meetingId) } returns org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.0, 127.0)
-
+        coEvery { createSurveyKeywordService.getStationCoordinates(meetingId) } returns
+            org.depromeet.team3.meeting.MeetingQuery.StationCoordinates(37.0, 127.0)
 
         // 10명의 사용자가 동시에 요청
         val concurrency = 10
@@ -165,7 +180,7 @@ class ExecutePlaceSearchServiceConcurrencyTest {
 
         // 2. Google API (textSearch) 호출은 단 한 번만 발생해야 함 (첫 번째 락 획득자만 수행)
         coVerify(exactly = 1) { placeQuery.textSearch(any(), any(), any(), any(), any()) }
-        
+
         // 3. 락 시도는 최소 1번 이상 발생함
         coVerify(atLeast = 1) { lockService.withLock<PlacesSearchResponse>(any(), any(), any()) }
     }

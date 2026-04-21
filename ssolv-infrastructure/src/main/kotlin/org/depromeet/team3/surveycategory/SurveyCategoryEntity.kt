@@ -1,8 +1,8 @@
 package org.depromeet.team3.surveycategory
 
+import com.querydsl.core.annotations.QueryEntity
 import jakarta.persistence.*
 import org.depromeet.team3.common.BaseTimeEntity
-import com.querydsl.core.annotations.QueryEntity
 
 @Entity
 @QueryEntity
@@ -11,13 +11,13 @@ import com.querydsl.core.annotations.QueryEntity
     uniqueConstraints = [
         UniqueConstraint(
             name = "uk_survey_category_name_parent",
-            columnNames = ["name", "parent_id"]
+            columnNames = ["name", "parent_id"],
         ),
         UniqueConstraint(
-            name = "uk_survey_category_order_parent", 
-            columnNames = ["sort_order", "parent_id"]
-        )
-    ]
+            name = "uk_survey_category_order_parent",
+            columnNames = ["sort_order", "parent_id"],
+        ),
+    ],
 )
 class SurveyCategoryEntity(
 
@@ -40,5 +40,5 @@ class SurveyCategoryEntity(
     var sortOrder: Int,
 
     @Column(name = "is_deleted", nullable = false)
-    var isDeleted: Boolean = false
+    var isDeleted: Boolean = false,
 ) : BaseTimeEntity()

@@ -12,11 +12,13 @@ interface DeviceTokenJpaRepository : JpaRepository<DeviceTokenEntity, Long> {
     fun deleteByUserIdAndFcmToken(userId: Long, fcmToken: String)
     fun deleteAllByUserId(userId: Long)
 
-    @Query("""
+    @Query(
+        """
         SELECT dt.fcmToken 
         FROM DeviceTokenEntity dt 
         JOIN UserEntity u ON dt.userId = u.id 
         WHERE dt.userId IN :userIds AND u.notificationEnabled = :isNotificationEnabled
-    """)
+    """,
+    )
     fun findValidTokensByUserIds(userIds: List<Long>, isNotificationEnabled: Boolean): List<String>
 }

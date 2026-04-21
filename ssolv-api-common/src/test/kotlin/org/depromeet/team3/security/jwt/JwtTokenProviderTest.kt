@@ -1,20 +1,19 @@
 package org.depromeet.team3.security.jwt
 
+import jakarta.servlet.http.HttpServletRequest
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
-import org.assertj.core.api.Assertions.assertThat
-import jakarta.servlet.http.HttpServletRequest
 
 /**
  * JwtTokenProvider 핵심 기능 테스트
  */
 @ExtendWith(MockitoExtension::class)
 class JwtTokenProviderTest {
-    
+
     private lateinit var jwtTokenProvider: JwtTokenProvider
     private lateinit var jwtProperties: JwtProperties
 
@@ -23,7 +22,7 @@ class JwtTokenProviderTest {
         jwtProperties = JwtProperties(
             secret = "test-secret-key-for-jwt-token-generation-minimum-256-bits-long",
             accessTokenValidity = 3600000L, // 1시간
-            refreshTokenValidity = 604800000L // 1주일
+            refreshTokenValidity = 604800000L, // 1주일
         )
         jwtTokenProvider = JwtTokenProvider(jwtProperties)
     }
@@ -63,10 +62,10 @@ class JwtTokenProviderTest {
         val shortJwtProperties = JwtProperties(
             secret = "test-secret-key-for-jwt-token-generation-minimum-256-bits-long",
             accessTokenValidity = 1L, // 1ms
-            refreshTokenValidity = 1L // 1ms
+            refreshTokenValidity = 1L, // 1ms
         )
         val shortLivedProvider = JwtTokenProvider(shortJwtProperties)
-        
+
         val userId = 123L
         val userEmail = "test@example.com"
         val accessToken = shortLivedProvider.generateAccessToken(userId, userEmail)
@@ -94,7 +93,7 @@ class JwtTokenProviderTest {
         // given
         val request = mock<HttpServletRequest>()
         val accessToken = "test-access-token"
-        
+
         whenever(request.getHeader("Authorization")).thenReturn("Bearer $accessToken")
 
         // when
@@ -142,10 +141,10 @@ class JwtTokenProviderTest {
     fun `사용자 ID 문자열을 Long으로 변환할 수 있다`() {
         // given
         val userIdString = "123"
-        
+
         // when
         val userId = userIdString.toLongOrNull()
-        
+
         // then
         assertThat(userId).isEqualTo(123L)
     }
@@ -154,14 +153,14 @@ class JwtTokenProviderTest {
     fun `잘못된 사용자 ID 문자열은 null을 반환한다`() {
         // given
         val invalidUserIdString = "invalid"
-        
+
         // when
         val userId = invalidUserIdString.toLongOrNull()
-        
+
         // then
         assertThat(userId).isNull()
     }
-    
+
     @Test
     fun `토큰에서 이메일을 추출할 수 있다`() {
         // given

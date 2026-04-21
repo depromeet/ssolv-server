@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository
 interface MeetingPlaceJpaRepository : JpaRepository<MeetingPlaceEntity, Long> {
     fun findByMeetingId(meetingId: Long): List<MeetingPlaceEntity>
     fun findByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): MeetingPlaceEntity?
-    
+
     @Query("SELECT mp.id FROM MeetingPlaceEntity mp WHERE mp.meeting.id = :meetingId AND mp.place.id = :placeId")
     fun findIdByMeetingIdAndPlaceId(meetingId: Long, placeId: Long): Long?
 

@@ -1,3 +1,9 @@
+---
+description: Tail container logs for a service on a production instance via SSH (docker logs).
+argument-hint: "<service> [instance] [options]"
+allowed-tools: Bash
+---
+
 프로덕션 인스턴스의 컨테이너 로그를 조회합니다.
 
 ## 사용법

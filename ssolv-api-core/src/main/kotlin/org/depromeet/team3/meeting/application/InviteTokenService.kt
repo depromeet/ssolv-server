@@ -1,10 +1,9 @@
 package org.depromeet.team3.meeting.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.ContextConstants.API_VERSION_V1
 import org.depromeet.team3.common.ContextConstants.BASE_DOMAIN
 import org.depromeet.team3.common.ContextConstants.HTTPS_PROTOCOL
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.dto.response.ValidateInviteTokenResponse
@@ -26,7 +25,7 @@ class InviteTokenService(
         const val SEPARATOR = ":"
     }
 
-    suspend fun generateInviteToken(meetingId: Long): String = withTracingContext() {
+    suspend fun generateInviteToken(meetingId: Long): String = withTracingContext {
         val meeting = meetingRepository.findById(meetingId)
             ?: throw IllegalArgumentException("Not Found meeting ID: $meetingId")
 
@@ -46,7 +45,7 @@ class InviteTokenService(
         return DataEncoder.encodeWithSeparator(SEPARATOR, meeting.id.toString(), endAtTimestamp.toString())
     }
 
-    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withTracingContext() {
+    suspend fun validateInviteToken(userId: Long, token: String): ValidateInviteTokenResponse = withTracingContext {
         val (meetingId, expiryTimestamp) = parseTokenData(token)
 
         if (System.currentTimeMillis() > expiryTimestamp) {
@@ -57,24 +56,24 @@ class InviteTokenService(
             ?: throw MeetingException(ErrorCode.MEETING_NOT_FOUND, mapOf("meetingId" to meetingId))
 
         val joined = meetingAttendeeRepository.existsByMeetingIdAndUserId(meetingId, userId)
-        if (joined) throw MeetingException(
-            ErrorCode.MEETING_ALREADY_JOINED,
-            mapOf("userId" to userId, "meetingId" to meetingId)
-        )
+        if (joined) {
+            throw MeetingException(
+                ErrorCode.MEETING_ALREADY_JOINED,
+                mapOf("userId" to userId, "meetingId" to meetingId),
+            )
+        }
 
         if (meeting.isClosed) {
             throw MeetingException(
                 ErrorCode.MEETING_ALREADY_CLOSED,
-                mapOf("meetingId" to meetingId, "userId" to userId)
+                mapOf("meetingId" to meetingId, "userId" to userId),
             )
         }
 
         ValidateInviteTokenResponse(meetingId)
     }
 
-    fun resolveMeetingId(identifier: String): Long {
-        return MeetingIdParser.parse(identifier)
-    }
+    fun resolveMeetingId(identifier: String): Long = MeetingIdParser.parse(identifier)
 
     private fun parseTokenData(token: String): Pair<Long, Long> {
         val parts = DataEncoder.decodeWithSeparator(token, SEPARATOR)

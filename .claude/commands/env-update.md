@@ -1,3 +1,9 @@
+---
+description: Update a key=value in the production `.env` file via SSH and restart affected services.
+argument-hint: "<key> <value> [instance]"
+allowed-tools: Bash
+---
+
 프로덕션 인스턴스의 `.env` 파일을 수정하고 영향받는 서비스를 재시작합니다.
 
 ## 사용법

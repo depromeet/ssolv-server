@@ -12,5 +12,5 @@ data class KakaoProperties(
     var tokenUri: String = "https://kauth.kakao.com/oauth/token",
     var userInfoUri: String = "https://kapi.kakao.com/v2/user/me",
     var adminKey: String = "",
-    var logoutRedirectUri: String = ""
+    var logoutRedirectUri: String = "",
 )

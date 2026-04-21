@@ -1,3 +1,9 @@
+---
+description: Audit Terraform (.tf) files against ssolv IaC rules (encryption, IMDSv2, SG source references, required tags).
+argument-hint: "[path]"
+allowed-tools: Read, Glob, Grep, Bash
+---
+
 Terraform 파일에 대해 IaC 보안 감사를 수행해줘.
 
 ## 감사 대상

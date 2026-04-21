@@ -1,11 +1,11 @@
 package org.depromeet.team3.notification.application
 
+import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.common.constants.RedisStreamConstants.MEETING_NOTIFICATION_GROUP
@@ -14,12 +14,12 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.data.domain.Range
+import org.springframework.data.redis.connection.RedisStreamCommands.XClaimOptions
 import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.PendingMessage
 import org.springframework.data.redis.connection.stream.PendingMessages
 import org.springframework.data.redis.connection.stream.RecordId
-import org.springframework.data.redis.connection.RedisStreamCommands.XClaimOptions
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import java.time.Duration

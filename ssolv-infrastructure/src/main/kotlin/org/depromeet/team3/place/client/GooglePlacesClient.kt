@@ -1,6 +1,11 @@
 package org.depromeet.team3.place.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.AttributeKey
@@ -19,11 +24,6 @@ import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.place.exception.PlaceSearchException
 import org.depromeet.team3.place.model.PlacesTextSearchRequest
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import kotlin.random.Random
@@ -44,16 +44,12 @@ class GooglePlacesClient(
     private val apiTimeoutMillis = 5_000L
 
     // 재시도 설정
-    private val maxRetries = 3  // 최대 3번 시도 (초기 1번 + 재시도 2번)
+    private val maxRetries = 3 // 최대 3번 시도 (초기 1번 + 재시도 2번)
     private val initialDelayMillis = 100L
     private val maxDelayMillis = 2000L
     private val jitterMaxMillis = 100L
 
-    private suspend fun <T> retryWithExponentialBackoff(
-        operation: String,
-        operationDetail: String = "",
-        block: suspend () -> T
-    ): T {
+    private suspend fun <T> retryWithExponentialBackoff(operation: String, operationDetail: String = "", block: suspend () -> T): T {
         var lastException: Exception? = null
         var delayMillis = initialDelayMillis
 
@@ -62,7 +58,7 @@ class GooglePlacesClient(
                 return block()
             } catch (e: Exception) {
                 lastException = e
-                
+
                 // 재시도 여부 결정: 5xx 에러, 429 에러, 또는 네트워크 관련 예외일 때만 재시도
                 val isRetryable = when (e) {
                     is ResponseException -> {
@@ -90,10 +86,13 @@ class GooglePlacesClient(
                     Span.current().addEvent(
                         "retry",
                         Attributes.of(
-                            AttributeKey.longKey("retry.attempt"), (attempt + 1).toLong(),
-                            AttributeKey.stringKey("retry.reason"), e.javaClass.simpleName,
-                            AttributeKey.longKey("retry.delay_ms"), totalDelay
-                        )
+                            AttributeKey.longKey("retry.attempt"),
+                            (attempt + 1).toLong(),
+                            AttributeKey.stringKey("retry.reason"),
+                            e.javaClass.simpleName,
+                            AttributeKey.longKey("retry.delay_ms"),
+                            totalDelay,
+                        ),
                     )
                     delay(totalDelay)
                     delayMillis = minOf(delayMillis * 2, maxDelayMillis)
@@ -106,7 +105,7 @@ class GooglePlacesClient(
         logger.error(lastException) { "$operation 최종 실패 (${maxRetries - 1}회 재시도 후), $operationDetail" }
         throw lastException ?: PlaceSearchException(
             ErrorCode.PLACE_API_ERROR,
-            detail = mapOf("detail" to "$operation 실패")
+            detail = mapOf("detail" to "$operation 실패"),
         )
     }
 
@@ -118,7 +117,7 @@ class GooglePlacesClient(
         maxResults: Int = 10,
         latitude: Double? = null,
         longitude: Double? = null,
-        radius: Double = 3000.0
+        radius: Double = 3000.0,
     ): PlacesTextSearchResponse {
         val span = tracer.spanBuilder("google.places.textSearch")
             .setSpanKind(SpanKind.CLIENT)
@@ -135,7 +134,7 @@ class GooglePlacesClient(
             withContext(tracingContext) {
                 retryWithExponentialBackoff(
                     operation = "텍스트 검색",
-                    operationDetail = "query=$query"
+                    operationDetail = "query=$query",
                 ) {
                     // raw 예외(ResponseException / TimeoutCancellationException 등)를 그대로 전파해야
                     // retryWithExponentialBackoff 가 5xx/429/타임아웃을 retryable 로 판정할 수 있음.
@@ -146,18 +145,20 @@ class GooglePlacesClient(
                                 circle = PlacesTextSearchRequest.Circle(
                                     center = PlacesTextSearchRequest.Circle.Center(
                                         latitude = latitude,
-                                        longitude = longitude
+                                        longitude = longitude,
                                     ),
-                                    radius = radius
-                                )
+                                    radius = radius,
+                                ),
                             )
-                        } else null
+                        } else {
+                            null
+                        }
 
                         val request = PlacesTextSearchRequest(
                             textQuery = query,
                             languageCode = "ko",
                             maxResultCount = maxResults,
-                            locationBias = locationBias
+                            locationBias = locationBias,
                         )
 
                         val response = httpClient.post("${googlePlacesApiProperties.baseUrl}/v1/places:searchText") {
@@ -180,7 +181,7 @@ class GooglePlacesClient(
             logger.error(e) { "Google Places API 텍스트 검색 타임아웃: query=$query" }
             throw PlaceSearchException(
                 ErrorCode.PLACE_API_ERROR,
-                detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)")
+                detail = mapOf("query" to query, "error" to "요청 타임아웃 (${apiTimeoutMillis}ms 초과)"),
             )
         } catch (e: ResponseException) {
             val body = e.response.body<String>()
@@ -189,7 +190,7 @@ class GooglePlacesClient(
             logger.error { "Google Places API 오류 (${e.response.status}): $body" }
             throw PlaceSearchException(
                 ErrorCode.PLACE_API_ERROR,
-                detail = mapOf("statusCode" to e.response.status.value, "body" to body)
+                detail = mapOf("statusCode" to e.response.status.value, "body" to body),
             )
         } catch (e: Exception) {
             span.recordException(e)
@@ -200,17 +201,15 @@ class GooglePlacesClient(
         }
     }
 
-    private fun buildTextSearchFieldMask(): String {
-        return listOf(
-            "places.id",
-            "places.displayName",
-            "places.formattedAddress",
-            "places.rating",
-            "places.userRatingCount",
-            "places.photos",
-            "places.location",
-            "places.types",
-            "places.googleMapsUri"
-        ).joinToString(",")
-    }
+    private fun buildTextSearchFieldMask(): String = listOf(
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.rating",
+        "places.userRatingCount",
+        "places.photos",
+        "places.location",
+        "places.types",
+        "places.googleMapsUri",
+    ).joinToString(",")
 }

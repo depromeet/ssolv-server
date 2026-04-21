@@ -15,9 +15,7 @@ import org.springframework.context.annotation.Configuration
  * GlobalOpenTelemetry.getTracer / getPropagators 호출이 실제 SDK 로 연결되도록 한다.
  */
 @Configuration
-class OpenTelemetryGlobalRegistrar(
-    private val openTelemetry: OpenTelemetry,
-) {
+class OpenTelemetryGlobalRegistrar(private val openTelemetry: OpenTelemetry) {
     private val logger = LoggerFactory.getLogger(OpenTelemetryGlobalRegistrar::class.java)
 
     @PostConstruct

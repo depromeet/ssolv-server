@@ -23,7 +23,7 @@ class TestSecurityConfig {
             .authorizeHttpRequests { authz ->
                 authz.anyRequest().permitAll()
             }
-        
+
         return http.build()
     }
 }

@@ -15,15 +15,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig(
-    private val jwtTokenProvider: JwtTokenProvider,
-    private val objectMapper: ObjectMapper
-) {
+class SecurityConfig(private val jwtTokenProvider: JwtTokenProvider, private val objectMapper: ObjectMapper) {
 
     @Bean
-    fun passwordEncoder(): PasswordEncoder {
-        return BCryptPasswordEncoder()
-    }
+    fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 
     @Bean
     @Throws(Exception::class)
@@ -38,14 +33,14 @@ class SecurityConfig(
                     "/api/v1/auth/**",
                     "/auth/callback/**",
                     "/swagger", "/swagger/", "/swagger-ui/**", "/v3/api-docs/**",
-                    "/index.html", "/static/**", "/favicon.ico"
+                    "/index.html", "/static/**", "/favicon.ico",
                 ).permitAll()
                 // it.anyRequest().authenticated()
-                it.anyRequest().permitAll()     // 일단 전부 열어놓겠습니다.
+                it.anyRequest().permitAll() // 일단 전부 열어놓겠습니다.
             }
             .addFilterBefore(
                 JwtAuthenticationFilter(jwtTokenProvider, objectMapper),
-                UsernamePasswordAuthenticationFilter::class.java
+                UsernamePasswordAuthenticationFilter::class.java,
             )
         return http.build()
     }

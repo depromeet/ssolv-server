@@ -15,7 +15,7 @@ dependencies {
 
     // Caffeine Cache
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
-    
+
     // Redis
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
@@ -61,7 +61,7 @@ jib {
     container {
         jvmFlags = listOf(
             "-Duser.timezone=Asia/Seoul",
-            "-XX:MaxRAMPercentage=75.0"
+            "-XX:MaxRAMPercentage=75.0",
         )
         ports = listOf("8080")
         creationTime = "USE_CURRENT_TIMESTAMP"

@@ -1,8 +1,8 @@
 package org.depromeet.team3.fixture
 
+import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.meeting.Meeting
 import org.depromeet.team3.meeting.MeetingEntity
-import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.station.StationEntity
 import java.time.LocalDateTime
 
@@ -16,7 +16,7 @@ object MeetingFixture {
         attendeeCount: Int = 5,
         isClosed: Boolean = false,
         stationId: Long = 1L,
-        endAt: LocalDateTime? = LocalDateTime.now().plusDays(1)
+        endAt: LocalDateTime? = LocalDateTime.now().plusDays(1),
     ) = Meeting(
         id = id,
         name = name,
@@ -24,9 +24,8 @@ object MeetingFixture {
         attendeeCount = attendeeCount,
         isClosed = isClosed,
         stationId = stationId,
-        endAt = endAt
+        endAt = endAt,
     )
-
 
     fun createEntity(
         id: Long? = 1L,
@@ -35,7 +34,7 @@ object MeetingFixture {
         isClosed: Boolean = false,
         endAt: LocalDateTime? = LocalDateTime.now().plusDays(1),
         hostUser: UserEntity = UserFixture.createEntity(id = 99L),
-        station: StationEntity = StationFixture.createEntity()
+        station: StationEntity = StationFixture.createEntity(),
     ) = MeetingEntity(
         id = id,
         name = name,
@@ -43,7 +42,7 @@ object MeetingFixture {
         isClosed = isClosed,
         endAt = endAt,
         hostUser = hostUser,
-        station = station
+        station = station,
     )
 
     fun createEntityWithoutId(
@@ -52,6 +51,14 @@ object MeetingFixture {
         isClosed: Boolean = false,
         endAt: LocalDateTime? = LocalDateTime.now().plusDays(1),
         hostUser: UserEntity = UserFixture.createEntityWithoutId(),
-        station: StationEntity = StationFixture.createEntityWithoutId()
-    ) = createEntity(id = null, name = name, attendeeCount = attendeeCount, isClosed = isClosed, endAt = endAt, hostUser = hostUser, station = station)
+        station: StationEntity = StationFixture.createEntityWithoutId(),
+    ) = createEntity(
+        id = null,
+        name = name,
+        attendeeCount = attendeeCount,
+        isClosed = isClosed,
+        endAt = endAt,
+        hostUser = hostUser,
+        station = station,
+    )
 }

@@ -10,14 +10,12 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 @Service
-class PlaceLikeSseService(
-    private val redisMessageListenerContainer: RedisMessageListenerContainer
-) {
+class PlaceLikeSseService(private val redisMessageListenerContainer: RedisMessageListenerContainer) {
     private val logger = LoggerFactory.getLogger(PlaceLikeSseService::class.java)
-    
+
     // meetingId -> active SseEmitters
     private val emitters = ConcurrentHashMap<Long, MutableList<SseEmitter>>()
-    
+
     // 하트비트용 스케줄러 (30초마다 모든 에미터에 ping 전송)
     private val heartbeatExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
 
@@ -74,7 +72,7 @@ class PlaceLikeSseService(
     private fun cleanup(meetingId: Long, emitter: SseEmitter) {
         val meetingEmitters = emitters[meetingId] ?: return
         meetingEmitters.remove(emitter)
-        
+
         if (meetingEmitters.isEmpty()) {
             emitters.remove(meetingId)
         }
@@ -86,10 +84,12 @@ class PlaceLikeSseService(
 
         meetingEmitters.forEach { emitter ->
             try {
-                emitter.send(SseEmitter.event()
-                    .name("placeUpdate")
-                    .data(payload)
-                    .id(System.currentTimeMillis().toString()))
+                emitter.send(
+                    SseEmitter.event()
+                        .name("placeUpdate")
+                        .data(payload)
+                        .id(System.currentTimeMillis().toString()),
+                )
             } catch (e: Exception) {
                 deadEmitters.add(emitter)
             }

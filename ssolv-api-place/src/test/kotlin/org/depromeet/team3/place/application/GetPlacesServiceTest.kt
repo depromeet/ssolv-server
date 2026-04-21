@@ -1,18 +1,18 @@
 package org.depromeet.team3.place.application
 
 import io.mockk.*
+import io.mockk.junit5.MockKExtension
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.place.application.facade.GetPlacesService
-import org.depromeet.team3.place.application.plan.CreatePlaceSearchPlanService
 import org.depromeet.team3.place.application.execution.ExecutePlaceSearchService
+import org.depromeet.team3.place.application.facade.GetPlacesService
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
+import org.depromeet.team3.place.application.plan.CreatePlaceSearchPlanService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import io.mockk.junit5.MockKExtension
 
 @ExtendWith(MockKExtension::class)
 class GetPlacesServiceTest {
@@ -27,7 +27,7 @@ class GetPlacesServiceTest {
         executePlaceSearchService = mockk(relaxed = true)
         getPlacesService = GetPlacesService(
             createPlaceSearchPlanService = createPlaceSearchPlanService,
-            executePlaceSearchService = executePlaceSearchService
+            executePlaceSearchService = executePlaceSearchService,
         )
     }
 
@@ -38,7 +38,7 @@ class GetPlacesServiceTest {
         val plan = PlaceSearchPlan.Automatic(
             keywords = emptyList(),
             stationCoordinates = null,
-            fallbackKeyword = "Jamsil"
+            fallbackKeyword = "Jamsil",
         )
         val expectedResponse = PlacesSearchResponse(emptyList())
 
@@ -50,7 +50,7 @@ class GetPlacesServiceTest {
 
         // then
         assertThat(response).isEqualTo(expectedResponse)
-        
+
         coVerify {
             createPlaceSearchPlanService.resolve(request)
             executePlaceSearchService.search(eq(request), eq(plan), any())

@@ -1,3 +1,9 @@
+---
+description: Run a full health check on a production instance (containers, nginx, Redis, disk) via SSH.
+argument-hint: "[instance]"
+allowed-tools: Bash
+---
+
 프로덕션 인스턴스의 전체 상태를 확인합니다.
 
 ## 사용법

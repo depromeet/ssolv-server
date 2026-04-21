@@ -1,9 +1,8 @@
 package org.depromeet.team3.placelike.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingQuery
+import org.depromeet.team3.place.application.execution.MeetingPlaceSearchService
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
@@ -16,14 +15,15 @@ class PlaceLikeService(
     private val redisTemplate: StringRedisTemplate,
     private val searchService: MeetingPlaceSearchService,
     private val meetingQuery: MeetingQuery,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(PlaceLikeService::class.java)
     private val likeScoreMultiplier = 50.0
-    private val DEFAULT_TTL = 604800L // 7 days fallback
 
-    private val toggleScript = DefaultRedisScript("""
+    private val toggleScript =
+        DefaultRedisScript(
+            """
         local likeKey = KEYS[1]
         local meetingKey = KEYS[2]
         local userId = ARGV[1]
@@ -49,23 +49,25 @@ class PlaceLikeService(
         
         local count = redis.call('SCARD', likeKey)
         return {isLiked, count}
-    """.trimIndent(), List::class.java)
+            """.trimIndent(),
+            List::class.java,
+        )
 
-    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withTracingContext() {
+    suspend fun toggle(meetingId: Long, userId: Long, placeId: Long): PlaceLikeResult = withTracingContext {
         logger.debug("Toggle Like Request (Atomic Lua) - meetingId: {}, userId: {}, placeId: {}", meetingId, userId, placeId)
-        
+
         val likeKey = searchService.getLikeKey(meetingId, placeId)
         val meetingKey = searchService.getMeetingKey(meetingId)
-        
+
         // TTL 30일 고정 정책 반영
         val ttlSeconds = 30 * 24 * 3600L
-        
+
         val result = redisTemplate.execute(
             toggleScript,
             listOf(likeKey, meetingKey),
             userId.toString(),
             placeId.toString(),
-            ttlSeconds.toString()
+            ttlSeconds.toString(),
         ) as List<*>
 
         val isLiked = (result[0] as Number).toLong() == 1L
@@ -84,17 +86,17 @@ class PlaceLikeService(
 
         PlaceLikeResult(
             isLiked = isLiked,
-            likeCount = likeCount.toInt()
+            likeCount = likeCount.toInt(),
         )
     }
 
     private suspend fun calculateMeetingTTL(meetingId: Long): Long {
         val meeting = meetingQuery.findById(meetingId)
-        val endAt = meeting?.endAt ?: return DEFAULT_TTL
-        
+        val endAt = meeting?.endAt ?: return DEFAULT_TTL_SECONDS
+
         val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
         val duration = Duration.between(now, endAt)
-        
+
         return if (duration.isNegative || duration.isZero) {
             3600L // 1 hour if already expired but somehow still active
         } else {
@@ -102,8 +104,9 @@ class PlaceLikeService(
         }
     }
 
-    data class PlaceLikeResult(
-        val isLiked: Boolean,
-        val likeCount: Int
-    )
+    data class PlaceLikeResult(val isLiked: Boolean, val likeCount: Int)
+
+    companion object {
+        private const val DEFAULT_TTL_SECONDS = 604800L // 7 days fallback
+    }
 }

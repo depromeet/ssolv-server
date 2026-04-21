@@ -1,9 +1,8 @@
 package org.depromeet.team3.notification.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.UserQueryRepository
 import org.depromeet.team3.auth.exception.UserException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.notification.domain.DevicePlatform
 import org.depromeet.team3.notification.domain.DeviceToken
 import org.depromeet.team3.notification.domain.DeviceTokenCommandRepository
@@ -17,10 +16,10 @@ import java.time.LocalDateTime
 class RegisterDeviceTokenService(
     private val deviceTokenQueryRepository: DeviceTokenQueryRepository,
     private val deviceTokenCommandRepository: DeviceTokenCommandRepository,
-    private val userQueryRepository: UserQueryRepository
+    private val userQueryRepository: UserQueryRepository,
 ) {
     @Transactional
-    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withTracingContext() {
+    suspend fun execute(userId: Long, request: RegisterDeviceTokenRequest) = withTracingContext {
         // 사용자 존재 여부 확인
         userQueryRepository.findById(userId) ?: throw UserException(ErrorCode.USER_NOT_FOUND)
 
@@ -42,7 +41,7 @@ class RegisterDeviceTokenService(
             val updatedToken = existingTokenByString.copy(
                 userId = userId,
                 platform = platform,
-                updatedAt = LocalDateTime.now()
+                updatedAt = LocalDateTime.now(),
             )
             deviceTokenCommandRepository.save(updatedToken)
             return@withTracingContext
@@ -59,7 +58,7 @@ class RegisterDeviceTokenService(
              */
             val updatedToken = existingTokenByUser.copy(
                 fcmToken = request.fcmToken,
-                updatedAt = LocalDateTime.now()
+                updatedAt = LocalDateTime.now(),
             )
             deviceTokenCommandRepository.save(updatedToken)
         } else {
@@ -71,7 +70,7 @@ class RegisterDeviceTokenService(
                 userId = userId,
                 fcmToken = request.fcmToken,
                 platform = platform,
-                createdAt = LocalDateTime.now()
+                createdAt = LocalDateTime.now(),
             )
             deviceTokenCommandRepository.save(newToken)
         }

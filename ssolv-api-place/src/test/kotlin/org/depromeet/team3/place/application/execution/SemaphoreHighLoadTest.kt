@@ -47,8 +47,10 @@ class SemaphoreHighLoadTest {
         val totalRequests = totalMeetings * keywordsPerMeeting
 
         // ── Before: Semaphore 미적용 ──────────────────────────────────
-        globalConcurrentCalls.set(0); peakConcurrentCalls.set(0)
-        var successBefore = 0; var errorBefore = 0
+        globalConcurrentCalls.set(0)
+        peakConcurrentCalls.set(0)
+        var successBefore = 0
+        var errorBefore = 0
         val startBefore = System.currentTimeMillis()
 
         (1..totalMeetings).map {
@@ -70,16 +72,20 @@ class SemaphoreHighLoadTest {
         val elapsedBefore = System.currentTimeMillis() - startBefore
         val peakBefore = peakConcurrentCalls.get()
 
-        println("""
+        println(
+            """
             |
             |[Before] Semaphore 미적용
             |  총 요청: ${totalRequests}건  성공: ${successBefore}건  실패(429): ${errorBefore}건
             |  최대 동시 호출: ${peakBefore}개  소요 시간: ${elapsedBefore}ms
-        """.trimMargin())
+            """.trimMargin(),
+        )
 
         // ── After: 2-tier Semaphore (전역 15 + 모임별 4) ─────────────
-        globalConcurrentCalls.set(0); peakConcurrentCalls.set(0)
-        var successAfter = 0; var errorAfter = 0
+        globalConcurrentCalls.set(0)
+        peakConcurrentCalls.set(0)
+        var successAfter = 0
+        var errorAfter = 0
         val globalApiSemaphore = Semaphore(15)
         val startAfter = System.currentTimeMillis()
 
@@ -106,11 +112,13 @@ class SemaphoreHighLoadTest {
         val elapsedAfter = System.currentTimeMillis() - startAfter
         val peakAfter = peakConcurrentCalls.get()
 
-        println("""
+        println(
+            """
             |
             |[After]  2-tier Semaphore (전역 15 + 모임별 4)
             |  총 요청: ${totalRequests}건  성공: ${successAfter}건  실패(429): ${errorAfter}건
             |  최대 동시 호출: ${peakAfter}개  소요 시간: ${elapsedAfter}ms
-        """.trimMargin())
+            """.trimMargin(),
+        )
     }
 }

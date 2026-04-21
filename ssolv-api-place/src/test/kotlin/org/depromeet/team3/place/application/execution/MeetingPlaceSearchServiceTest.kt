@@ -1,7 +1,5 @@
 package org.depromeet.team3.place.application.execution
-import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
@@ -12,17 +10,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.kotlin.*
 import org.mockito.quality.Strictness
-import org.springframework.data.redis.core.ListOperations
 import org.springframework.data.redis.core.SetOperations
-import org.springframework.data.redis.core.ZSetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
-import java.util.concurrent.TimeUnit
+import org.springframework.data.redis.core.ZSetOperations
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
@@ -70,7 +65,7 @@ class MeetingPlaceSearchServiceTest {
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             placeQuery = placeQuery,
-            googlePlacesApiProperties = googlePlacesApiProperties
+            googlePlacesApiProperties = googlePlacesApiProperties,
         )
     }
 
@@ -90,20 +85,28 @@ class MeetingPlaceSearchServiceTest {
             on { score } doReturn 80.0
         }
         val tuples = setOf(tuple1, tuple2)
-        
+
         whenever(zSetOps.reverseRangeWithScores("meeting:places:$meetingId", 0, 9)).thenReturn(tuples)
-        
+
         val json1 = """{"placeId":101,"name":"쉑쉑버거"}"""
         val json2 = """{"placeId":205,"name":"마라탕"}"""
-        
-        val item1 = PlacesSearchResponse.PlaceItem(placeId = 101L, name = "쉑쉑버거", address = "", rating = 4.5, userRatingsTotal = 10, openNow = true, photos = emptyList(), link = "", weekdayText = emptyList(), topReview = null, priceRange = null, addressDescriptor = null)
-        val item2 = PlacesSearchResponse.PlaceItem(placeId = 205L, name = "마라탕", address = "", rating = 4.8, userRatingsTotal = 20, openNow = true, photos = emptyList(), link = "", weekdayText = emptyList(), topReview = null, priceRange = null, addressDescriptor = null)
+
+        val item1 = PlacesSearchResponse.PlaceItem(
+            placeId = 101L, name = "쉑쉑버거", address = "", rating = 4.5, userRatingsTotal = 10,
+            openNow = true, photos = emptyList(), link = "", weekdayText = emptyList(),
+            topReview = null, priceRange = null, addressDescriptor = null,
+        )
+        val item2 = PlacesSearchResponse.PlaceItem(
+            placeId = 205L, name = "마라탕", address = "", rating = 4.8, userRatingsTotal = 20,
+            openNow = true, photos = emptyList(), link = "", weekdayText = emptyList(),
+            topReview = null, priceRange = null, addressDescriptor = null,
+        )
 
         whenever(valueOps.multiGet(listOf("place:details:101", "place:details:205"))).thenReturn(listOf(json1, json2))
         whenever(objectMapper.readValue(json1, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item1)
         whenever(objectMapper.readValue(json2, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item2)
 
-        // 좋아요 정보 모킹 
+        // 좋아요 정보 모킹
         // 101: 0개, 205: 10개 (로그 점수가 101의 베이스 점수 20차이를 극복할 수 있는지 확인)
         // ln(11) * 50 ≈ 119.8점 추가됨 -> 205가 역전해야 함
         whenever(redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<Any>>()))
@@ -115,11 +118,11 @@ class MeetingPlaceSearchServiceTest {
         // then
         assertThat(result).isNotNull
         assertThat(result?.items).hasSize(2)
-        
+
         // 좋아요가 많은 205번이 상단으로 재정렬되었는지 확인
         assertThat(result?.items?.get(0)?.placeId).isEqualTo(205L)
         assertThat(result?.items?.get(1)?.placeId).isEqualTo(101L)
-        
+
         verify(placeQuery, never()).findByIds(any())
     }
 
@@ -137,17 +140,22 @@ class MeetingPlaceSearchServiceTest {
             on { score } doReturn 80.0
         }
         val tuples = setOf(tuple1, tuple2)
-        
+
         whenever(zSetOps.reverseRangeWithScores("meeting:places:$meetingId", 0, 9)).thenReturn(tuples)
-        
+
         val json1 = """{"placeId":101,"name":"쉑쉑버거"}"""
         // 205번 누락 (null)
         whenever(valueOps.multiGet(listOf("place:details:101", "place:details:205"))).thenReturn(listOf(json1, null))
-        
-        val item1 = PlacesSearchResponse.PlaceItem(placeId = 101L, name = "쉑쉑버거", address = "", rating = null, userRatingsTotal = null, openNow = null, photos = null, link = "", weekdayText = null, topReview = null, priceRange = null, addressDescriptor = null)
+
+        val item1 = PlacesSearchResponse.PlaceItem(
+            placeId = 101L, name = "쉑쉑버거", address = "", rating = null, userRatingsTotal = null,
+            openNow = null, photos = null, link = "", weekdayText = null, topReview = null,
+            priceRange = null, addressDescriptor = null,
+        )
         whenever(objectMapper.readValue(json1, PlacesSearchResponse.PlaceItem::class.java)).thenReturn(item1)
 
-        val missingEntity = PlaceEntity(id = 205L, googlePlaceId = "g205", name = "마라탕", address = "강남", rating = 4.8, userRatingsTotal = 20)
+        val missingEntity =
+            PlaceEntity(id = 205L, googlePlaceId = "g205", name = "마라탕", address = "강남", rating = 4.8, userRatingsTotal = 20)
         whenever(placeQuery.findByIds(listOf(205L))).thenReturn(listOf(missingEntity))
         whenever(objectMapper.writeValueAsString(any())).thenReturn("""{"placeId":205,"name":"마라탕"}""")
 
@@ -164,4 +172,3 @@ class MeetingPlaceSearchServiceTest {
         verify(valueOps).set(eq("place:details:205"), any(), any(), any())
     }
 }
-

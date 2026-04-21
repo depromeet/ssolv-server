@@ -1,22 +1,19 @@
 package org.depromeet.team3.notification.application
+import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
-
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.application.InviteTokenService
 import org.depromeet.team3.meeting.exception.MeetingException
-import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.notification.domain.DeviceTokenQueryRepository
 import org.depromeet.team3.notification.domain.FcmClient
 import org.depromeet.team3.station.StationRepository
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import kotlinx.coroutines.runBlocking
-import org.springframework.data.redis.core.StringRedisTemplate
 
 /**
  * 모임 결과(확정된 식당) 또는 설문 완료 정보를 기반으로 FCM 푸시 알림을 발송하는 서비스
- * 
+ *
  * 주요 기능:
  * 1. 모임 참여자 전원의 디바이스 토큰 및 알림 설정 확인
  * 2. 알림 제목, 내용 생성 및 랜딩 페이지 데이터 구성
@@ -30,7 +27,7 @@ class SendMeetingResultNotificationService(
     private val stationRepository: StationRepository,
     private val inviteTokenService: InviteTokenService,
     private val transactionTemplate: TransactionTemplate,
-    private val stringRedisTemplate: StringRedisTemplate
+    private val stringRedisTemplate: StringRedisTemplate,
 ) {
     private val logger = org.slf4j.LoggerFactory.getLogger(SendMeetingResultNotificationService::class.java)
 
@@ -39,7 +36,7 @@ class SendMeetingResultNotificationService(
         private val IDEMPOTENCY_TTL = java.time.Duration.ofHours(1)
     }
 
-    suspend fun send(meetingId: Long, userId: Long) = withTracingContext() {
+    suspend fun send(meetingId: Long, userId: Long) = withTracingContext {
         // 0. 멱등성 체크 (중복 발송 방지)
         val idempotencyKey = "$IDEMPOTENCY_KEY_PREFIX:$meetingId:$userId"
         val isNew = stringRedisTemplate.opsForValue()
@@ -59,7 +56,7 @@ class SendMeetingResultNotificationService(
             runBlocking {
                 deviceTokenQueryRepository.findValidTokensByUserIds(
                     userIds = listOf(userId),
-                    isNotificationEnabled = true
+                    isNotificationEnabled = true,
                 )
             }
         } ?: emptyList()
@@ -74,17 +71,17 @@ class SendMeetingResultNotificationService(
             runBlocking { stationRepository.findById(meeting.stationId) }
         }
         val stationName = station?.name ?: "약속 장소"
-        
+
         val title = "${meeting.name}의 식당이 정해졌어요!"
         val body = "$stationName 근처 딱 맞는 식당을 골랐어요."
-        
+
         // 3. 앱 이동 데이터
         val meetingToken = inviteTokenService.generateToken(meeting) ?: meetingId.toString()
 
         val data = mapOf(
             "type" to "MEETING_RESULT_READY",
             "meetingToken" to meetingToken,
-            "path" to "/meetings/$meetingToken/result/overview"
+            "path" to "/meetings/$meetingToken/result/overview",
         )
 
         // 4. 발송
@@ -92,7 +89,7 @@ class SendMeetingResultNotificationService(
             tokens = validTokens,
             title = title,
             body = body,
-            data = data
+            data = data,
         )
     }
 }

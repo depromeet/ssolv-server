@@ -8,5 +8,5 @@ data class CreateMeetingResponse(
     val id: Long,
 
     @Schema(description = "토큰 검증 링크", example = "https://app.ssolv.site/meetings/validate-invite?token=MSK@KS")
-    val validateTokenUrl: String
+    val validateTokenUrl: String,
 )

@@ -10,13 +10,11 @@ import org.springframework.stereotype.Service
  *  내부적으로 CreateSurveyKeywordService 호출하여 설문 기반 키워드 생성
  */
 @Service
-class CreatePlaceSearchPlanService(
-    private val createSurveyKeywordService: CreateSurveyKeywordService
-) {
+class CreatePlaceSearchPlanService(private val createSurveyKeywordService: CreateSurveyKeywordService) {
     suspend fun resolve(request: PlacesSearchRequest): PlaceSearchPlan {
         val meetingId = request.meetingId ?: throw PlaceSearchException(
             errorCode = ErrorCode.MISSING_PARAMETER,
-            detail = mapOf("parameter" to "meetingId")
+            detail = mapOf("parameter" to "meetingId"),
         )
         val stationCoordinates = createSurveyKeywordService.getStationCoordinates(meetingId)
 
@@ -25,14 +23,14 @@ class CreatePlaceSearchPlanService(
         if (keywordPlan.keywords.isEmpty()) {
             throw PlaceSearchException(
                 errorCode = ErrorCode.SURVEY_RESULT_NOT_FOUND,
-                detail = mapOf("meetingId" to meetingId)
+                detail = mapOf("meetingId" to meetingId),
             )
         }
 
         return PlaceSearchPlan.Automatic(
             keywords = keywordPlan.keywords,
             stationCoordinates = stationCoordinates,
-            fallbackKeyword = keywordPlan.fallbackKeyword
+            fallbackKeyword = keywordPlan.fallbackKeyword,
         )
     }
 }

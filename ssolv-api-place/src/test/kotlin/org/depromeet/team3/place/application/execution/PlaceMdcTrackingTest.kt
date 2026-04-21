@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
-import java.util.concurrent.Executors
 import java.util.UUID
 
 class PlaceMdcTrackingTest {
@@ -30,19 +29,19 @@ class PlaceMdcTrackingTest {
         // 운영 스레드 유지를 위해 로컬 변수로 스레드명 관리
         val mainThreadName = "http-nio-8080-exec-1"
         Thread.currentThread().name = mainThreadName
-        
+
         val requestId = UUID.randomUUID().toString().substring(0, 8)
         val userId = (1..500).random().toString()
         MDC.put(requestIdKey, requestId)
         MDC.put(userIdKey, userId)
 
         logger.info(">>> [Controller] GET /api/v1/places/search?meetingId=12345")
-        
+
         // ❌ MDCContext() 누락 상황
-        withContext(Dispatchers.IO) { 
+        withContext(Dispatchers.IO) {
             // 비동기 스레드에서 유실됨
             logger.info("   [Service] ExecutePlaceSearchService.search() 실행")
-            
+
             val keywords = listOf("강남 맛집", "강남 카페")
             val deferreds = keywords.map { kw ->
                 async {
@@ -52,7 +51,7 @@ class PlaceMdcTrackingTest {
                 }
             }
             deferreds.awaitAll()
-            
+
             logger.info("   [Service] 검색 결과 가공 및 랭킹 산정 완료")
         }
 
@@ -73,22 +72,22 @@ class PlaceMdcTrackingTest {
         MDC.put(userIdKey, userId)
 
         logger.info(">>> [Controller] GET /api/v1/places/search?meetingId=55555")
-        
+
         // ✅ MDCContext() 정상 적용 상황
         withContext(MDCContext() + Dispatchers.IO) {
             logger.info("   [Service] ExecutePlaceSearchService.search() 실행")
-            
+
             val keywords = listOf("홍대 맛집", "홍대 술집")
             val parentContext = currentCoroutineContext()
             val deferreds = keywords.map { kw ->
-                async(parentContext) { 
+                async(parentContext) {
                     logger.info("      [GoogleAPI] '$kw' 검색 API 호출 중...")
                     delay(10)
                     "Result"
                 }
             }
             deferreds.awaitAll()
-            
+
             logger.info("   [Service] 검색 결과 가공 및 랭킹 산정 완료")
         }
 

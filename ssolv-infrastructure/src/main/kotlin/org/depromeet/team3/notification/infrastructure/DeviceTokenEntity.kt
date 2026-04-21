@@ -19,6 +19,6 @@ class DeviceTokenEntity(
 
     @Enumerated(EnumType.STRING)
     @Column(name = "platform", nullable = false)
-    val platform: DevicePlatform
+    val platform: DevicePlatform,
 
 ) : BaseTimeEntity()

@@ -1,6 +1,7 @@
 package org.depromeet.team3.surveycategory.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.config.SecurityTestConfig
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
@@ -8,7 +9,6 @@ import org.depromeet.team3.surveycategory.application.CreateSurveyCategoryServic
 import org.depromeet.team3.surveycategory.application.DeleteSurveyCategoryService
 import org.depromeet.team3.surveycategory.application.GetSurveyCategoryService
 import org.depromeet.team3.surveycategory.application.UpdateSurveyCategoryService
-import org.depromeet.team3.surveycategory.controller.SurveyCategoryController
 import org.depromeet.team3.surveycategory.dto.request.CreateSurveyCategoryRequest
 import org.depromeet.team3.surveycategory.dto.request.UpdateSurveyCategoryRequest
 import org.depromeet.team3.surveycategory.dto.response.CreateSurveyCategoryResponse
@@ -17,7 +17,6 @@ import org.depromeet.team3.surveycategory.exception.SurveyCategoryException
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
-import kotlinx.coroutines.test.runTest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.context.annotation.Import
@@ -67,8 +66,8 @@ class SurveyCategoryControllerTest {
                     level = SurveyCategoryLevel.BRANCH,
                     name = "한식",
                     sortOrder = 1,
-                    children = emptyList()
-                )
+                    children = emptyList(),
+                ),
             )
 
             getSurveyCategoryService.stub {
@@ -110,16 +109,16 @@ class SurveyCategoryControllerTest {
                             level = SurveyCategoryLevel.LEAF,
                             name = "김치찌개",
                             sortOrder = 1,
-                            children = emptyList()
+                            children = emptyList(),
                         ),
                         SurveyCategoryItem(
                             id = 3L,
                             level = SurveyCategoryLevel.LEAF,
                             name = "불고기",
                             sortOrder = 2,
-                            children = emptyList()
-                        )
-                    )
+                            children = emptyList(),
+                        ),
+                    ),
                 ),
                 SurveyCategoryItem(
                     id = 4L,
@@ -132,10 +131,10 @@ class SurveyCategoryControllerTest {
                             level = SurveyCategoryLevel.LEAF,
                             name = "짜장면",
                             sortOrder = 1,
-                            children = emptyList()
-                        )
-                    )
-                )
+                            children = emptyList(),
+                        ),
+                    ),
+                ),
             )
 
             getSurveyCategoryService.stub {
@@ -175,15 +174,15 @@ class SurveyCategoryControllerTest {
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "한식",
-                sortOrder = 1
+                sortOrder = 1,
             )
-            
+
             val response = CreateSurveyCategoryResponse(
                 id = 1L,
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "한식",
-                sortOrder = 1
+                sortOrder = 1,
             )
 
             // Mock 설정 - 생성된 카테고리 응답 반환
@@ -196,7 +195,7 @@ class SurveyCategoryControllerTest {
                 post("/api/v1/survey-categories")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
-                    .with(csrf())
+                    .with(csrf()),
             )
                 .andExpect(request().asyncStarted())
                 .andReturn()
@@ -223,7 +222,7 @@ class SurveyCategoryControllerTest {
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "전통한식",
-                sortOrder = 2
+                sortOrder = 2,
             )
 
             // Mock 설정 - 실제 서비스 호출을 방지
@@ -236,7 +235,7 @@ class SurveyCategoryControllerTest {
                 put("/api/v1/survey-categories/$categoryId")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
-                    .with(csrf())
+                    .with(csrf()),
             )
                 .andExpect(request().asyncStarted())
                 .andReturn()
@@ -261,8 +260,10 @@ class SurveyCategoryControllerTest {
             }
 
             // when & then
-            val mvcResult = mockMvc.perform(delete("/api/v1/survey-categories/$categoryId")
-                .with(csrf()))
+            val mvcResult = mockMvc.perform(
+                delete("/api/v1/survey-categories/$categoryId")
+                    .with(csrf()),
+            )
                 .andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -283,12 +284,14 @@ class SurveyCategoryControllerTest {
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "전통한식",
-                sortOrder = 2
+                sortOrder = 2,
             )
 
             // Mock 설정 - 예외 발생 시뮬레이션
             updateSurveyCategoryService.stub {
-                onBlocking { invoke(any(), any()) }.doThrow(SurveyCategoryException(ErrorCode.CATEGORY_NOT_FOUND, mapOf("id" to categoryId)))
+                onBlocking {
+                    invoke(any(), any())
+                }.doThrow(SurveyCategoryException(ErrorCode.CATEGORY_NOT_FOUND, mapOf("id" to categoryId)))
             }
 
             // when & then
@@ -296,7 +299,7 @@ class SurveyCategoryControllerTest {
                 put("/api/v1/survey-categories/$categoryId")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
-                    .with(csrf())
+                    .with(csrf()),
             )
                 .andExpect(request().asyncStarted())
                 .andReturn()
@@ -317,12 +320,21 @@ class SurveyCategoryControllerTest {
             val categoryId = 1L
 
             deleteSurveyCategoryService.stub {
-                onBlocking { invoke(any()) }.doThrow(SurveyCategoryException(ErrorCode.CATEGORY_HAS_CHILDREN, mapOf("categoryId" to categoryId)))
+                onBlocking { invoke(any()) }.doThrow(
+                    SurveyCategoryException(
+                        ErrorCode.CATEGORY_HAS_CHILDREN,
+                        mapOf(
+                            "categoryId" to categoryId,
+                        ),
+                    ),
+                )
             }
 
             // when & then
-            val mvcResult = mockMvc.perform(delete("/api/v1/survey-categories/$categoryId")
-                .with(csrf()))
+            val mvcResult = mockMvc.perform(
+                delete("/api/v1/survey-categories/$categoryId")
+                    .with(csrf()),
+            )
                 .andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -343,12 +355,20 @@ class SurveyCategoryControllerTest {
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "한식",
-                sortOrder = 1
+                sortOrder = 1,
             )
 
             // Mock 설정 - 중복된 sortOrder 예외 발생 시뮬레이션
             createSurveyCategoryService.stub {
-                onBlocking { invoke(any()) }.doThrow(SurveyCategoryException(ErrorCode.DUPLICATE_CATEGORY_ORDER, mapOf("sortOrder" to 1, "parentId" to null)))
+                onBlocking { invoke(any()) }.doThrow(
+                    SurveyCategoryException(
+                        ErrorCode.DUPLICATE_CATEGORY_ORDER,
+                        mapOf(
+                            "sortOrder" to 1,
+                            "parentId" to null,
+                        ),
+                    ),
+                )
             }
 
             // when & then
@@ -356,7 +376,7 @@ class SurveyCategoryControllerTest {
                 post("/api/v1/survey-categories")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
-                    .with(csrf())
+                    .with(csrf()),
             )
                 .andExpect(request().asyncStarted())
                 .andReturn()
@@ -381,12 +401,20 @@ class SurveyCategoryControllerTest {
                 parentId = null,
                 level = SurveyCategoryLevel.BRANCH,
                 name = "전통한식",
-                sortOrder = 2
+                sortOrder = 2,
             )
 
             // Mock 설정 - 중복된 sortOrder 예외 발생 시뮬레이션
             updateSurveyCategoryService.stub {
-                onBlocking { invoke(any(), any()) }.doThrow(SurveyCategoryException(ErrorCode.DUPLICATE_CATEGORY_ORDER, mapOf("sortOrder" to 2, "parentId" to null)))
+                onBlocking { invoke(any(), any()) }.doThrow(
+                    SurveyCategoryException(
+                        ErrorCode.DUPLICATE_CATEGORY_ORDER,
+                        mapOf(
+                            "sortOrder" to 2,
+                            "parentId" to null,
+                        ),
+                    ),
+                )
             }
 
             // when & then
@@ -394,7 +422,7 @@ class SurveyCategoryControllerTest {
                 put("/api/v1/survey-categories/$categoryId")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
-                    .with(csrf())
+                    .with(csrf()),
             )
                 .andExpect(request().asyncStarted())
                 .andReturn()
@@ -417,7 +445,7 @@ class SurveyCategoryControllerTest {
             parentId = null,
             level = SurveyCategoryLevel.BRANCH,
             name = "", // 빈 문자열 - 유효성 검사 실패
-            sortOrder = 1
+            sortOrder = 1,
         )
 
         // when & then
@@ -425,7 +453,7 @@ class SurveyCategoryControllerTest {
             post("/api/v1/survey-categories")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest))
-                .with(csrf())
+                .with(csrf()),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.data").doesNotExist())

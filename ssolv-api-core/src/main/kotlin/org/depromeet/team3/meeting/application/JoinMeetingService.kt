@@ -1,7 +1,8 @@
 package org.depromeet.team3.meeting.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingRepository
 import org.depromeet.team3.meeting.exception.InvalidInviteTokenException
 import org.depromeet.team3.meeting.exception.MeetingException
@@ -10,23 +11,18 @@ import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.depromeet.team3.meetingattendee.MuzziColor
 import org.depromeet.team3.meetingattendee.exception.MeetingAttendeeException
 import org.depromeet.team3.util.DataEncoder
-import org.depromeet.team3.auth.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import kotlinx.coroutines.runBlocking
 
 @Service
 class JoinMeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingAttendeeRepository: MeetingAttendeeRepository,
     private val transactionTemplate: TransactionTemplate,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
 ) {
 
-    suspend operator fun invoke(
-        userId: Long,
-        token: String,
-    ): Unit = withTracingContext() {
+    suspend operator fun invoke(userId: Long, token: String): Unit = withTracingContext {
         transactionTemplate.execute {
             val meetingId = parseTokenId(token)
             runBlocking { validateMeeting(meetingId, userId) }
@@ -35,7 +31,7 @@ class JoinMeetingService(
                 .orElseThrow {
                     MeetingException(
                         errorCode = ErrorCode.USER_NOT_FOUND,
-                        detail = mapOf("userId" to userId)
+                        detail = mapOf("userId" to userId),
                     )
                 }
 
@@ -46,7 +42,7 @@ class JoinMeetingService(
                 attendeeNickname = user.nickname,
                 muzziColor = MuzziColor.DEFAULT,
                 createdAt = null,
-                updatedAt = null
+                updatedAt = null,
             )
 
             runBlocking { meetingAttendeeRepository.save(meetingAttendee) }
@@ -58,13 +54,13 @@ class JoinMeetingService(
         val meeting = meetingRepository.findById(meetingId)
             ?: throw MeetingException(
                 errorCode = ErrorCode.MEETING_NOT_FOUND,
-                detail = mapOf("meetingId" to meetingId)
+                detail = mapOf("meetingId" to meetingId),
             )
 
         if (meeting.isClosed) {
             throw MeetingException(
                 errorCode = ErrorCode.MEETING_ALREADY_CLOSED,
-                detail = mapOf("meetingId" to meetingId)
+                detail = mapOf("meetingId" to meetingId),
             )
         }
 
@@ -73,8 +69,8 @@ class JoinMeetingService(
                 errorCode = ErrorCode.MEETING_ALREADY_JOINED,
                 detail = mapOf(
                     "meetingId" to meetingId,
-                    "userId" to userId
-                )
+                    "userId" to userId,
+                ),
             )
         }
 
@@ -85,8 +81,8 @@ class JoinMeetingService(
                 detail = mapOf(
                     "meetingId" to meetingId,
                     "currentCount" to currentAttendeeCount,
-                    "maxCount" to meeting.attendeeCount
-                )
+                    "maxCount" to meeting.attendeeCount,
+                ),
             )
         }
     }

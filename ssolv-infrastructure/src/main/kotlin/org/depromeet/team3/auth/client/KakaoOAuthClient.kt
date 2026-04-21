@@ -1,10 +1,5 @@
 package org.depromeet.team3.auth.client
 
-import org.depromeet.team3.auth.properties.KakaoProperties
-import org.depromeet.team3.common.exception.ErrorCode
-import org.depromeet.team3.auth.exception.AuthException
-import org.depromeet.team3.auth.model.KakaoResponse
-import org.slf4j.LoggerFactory
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -13,13 +8,15 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import org.depromeet.team3.auth.exception.AuthException
+import org.depromeet.team3.auth.model.KakaoResponse
+import org.depromeet.team3.auth.properties.KakaoProperties
+import org.depromeet.team3.common.exception.ErrorCode
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 @Component
-class KakaoOAuthClient(
-    private val kakaoProperties: KakaoProperties,
-    private val httpClient: HttpClient,
-) {
+class KakaoOAuthClient(private val kakaoProperties: KakaoProperties, private val httpClient: HttpClient) {
     private val log = LoggerFactory.getLogger(KakaoOAuthClient::class.java)
 
     private fun getAllowedRedirectUris(): Set<String> {
@@ -29,12 +26,12 @@ class KakaoOAuthClient(
             "http://localhost:8080/auth/callback",
             "https://api.ssolv.site/auth/callback",
             "https://www.ssolv.site/auth/callback",
-            "https://ec01-58-29-179-24.ngrok-free.app/auth/callback"
+            "https://ec01-58-29-179-24.ngrok-free.app/auth/callback",
         )
-        
+
         val configUris = kakaoProperties.redirectUris.toSet()
         val singleUri = setOfNotNull(kakaoProperties.redirectUri.takeIf { it.isNotBlank() })
-        
+
         return hardcodedUris + configUris + singleUri
     }
 
@@ -57,7 +54,7 @@ class KakaoOAuthClient(
                         append("client_id", kakaoProperties.clientId)
                         append("redirect_uri", trimmedRedirectUri)
                         append("code", accessCode)
-                    }
+                    },
                 ).body<KakaoResponse.OAuthToken>()
             }
         } catch (e: Exception) {
@@ -117,7 +114,7 @@ class KakaoOAuthClient(
                     formParameters = parameters {
                         append("target_id_type", "user_id")
                         append("target_id", socialId)
-                    }
+                    },
                 ) {
                     header(HttpHeaders.Authorization, "KakaoAK ${kakaoProperties.adminKey}")
                 }
