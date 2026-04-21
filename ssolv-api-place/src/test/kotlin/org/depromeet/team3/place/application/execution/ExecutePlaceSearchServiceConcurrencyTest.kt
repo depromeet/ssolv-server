@@ -6,6 +6,7 @@ import io.mockk.*
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
+import io.opentelemetry.api.OpenTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -50,6 +51,8 @@ class ExecutePlaceSearchServiceConcurrencyTest {
     lateinit var lockService: DistributedLockService
     @MockK
     lateinit var objectMapper: ObjectMapper
+    @MockK(relaxed = true)
+    lateinit var openTelemetry: OpenTelemetry
 
     @InjectMockKs
     lateinit var executePlaceSearchService: ExecutePlaceSearchService
