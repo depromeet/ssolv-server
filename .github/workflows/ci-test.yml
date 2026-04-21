@@ -52,7 +52,6 @@ jobs:
         
       - name: ktlint 스타일 검증
         run: ./gradlew ktlintCheck --continue
-        continue-on-error: true
 
       - name: Upload ktlint report
         if: always()

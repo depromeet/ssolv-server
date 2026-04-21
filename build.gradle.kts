@@ -14,6 +14,10 @@ plugins {
 extra["jjwtVersion"] = "0.13.0"
 extra["sentryVersion"] = "7.14.0"
 
+// harness 태스크로 호출된 빌드인지 감지 — harness 경로에서는 실패를 전파하여 차단,
+// 그 외(로컬 빌드, 단일 테스트, IDE 등)에서는 리포팅만 하고 실패 무시 (Phase 1 정책)
+val isHarness = gradle.startParameter.taskNames.any { it.contains("harness") }
+
 // 모든 프로젝트 공통 설정
 allprojects {
     group = "org.depromeet"
@@ -37,7 +41,9 @@ subprojects {
     // ktlint 설정: 기존 코드베이스에 대한 점진적 도입을 위해 baseline 전략 사용
     configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
         version.set("1.3.1") // Kotlin 1.9.x 호환
-        ignoreFailures.set(true) // Phase 1: baseline 수집 단계에서는 빌드 실패시키지 않음
+        // Phase 1: baseline에 2,708건의 기존 위반이 존재하므로 ktlint는 harness에서도 리포팅만.
+        // 향후 cleanup PR(ktlintFormat 일괄 적용)에서 `!isHarness`로 전환 예정.
+        ignoreFailures.set(true)
         outputToConsole.set(true)
         filter {
             exclude { element -> element.file.path.contains("/build/") }
@@ -104,8 +110,9 @@ subprojects {
             html.required.set(true)
         }
         
-        // 테스트 실패해도 계속 진행 (전체 리포트 생성을 위해)
-        ignoreFailures = true
+        // 일반 빌드에서는 전체 리포트 생성을 위해 실패 무시.
+        // harness 경로에서는 실패 전파 — pre-push 시 차단.
+        ignoreFailures = !isHarness
         
         // CI 환경에서만 테스트 캐시 비활성화 (로컬 개발 성능 저하 방지)
         val isCI = System.getenv("CI")?.toBoolean() ?: false
