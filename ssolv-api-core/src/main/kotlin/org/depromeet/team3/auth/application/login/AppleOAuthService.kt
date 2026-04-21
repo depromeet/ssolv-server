@@ -1,6 +1,4 @@
 package org.depromeet.team3.auth.application.login
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.depromeet.team3.auth.client.AppleOAuthClient
 import org.depromeet.team3.auth.command.AppleLoginCommand
@@ -9,6 +7,7 @@ import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.model.AppleResponse
 import org.depromeet.team3.auth.properties.AppleProperties
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -24,7 +23,7 @@ class AppleOAuthService(
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthService::class.java)
 
-    suspend fun login(command: AppleLoginCommand): LoginResponse = withTracingContext() {
+    suspend fun login(command: AppleLoginCommand): LoginResponse = withTracingContext {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 
@@ -37,7 +36,7 @@ class AppleOAuthService(
         // 3. 사용자 정보 파싱
         val socialId = idTokenPayload.sub
         val email = idTokenPayload.email
-        
+
         // 4. 최초 로그인 시 전달되는 사용자 정보 파싱
         val userInfo = command.user?.let { parseUserInfo(it) }
         val nickname = buildNickname(userInfo, email)
@@ -49,21 +48,17 @@ class AppleOAuthService(
         createAppleUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
     }
 
-    private fun getDefaultRedirectUri(): String {
-        return when {
-            appleProperties.redirectUris.isNotEmpty() -> appleProperties.redirectUris.first()
-            !appleProperties.redirectUri.isNullOrBlank() -> appleProperties.redirectUri
-            else -> throw AuthException(errorCode = ErrorCode.APPLE_REDIRECT_URI_NOT_CONFIGURED)
-        }
+    private fun getDefaultRedirectUri(): String = when {
+        appleProperties.redirectUris.isNotEmpty() -> appleProperties.redirectUris.first()
+        !appleProperties.redirectUri.isNullOrBlank() -> appleProperties.redirectUri
+        else -> throw AuthException(errorCode = ErrorCode.APPLE_REDIRECT_URI_NOT_CONFIGURED)
     }
 
-    private fun parseUserInfo(userJson: String): AppleResponse.UserInfo {
-        return try {
-            objectMapper.readValue(userJson, AppleResponse.UserInfo::class.java)
-        } catch (e: Exception) {
-            log.warn("애플 사용자 정보 파싱 실패: {}", e.message)
-            AppleResponse.UserInfo(name = null, email = null)
-        }
+    private fun parseUserInfo(userJson: String): AppleResponse.UserInfo = try {
+        objectMapper.readValue(userJson, AppleResponse.UserInfo::class.java)
+    } catch (e: Exception) {
+        log.warn("애플 사용자 정보 파싱 실패: {}", e.message)
+        AppleResponse.UserInfo(name = null, email = null)
     }
 
     private fun buildNickname(userInfo: AppleResponse.UserInfo?, email: String?): String {

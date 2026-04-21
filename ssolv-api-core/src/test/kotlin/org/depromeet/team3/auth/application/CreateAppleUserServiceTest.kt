@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate
 class CreateAppleUserServiceTest {
 
     @Mock private lateinit var userJpaRepository: UserRepository
+
     @Mock private lateinit var jwtTokenProvider: JwtTokenProvider
 
     private lateinit var transactionTemplate: TransactionTemplate
@@ -41,7 +42,11 @@ class CreateAppleUserServiceTest {
         val nickname = "ParkMineum"
         val socialId = "apple-social-id"
         val userEntity = UserFixture.createEntity(
-            id = 1L, provider = AuthProvider.APPLE, socialId = socialId, email = email, nickname = nickname
+            id = 1L,
+            provider = AuthProvider.APPLE,
+            socialId = socialId,
+            email = email,
+            nickname = nickname,
         )
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(null)
         whenever(userJpaRepository.findByNickname(any())).thenReturn(null)
@@ -67,7 +72,10 @@ class CreateAppleUserServiceTest {
         val email = "apple@example.com"
         val socialId = "apple-social-id"
         val existingUser = UserFixture.createEntity(
-            id = 1L, provider = AuthProvider.APPLE, socialId = socialId, email = email
+            id = 1L,
+            provider = AuthProvider.APPLE,
+            socialId = socialId,
+            email = email,
         )
         whenever(userJpaRepository.findByProviderAndSocialId(AuthProvider.APPLE, socialId)).thenReturn(existingUser)
         whenever(jwtTokenProvider.generateAccessToken(any(), anyOrNull(), any())).thenReturn("access-token")

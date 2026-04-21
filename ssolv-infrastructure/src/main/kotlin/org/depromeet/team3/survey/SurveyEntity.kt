@@ -14,9 +14,9 @@ import org.depromeet.team3.surveyresult.SurveyResultEntity
     uniqueConstraints = [
         UniqueConstraint(
             name = "uk_survey_meeting_participant",
-            columnNames = ["meeting_id", "participant_id"]
-        )
-    ]
+            columnNames = ["meeting_id", "participant_id"],
+        ),
+    ],
 )
 class SurveyEntity(
     @Id
@@ -32,5 +32,5 @@ class SurveyEntity(
     val participant: MeetingAttendeeEntity,
 
     @OneToMany(mappedBy = "survey", fetch = FetchType.LAZY, cascade = [CascadeType.ALL])
-    val surveyResults: MutableList<SurveyResultEntity> = mutableListOf()
+    val surveyResults: MutableList<SurveyResultEntity> = mutableListOf(),
 ) : BaseTimeEntity()

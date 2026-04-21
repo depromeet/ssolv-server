@@ -28,8 +28,11 @@ import java.util.Optional
 class WithdrawServiceTest {
 
     @Mock private lateinit var userJpaRepository: UserRepository
+
     @Mock private lateinit var kakaoOAuthClient: KakaoOAuthClient
+
     @Mock private lateinit var meetingJpaRepository: MeetingJpaRepository
+
     @Mock private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
 
     private lateinit var transactionTemplate: TransactionTemplate
@@ -43,9 +46,11 @@ class WithdrawServiceTest {
             callback.doInTransaction(mock())
         }
         withdrawService = WithdrawService(
-            userJpaRepository, kakaoOAuthClient,
-            meetingJpaRepository, meetingAttendeeJpaRepository,
-            transactionTemplate
+            userJpaRepository,
+            kakaoOAuthClient,
+            meetingJpaRepository,
+            meetingAttendeeJpaRepository,
+            transactionTemplate,
         )
     }
 

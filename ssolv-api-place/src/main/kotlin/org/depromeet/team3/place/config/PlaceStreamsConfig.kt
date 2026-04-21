@@ -27,19 +27,14 @@ import java.util.UUID
  */
 @Configuration
 @Profile("!test")
-class PlaceStreamsConfig(
-    private val placeSearchConsumer: PlaceSearchConsumer,
-    private val stringRedisTemplate: StringRedisTemplate
-) {
+class PlaceStreamsConfig(private val placeSearchConsumer: PlaceSearchConsumer, private val stringRedisTemplate: StringRedisTemplate) {
     private val logger = LoggerFactory.getLogger(PlaceStreamsConfig::class.java)
 
     private lateinit var savedFactory: RedisConnectionFactory
     private lateinit var container: StreamMessageListenerContainer<String, MapRecord<String, String, String>>
 
     @Bean
-    fun placeSearchStreamMessageListenerContainer(
-        redisConnectionFactory: RedisConnectionFactory
-    ): Subscription {
+    fun placeSearchStreamMessageListenerContainer(redisConnectionFactory: RedisConnectionFactory): Subscription {
         savedFactory = redisConnectionFactory
         return createAndStart()
     }
@@ -73,7 +68,7 @@ class PlaceStreamsConfig(
         val subscription = container.receive(
             Consumer.from(groupName, consumerName),
             StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
-            placeSearchConsumer
+            placeSearchConsumer,
         )
         container.start()
         logger.info("Redis Stream 구독 시작 ($streamKey / $groupName / $consumerName)")

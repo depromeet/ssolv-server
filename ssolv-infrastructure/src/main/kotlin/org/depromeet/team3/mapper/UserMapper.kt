@@ -7,21 +7,19 @@ import org.springframework.stereotype.Component
 @Component
 class UserMapper : DomainMapper<User, UserEntity> {
 
-    override fun toDomain(entity: UserEntity): User {
-        return User(
-            id = entity.id,
-            provider = entity.provider,
-            socialId = entity.socialId,
-            email = entity.email,
-            nickname = entity.nickname,
-            profileImage = entity.profileImage,
-            refreshToken = entity.refreshToken,
-            notificationEnabled = entity.notificationEnabled,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt,
-            deletedAt = entity.deletedAt
-        )
-    }
+    override fun toDomain(entity: UserEntity): User = User(
+        id = entity.id,
+        provider = entity.provider,
+        socialId = entity.socialId,
+        email = entity.email,
+        nickname = entity.nickname,
+        profileImage = entity.profileImage,
+        refreshToken = entity.refreshToken,
+        notificationEnabled = entity.notificationEnabled,
+        createdAt = entity.createdAt,
+        updatedAt = entity.updatedAt,
+        deletedAt = entity.deletedAt,
+    )
 
     override fun toEntity(domain: User): UserEntity {
         return UserEntity(
@@ -33,7 +31,7 @@ class UserMapper : DomainMapper<User, UserEntity> {
             refreshToken = domain.refreshToken,
             nickname = domain.nickname,
             notificationEnabled = domain.notificationEnabled,
-            deletedAt = domain.deletedAt
+            deletedAt = domain.deletedAt,
         )
         // Note: createdAt and updatedAt are now managed by JPA auditing
         // Do not manually set these fields to prevent audit integrity issues

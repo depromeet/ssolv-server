@@ -5,8 +5,4 @@ import org.springframework.stereotype.Component
 
 @Component
 @ConfigurationProperties(prefix = "demo")
-data class DemoProperties(
-    var email: String = "",
-    var password: String = "",
-    var nickname: String = "ssolv공식"
-)
+data class DemoProperties(var email: String = "", var password: String = "", var nickname: String = "ssolv공식")

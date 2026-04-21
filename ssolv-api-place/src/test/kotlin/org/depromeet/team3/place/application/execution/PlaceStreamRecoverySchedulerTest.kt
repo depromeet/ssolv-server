@@ -3,9 +3,7 @@ package org.depromeet.team3.place.application.execution
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.common.constants.RedisStreamConstants.MEETING_CALCULATION_GROUP

@@ -1,12 +1,11 @@
 package org.depromeet.team3.auth.application.login
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.springframework.stereotype.Service
 
 /**
@@ -19,7 +18,7 @@ class KakaoLoginService(
     private val kakaoProperties: KakaoProperties,
 ) {
 
-    suspend fun login(command: KakaoLoginCommand): LoginResponse = withTracingContext() {
+    suspend fun login(command: KakaoLoginCommand): LoginResponse = withTracingContext {
         val code = command.authorizationCode
         val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
 
@@ -36,12 +35,10 @@ class KakaoLoginService(
         // 3. DB 작업 위임 (자체적으로 IO 디스패처/VT를 사용할 수 있지만 여기서는 순차 실행)
         createKakaoUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
     }
-    
-    private fun getDefaultRedirectUri(): String {
-        return when {
-            kakaoProperties.redirectUris.isNotEmpty() -> kakaoProperties.redirectUris.first()
-            !kakaoProperties.redirectUri.isNullOrBlank() -> kakaoProperties.redirectUri
-            else -> throw AuthException(errorCode = ErrorCode.KAKAO_REDIRECT_URI_NOT_CONFIGURED)
-        }
+
+    private fun getDefaultRedirectUri(): String = when {
+        kakaoProperties.redirectUris.isNotEmpty() -> kakaoProperties.redirectUris.first()
+        !kakaoProperties.redirectUri.isNullOrBlank() -> kakaoProperties.redirectUri
+        else -> throw AuthException(errorCode = ErrorCode.KAKAO_REDIRECT_URI_NOT_CONFIGURED)
     }
 }

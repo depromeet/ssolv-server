@@ -17,31 +17,29 @@ import org.springframework.context.annotation.Configuration
 class KtorClientConfig {
 
     @Bean
-    fun ktorHttpClient(): HttpClient {
-        return HttpClient(CIO) {
-            install(ContentNegotiation) {
-                jackson {
-                    configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                    configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-                    registerModule(KotlinModule.Builder().build())
-                    registerModule(JavaTimeModule())
-                }
+    fun ktorHttpClient(): HttpClient = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            jackson {
+                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+                registerModule(KotlinModule.Builder().build())
+                registerModule(JavaTimeModule())
             }
+        }
 
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.INFO
-            }
+        install(Logging) {
+            logger = Logger.DEFAULT
+            level = LogLevel.INFO
+        }
 
-            install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 5000
-                socketTimeoutMillis = 15000
-            }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 15000
+            connectTimeoutMillis = 5000
+            socketTimeoutMillis = 15000
+        }
 
-            defaultRequest {
-                // Common headers or etc can be added here
-            }
+        defaultRequest {
+            // Common headers or etc can be added here
         }
     }
 }

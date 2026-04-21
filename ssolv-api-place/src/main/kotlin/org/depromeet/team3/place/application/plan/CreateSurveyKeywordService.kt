@@ -12,11 +12,10 @@ import org.springframework.stereotype.Service
 class CreateSurveyKeywordService(
     private val meetingQuery: MeetingQuery,
     private val getSurveyAggregateService: GetSurveyAggregateService,
-    private val selectSurveyKeywordsService: SelectSurveyKeywordsService
+    private val selectSurveyKeywordsService: SelectSurveyKeywordsService,
 ) {
 
-    suspend fun getStationCoordinates(meetingId: Long): MeetingQuery.StationCoordinates? =
-        meetingQuery.getStationCoordinates(meetingId)
+    suspend fun getStationCoordinates(meetingId: Long): MeetingQuery.StationCoordinates? = meetingQuery.getStationCoordinates(meetingId)
 
     /**
      * 단계 요약:
@@ -33,24 +32,22 @@ class CreateSurveyKeywordService(
         return KeywordPlan(
             keywords = keywordCandidates,
             stationCoordinates = aggregate.stationCoordinates,
-            fallbackKeyword = buildFallbackKeyword(aggregate.stationName)
+            fallbackKeyword = buildFallbackKeyword(aggregate.stationName),
         )
     }
 
-    private fun buildFallbackKeyword(stationName: String): String =
-        "$stationName 맛집"
+    private fun buildFallbackKeyword(stationName: String): String = "$stationName 맛집"
 
     companion object {
         private val whitespaceRegex = "\\s+".toRegex()
 
-        fun normalizeKeyword(keyword: String): String =
-            keyword.replace(whitespaceRegex, " ").trim()
+        fun normalizeKeyword(keyword: String): String = keyword.replace(whitespaceRegex, " ").trim()
     }
 
     data class KeywordPlan(
         val keywords: List<KeywordCandidate>,
         val stationCoordinates: MeetingQuery.StationCoordinates?,
-        val fallbackKeyword: String
+        val fallbackKeyword: String,
     )
 
     data class KeywordCandidate(
@@ -61,12 +58,12 @@ class CreateSurveyKeywordService(
         val branchName: String? = null,
         val matchKeywords: Set<String> = emptySet(),
         val fallbackKeyword: String? = null,
-        val fallbackMatchKeywords: Set<String> = emptySet()
+        val fallbackMatchKeywords: Set<String> = emptySet(),
     )
 
     enum class KeywordType {
         LEAF,
         BRANCH,
-        GENERAL
+        GENERAL,
     }
 }

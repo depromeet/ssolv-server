@@ -21,7 +21,7 @@ class MeetingTest {
             hostUserId = hostUserId,
             attendeeCount = attendeeCount,
             stationId = 1L,
-            createdAt = now
+            createdAt = now,
         )
 
         // then
@@ -44,7 +44,7 @@ class MeetingTest {
             hostUserId = 1L,
             attendeeCount = 5,
             stationId = 1L,
-            createdAt = now
+            createdAt = now,
         )
 
         val meeting2 = Meeting(
@@ -53,7 +53,7 @@ class MeetingTest {
             hostUserId = 1L,
             attendeeCount = 5,
             stationId = 1L,
-            createdAt = now
+            createdAt = now,
         )
 
         // when & then

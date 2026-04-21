@@ -11,9 +11,9 @@ import org.depromeet.team3.place.PlaceEntity
     uniqueConstraints = [
         UniqueConstraint(
             name = "uk_meeting_place",
-            columnNames = ["meeting_id", "place_id"]
-        )
-    ]
+            columnNames = ["meeting_id", "place_id"],
+        ),
+    ],
 )
 class MeetingPlaceEntity(
     @Id

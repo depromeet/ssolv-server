@@ -25,7 +25,7 @@ object MeetingIdParser {
     private fun parseToken(token: String): Long {
         val decoded = DataEncoder.decodeWithSeparator(token, SEPARATOR)
             ?: throw IllegalArgumentException("Invalid token format")
-            
+
         return decoded.firstOrNull()?.toLongOrNull()
             ?: throw IllegalArgumentException("Invalid meeting id in token")
     }

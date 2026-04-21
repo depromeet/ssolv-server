@@ -9,12 +9,8 @@ import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import org.depromeet.team3.CoreApiApplication
 import org.depromeet.team3.auth.UserRepository
-import org.depromeet.team3.config.TestContainerConfig
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.ContextConfiguration
 import org.depromeet.team3.common.constants.RedisStreamConstants
+import org.depromeet.team3.config.TestContainerConfig
 import org.depromeet.team3.fixture.MeetingFixture
 import org.depromeet.team3.fixture.StationFixture
 import org.depromeet.team3.fixture.UserFixture
@@ -35,11 +31,15 @@ import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.ContextConfiguration
 
 @SpringBootTest(classes = [CoreApiApplication::class], webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -48,19 +48,29 @@ import org.springframework.data.redis.core.ValueOperations
 class NotificationIntegrationTest {
 
     @Autowired private lateinit var createSurveyService: CreateSurveyService
+
     @Autowired private lateinit var meetingNotificationConsumer: MeetingNotificationConsumer
 
     @MockkBean private lateinit var stringRedisTemplate: StringRedisTemplate
+
     @MockkBean private lateinit var fcmClient: FcmClient
+
     @MockkBean private lateinit var meetingExpirationListener: MeetingExpirationListener
+
     @MockkBean private lateinit var placeLikeSseService: PlaceLikeSseService
 
     @Autowired private lateinit var meetingJpaRepository: MeetingJpaRepository
+
     @Autowired private lateinit var userRepository: UserRepository
+
     @Autowired private lateinit var stationJpaRepository: StationJpaRepository
+
     @Autowired private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
+
     @Autowired private lateinit var surveyJpaRepository: SurveyJpaRepository
+
     @Autowired private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
+
     @Autowired private lateinit var deviceTokenJpaRepository: DeviceTokenJpaRepository
 
     @Test
@@ -72,17 +82,21 @@ class NotificationIntegrationTest {
             userRepository.save(UserFixture.createEntityWithoutId(socialId = "user-$i", email = "user$i@test.com", nickname = "user-$i"))
         }
         users.forEach { user ->
-            deviceTokenJpaRepository.save(DeviceTokenEntity(userId = user.id!!, fcmToken = "token-${user.id}", platform = DevicePlatform.IOS))
+            deviceTokenJpaRepository.save(
+                DeviceTokenEntity(userId = user.id!!, fcmToken = "token-${user.id}", platform = DevicePlatform.IOS),
+            )
         }
         val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
-        val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(attendeeCount = participantsCount, hostUser = users[0], station = station))
+        val meeting = meetingJpaRepository.save(
+            MeetingFixture.createEntityWithoutId(attendeeCount = participantsCount, hostUser = users[0], station = station),
+        )
         users.forEach { user ->
             meetingAttendeeJpaRepository.save(
-                org.depromeet.team3.fixture.MeetingAttendeeFixture.createEntityWithoutId(meeting = meeting, user = user)
+                org.depromeet.team3.fixture.MeetingAttendeeFixture.createEntityWithoutId(meeting = meeting, user = user),
             )
         }
         val cat = surveyCategoryJpaRepository.save(
-            org.depromeet.team3.fixture.SurveyCategoryFixture.createEntityWithoutId()
+            org.depromeet.team3.fixture.SurveyCategoryFixture.createEntityWithoutId(),
         )
 
         // given — Redis mock 설정
@@ -119,7 +133,7 @@ class NotificationIntegrationTest {
         users.forEach { user ->
             val mockRecord = MapRecord.create(
                 RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-                mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
+                mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString()),
             ).withId(RecordId.of("123-${user.id}"))
             meetingNotificationConsumer.onMessage(mockRecord)
         }
@@ -127,7 +141,9 @@ class NotificationIntegrationTest {
             coVerify(timeout = 5000) {
                 fcmClient.sendMulticast(
                     tokens = match { it.contains("token-${user.id}") && it.size == 1 },
-                    title = any(), body = any(), data = any()
+                    title = any(),
+                    body = any(),
+                    data = any(),
                 )
             }
         }
@@ -139,7 +155,7 @@ class NotificationIntegrationTest {
         // given
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf("meetingId" to "1", "userId" to "100")
+            mapOf("meetingId" to "1", "userId" to "100"),
         ).withId(RecordId.of("999-0"))
 
         val valueOps = mockk<ValueOperations<String, String>>()
@@ -157,14 +173,16 @@ class NotificationIntegrationTest {
     @DisplayName("FCM 전송 중 예외 발생 시 acknowledge가 호출되지 않아야 한다")
     fun `FCM 전송 실패 시 재시도를 위해 ACK를 생략한다`() = runBlocking {
         // given
-        val user = userRepository.save(UserFixture.createEntityWithoutId(socialId = "fail-user", email = "fail@test.com", nickname = "fail-user"))
+        val user = userRepository.save(
+            UserFixture.createEntityWithoutId(socialId = "fail-user", email = "fail@test.com", nickname = "fail-user"),
+        )
         deviceTokenJpaRepository.save(DeviceTokenEntity(userId = user.id!!, fcmToken = "fail-token", platform = DevicePlatform.IOS))
         val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
         val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(hostUser = user, station = station))
 
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
+            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString()),
         ).withId(RecordId.of("888-0"))
 
         val streamOps = mockk<StreamOperations<String, String, String>>()
@@ -186,13 +204,15 @@ class NotificationIntegrationTest {
     @DisplayName("토큰이 없는 유저의 경우 알림 발송은 스킵되지만 메시지는 정상 처리(ACK)되어야 한다")
     fun `토큰 부재 시 알림 스킵 및 정상 ACK 처리 검증`() = runBlocking {
         // given — 토큰 미등록 유저
-        val user = userRepository.save(UserFixture.createEntityWithoutId(socialId = "no-token-user", email = "notoken@test.com", nickname = "no-token-user"))
+        val user = userRepository.save(
+            UserFixture.createEntityWithoutId(socialId = "no-token-user", email = "notoken@test.com", nickname = "no-token-user"),
+        )
         val station = stationJpaRepository.save(StationFixture.createEntityWithoutId())
         val meeting = meetingJpaRepository.save(MeetingFixture.createEntityWithoutId(hostUser = user, station = station))
 
         val mockRecord = MapRecord.create(
             RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
-            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString())
+            mapOf("meetingId" to meeting.id.toString(), "userId" to user.id.toString()),
         ).withId(RecordId.of("777-0"))
 
         val streamOps = mockk<StreamOperations<String, String, String>>()

@@ -9,14 +9,12 @@ import java.util.UUID
 
 /**
  * API 레이어에서 사용하는 경량 분산 락 서비스
- * 
+ *
  * - 타임아웃이 명확한 API 요청의 중복 실행(Cache Stampede)을 방지하기 위해 사용합니다.
  * - 배치의 긴 작업을 위한 Watchdog 기능은 포함하지 않으며, 고정 TTL 방식을 사용합니다.
  */
 @Component
-class DistributedLockService(
-    private val redisTemplate: StringRedisTemplate
-) {
+class DistributedLockService(private val redisTemplate: StringRedisTemplate) {
     private val logger = LoggerFactory.getLogger(DistributedLockService::class.java)
 
     // 안전한 해제를 위한 루아 스크립트 (내가 잡은 락일 때만 해제)
@@ -28,7 +26,7 @@ class DistributedLockService(
             return 0
         end
         """.trimIndent(),
-        Long::class.java
+        Long::class.java,
     )
 
     /**
@@ -37,13 +35,9 @@ class DistributedLockService(
      * @param action 락 획득 시 실행할 로직
      * @return 락 획득 실패 시 null, 성공 시 action의 결과
      */
-    suspend fun <T> withLock(
-        lockKey: String,
-        ttl: Duration = Duration.ofSeconds(10),
-        action: suspend () -> T
-    ): T? {
+    suspend fun <T> withLock(lockKey: String, ttl: Duration = Duration.ofSeconds(10), action: suspend () -> T): T? {
         val lockValue = UUID.randomUUID().toString()
-        
+
         // 1. 락 획득 시도 (SETNX)
         val acquired = redisTemplate.opsForValue()
             .setIfAbsent(lockKey, lockValue, ttl) ?: false
@@ -62,7 +56,7 @@ class DistributedLockService(
                 val result = redisTemplate.execute(
                     unlockScript,
                     listOf(lockKey),
-                    lockValue
+                    lockValue,
                 )
                 if (result != null && result > 0L) {
                     logger.debug("Successfully released lock [{}].", lockKey)

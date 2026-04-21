@@ -1,7 +1,7 @@
 package org.depromeet.team3.meeting.application
 
-import org.depromeet.team3.common.constants.RedisStreamConstants
 import kotlinx.coroutines.runBlocking
+import org.depromeet.team3.common.constants.RedisStreamConstants
 import org.depromeet.team3.meetingattendee.MeetingAttendeeRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -19,7 +19,7 @@ import java.time.Duration
 class MeetingExpirationListener(
     @Qualifier("redisMessageListenerContainer") listenerContainer: RedisMessageListenerContainer,
     private val stringRedisTemplate: StringRedisTemplate,
-    private val meetingAttendeeRepository: MeetingAttendeeRepository
+    private val meetingAttendeeRepository: MeetingAttendeeRepository,
 ) : KeyExpirationEventMessageListener(listenerContainer) {
 
     private val logger = LoggerFactory.getLogger(MeetingExpirationListener::class.java)
@@ -49,25 +49,26 @@ class MeetingExpirationListener(
 
             // 1. 식당 검색 추천 요청 발행
             val calcRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
-                RedisStreamConstants.MEETING_CALCULATION_STREAM, mapOf<String, String>(
+                RedisStreamConstants.MEETING_CALCULATION_STREAM,
+                mapOf<String, String>(
                     "meetingId" to meetingId.toString(),
-                    "requestId" to requestId
-                )
+                    "requestId" to requestId,
+                ),
             )
             stringRedisTemplate.opsForStream<String, String>().add(calcRecord)
 
             // 2. 만료 알림 트리거 발행 (Fan-out: 구성원 한 명 당 1개 메시지)
             runBlocking {
                 val attendees = meetingAttendeeRepository.findByMeetingId(meetingId)
-                
+
                 attendees.forEach { attendee ->
                     val notarRecord = org.springframework.data.redis.connection.stream.MapRecord.create(
                         RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
                         mapOf<String, String>(
                             "meetingId" to meetingId.toString(),
                             "userId" to attendee.userId.toString(),
-                            "requestId" to requestId
-                        )
+                            "requestId" to requestId,
+                        ),
                     )
                     stringRedisTemplate.opsForStream<String, String>().add(notarRecord)
                     logger.debug("모임 {} 만료 알림 발행 완료 (대상 사용자: {})", meetingId, attendee.userId)

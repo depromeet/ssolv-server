@@ -1,8 +1,7 @@
 package org.depromeet.team3.meeting.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingEntity
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.dto.request.CreateMeetingRequest
@@ -29,63 +28,62 @@ class CreateMeetingService(
     private val userJpaRepository: UserRepository,
     private val inviteTokenService: InviteTokenService,
     private val meetingExpirationSchedulerService: MeetingExpirationSchedulerService,
-    private val transactionTemplate: TransactionTemplate
+    private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse =
-        withTracingContext() {
-            val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
-            if (request.endAt != null && request.endAt.isBefore(now)) {
-                throw MeetingException(
-                    errorCode = ErrorCode.INVALID_END_TIME,
-                    detail = mapOf("endAt" to request.endAt.toString())
-                )
-            }
-
-            // Meeting + MeetingAttendee 저장을 하나의 트랜잭션으로 처리 (runBlocking 불필요)
-            val meetingId = transactionTemplate.execute {
-                val userEntity = userJpaRepository.findByIdOrNull(userId)
-                    ?: throw MeetingException(
-                        errorCode = ErrorCode.USER_NOT_FOUND,
-                        detail = mapOf("userId" to userId)
-                    )
-
-                val stationEntity = stationJpaRepository.findByIdOrNull(request.stationId)
-                    ?: throw MeetingException(
-                        errorCode = ErrorCode.STATION_NOT_FOUND,
-                        detail = mapOf("stationId" to request.stationId)
-                    )
-
-                val meetingEntity = meetingJpaRepository.save(
-                    MeetingEntity(
-                        name = request.name,
-                        hostUser = userEntity,
-                        attendeeCount = request.attendeeCount,
-                        isClosed = false,
-                        station = stationEntity,
-                        endAt = request.endAt
-                    )
-                )
-
-                meetingAttendeeJpaRepository.save(
-                    MeetingAttendeeEntity(
-                        meeting = meetingEntity,
-                        user = userEntity,
-                        attendeeNickname = userEntity.nickname,
-                        muzziColor = MuzziColor.DEFAULT
-                    )
-                )
-
-                meetingEntity.id!!
-            }!!
-
-            // suspend 함수이므로 트랜잭션 블록 바깥에서 호출
-            val inviteToken = inviteTokenService.generateInviteToken(meetingId)
-            
-            if (request.endAt != null) {
-                meetingExpirationSchedulerService.scheduleExpiration(meetingId, request.endAt)
-            }
-            
-            CreateMeetingResponse(meetingId, inviteToken)
+    suspend operator fun invoke(request: CreateMeetingRequest, userId: Long): CreateMeetingResponse = withTracingContext {
+        val now = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
+        if (request.endAt != null && request.endAt.isBefore(now)) {
+            throw MeetingException(
+                errorCode = ErrorCode.INVALID_END_TIME,
+                detail = mapOf("endAt" to request.endAt.toString()),
+            )
         }
+
+        // Meeting + MeetingAttendee 저장을 하나의 트랜잭션으로 처리 (runBlocking 불필요)
+        val meetingId = transactionTemplate.execute {
+            val userEntity = userJpaRepository.findByIdOrNull(userId)
+                ?: throw MeetingException(
+                    errorCode = ErrorCode.USER_NOT_FOUND,
+                    detail = mapOf("userId" to userId),
+                )
+
+            val stationEntity = stationJpaRepository.findByIdOrNull(request.stationId)
+                ?: throw MeetingException(
+                    errorCode = ErrorCode.STATION_NOT_FOUND,
+                    detail = mapOf("stationId" to request.stationId),
+                )
+
+            val meetingEntity = meetingJpaRepository.save(
+                MeetingEntity(
+                    name = request.name,
+                    hostUser = userEntity,
+                    attendeeCount = request.attendeeCount,
+                    isClosed = false,
+                    station = stationEntity,
+                    endAt = request.endAt,
+                ),
+            )
+
+            meetingAttendeeJpaRepository.save(
+                MeetingAttendeeEntity(
+                    meeting = meetingEntity,
+                    user = userEntity,
+                    attendeeNickname = userEntity.nickname,
+                    muzziColor = MuzziColor.DEFAULT,
+                ),
+            )
+
+            meetingEntity.id!!
+        }!!
+
+        // suspend 함수이므로 트랜잭션 블록 바깥에서 호출
+        val inviteToken = inviteTokenService.generateInviteToken(meetingId)
+
+        if (request.endAt != null) {
+            meetingExpirationSchedulerService.scheduleExpiration(meetingId, request.endAt)
+        }
+
+        CreateMeetingResponse(meetingId, inviteToken)
+    }
 }

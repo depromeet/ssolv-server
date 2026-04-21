@@ -3,11 +3,7 @@ package org.depromeet.team3.common.exception
 /**
  * 애플리케이션 전역에서 사용하는 에러 코드 정의
  */
-enum class ErrorCode(
-    val code: String,
-    val message: String,
-    val httpStatus: Int
-) {
+enum class ErrorCode(val code: String, val message: String, val httpStatus: Int) {
     // 4xx Client Errors
     INVALID_REQUEST("C001", "잘못된 요청입니다.", 400),
     INVALID_PARAMETER("C002", "유효하지 않은 파라미터입니다.", 400),
@@ -112,5 +108,5 @@ enum class ErrorCode(
     PLACE_NEARBY_SEARCH_FAILED("P006", "주변 장소 검색에 실패했습니다.", 500),
     PLACE_INVALID_QUERY("P007", "유효하지 않은 검색어입니다.", 400),
     PLACE_API_KEY_INVALID("P008", "Google Places API 키가 유효하지 않습니다.", 500),
-    PLACE_API_QUOTA_EXCEEDED("P009", "Google Places API 할당량을 초과했습니다.", 429)
+    PLACE_API_QUOTA_EXCEEDED("P009", "Google Places API 할당량을 초과했습니다.", 429),
 }

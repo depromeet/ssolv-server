@@ -18,5 +18,5 @@ class SurveyResultEntity(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "survey_category_id", nullable = false)
-    val surveyCategory: SurveyCategoryEntity
+    val surveyCategory: SurveyCategoryEntity,
 ) : BaseTimeEntity()

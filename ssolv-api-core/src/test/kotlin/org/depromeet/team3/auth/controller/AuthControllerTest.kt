@@ -3,13 +3,12 @@ package org.depromeet.team3.auth.controller
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.runTest
 import org.depromeet.team3.annotation.UnitTest
+import org.depromeet.team3.auth.application.common.LogoutService
+import org.depromeet.team3.auth.application.common.WithdrawService
 import org.depromeet.team3.auth.application.login.AppleOAuthService
 import org.depromeet.team3.auth.application.login.DemoLoginService
 import org.depromeet.team3.auth.application.login.KakaoLoginService
 import org.depromeet.team3.auth.application.token.UpdateTokenService
-import org.depromeet.team3.auth.application.common.LogoutService
-import org.depromeet.team3.auth.application.common.WithdrawService
-import org.depromeet.team3.auth.command.KakaoLoginCommand
 import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.LoginResponse
 import org.depromeet.team3.auth.dto.LogoutResponse
@@ -34,10 +33,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 class AuthControllerTest {
 
     @Mock private lateinit var kakaoLoginService: KakaoLoginService
+
     @Mock private lateinit var appleOAuthService: AppleOAuthService
+
     @Mock private lateinit var demoLoginService: DemoLoginService
+
     @Mock private lateinit var updateTokenService: UpdateTokenService
+
     @Mock private lateinit var logoutService: LogoutService
+
     @Mock private lateinit var withdrawService: WithdrawService
 
     @InjectMocks private lateinit var authController: AuthController
@@ -61,8 +65,8 @@ class AuthControllerTest {
             userProfile = UserProfileResponse(
                 email = "test@example.com",
                 nickname = "테스트사용자",
-                profileImage = "https://example.com/profile.jpg"
-            )
+                profileImage = "https://example.com/profile.jpg",
+            ),
         )
         kakaoLoginService.stub {
             onBlocking { login(any()) }.doReturn(loginResponse)
@@ -72,7 +76,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             get("/api/v1/auth/kakao-login")
                 .param("code", "test-auth-code")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON),
         )
             .andExpect(request().asyncStarted())
             .andReturn()
@@ -88,7 +92,7 @@ class AuthControllerTest {
     @Test
     fun `카카오 로그인 실패 - 400 에러 (코드 누락)`() {
         mockMvc.perform(
-            get("/api/v1/auth/kakao-login").contentType(MediaType.APPLICATION_JSON)
+            get("/api/v1/auth/kakao-login").contentType(MediaType.APPLICATION_JSON),
         ).andExpect(status().isBadRequest)
     }
 
@@ -104,7 +108,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token"))),
         )
             .andExpect(request().asyncStarted())
             .andReturn()
@@ -127,7 +131,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "invalid-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "invalid-refresh-token"))),
         )
             .andExpect(request().asyncStarted())
             .andReturn()
@@ -146,7 +150,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token"))),
         ).andExpect(request().asyncStarted()).andReturn()
 
         mockMvc.perform(asyncDispatch(mvcResult))
@@ -162,7 +166,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token"))),
         ).andExpect(request().asyncStarted()).andReturn()
 
         mockMvc.perform(asyncDispatch(mvcResult))
@@ -178,7 +182,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "different-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "different-refresh-token"))),
         ).andExpect(request().asyncStarted()).andReturn()
 
         mockMvc.perform(asyncDispatch(mvcResult))
@@ -194,7 +198,7 @@ class AuthControllerTest {
         val mvcResult = mockMvc.perform(
             post("/api/v1/auth/reissue-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token")))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(refreshToken = "valid-refresh-token"))),
         ).andExpect(request().asyncStarted()).andReturn()
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isInternalServerError)
@@ -211,7 +215,7 @@ class AuthControllerTest {
 
         // when
         val mvcResult = mockMvc.perform(
-            post("/api/v1/auth/logout").contentType(MediaType.APPLICATION_JSON)
+            post("/api/v1/auth/logout").contentType(MediaType.APPLICATION_JSON),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -230,7 +234,7 @@ class AuthControllerTest {
 
         // when
         val mvcResult = mockMvc.perform(
-            delete("/api/v1/auth/withdraw").contentType(MediaType.APPLICATION_JSON)
+            delete("/api/v1/auth/withdraw").contentType(MediaType.APPLICATION_JSON),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then
@@ -248,7 +252,7 @@ class AuthControllerTest {
 
         // when
         val mvcResult = mockMvc.perform(
-            delete("/api/v1/auth/withdraw").contentType(MediaType.APPLICATION_JSON)
+            delete("/api/v1/auth/withdraw").contentType(MediaType.APPLICATION_JSON),
         ).andExpect(request().asyncStarted()).andReturn()
 
         // then

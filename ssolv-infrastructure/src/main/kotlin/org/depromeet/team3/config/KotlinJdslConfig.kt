@@ -7,7 +7,5 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class KotlinJdslConfig {
     @Bean
-    fun jpqlRenderContext(): JpqlRenderContext {
-        return JpqlRenderContext()
-    }
+    fun jpqlRenderContext(): JpqlRenderContext = JpqlRenderContext()
 }

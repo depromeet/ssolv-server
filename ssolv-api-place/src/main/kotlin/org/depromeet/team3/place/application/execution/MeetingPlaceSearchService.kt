@@ -1,19 +1,17 @@
 package org.depromeet.team3.place.application.execution
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
-import kotlin.math.ln
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.meeting.MeetingQuery
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import java.util.concurrent.TimeUnit
+import kotlin.math.ln
 
 /**
  * 모임별 장소 검색 결과를 Redis에 저장/조회
- * 
+ *
  * - 검색 결과 중 장소 상세 정보를 개별적으로 캐싱 (place:details:{id}, TTL 30일)
  * - 모임에는 검색된 장소의 ID만 저장 (meeting:places:{meetingId}, ZSET 형태 혹은 List)
  * - 재요청 시 Redis에서 10개의 상세 정보를 한번에 가져오고, 누락된 건만 재조회
@@ -26,23 +24,21 @@ class MeetingPlaceSearchService(
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
 ) {
 
-    private val MEETING_KEY_PREFIX = "meeting:places:"
-    private val PLACE_KEY_PREFIX = "place:details:"
-    private val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
+    companion object {
+        private const val MEETING_KEY_PREFIX = "meeting:places:"
+        private const val PLACE_KEY_PREFIX = "place:details:"
+        private const val LIKE_KEY_TEMPLATE = "meeting:%d:place:%d:likes"
+    }
 
     /**
      * 검색 결과 저장 (Redis 기반 - ZSET 및 개별 상세정보 캐싱)
      */
-    suspend fun save(
-        meetingId: Long, 
-        result: PlacesSearchResponse,
-        scores: Map<Long, Double> = emptyMap()
-    ) = withTracingContext() {
+    suspend fun save(meetingId: Long, result: PlacesSearchResponse, scores: Map<Long, Double> = emptyMap()) = withTracingContext {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
-        
+
         // 1. 기존 모임 결과 지우고 새로 저장 (ZSET)
         redisTemplate.delete(meetingKey)
-        
+
         if (result.items.isNotEmpty()) {
             result.items.forEach { item ->
                 val score = scores[item.placeId] ?: 0.0
@@ -62,20 +58,19 @@ class MeetingPlaceSearchService(
         }
     }
 
-
     /**
      * 검색 결과 조회 (Redis 기반 MGET + 좋아요 실시간 결합)
      */
-    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withTracingContext() {
+    suspend fun find(meetingId: Long, userId: Long? = null): PlacesSearchResponse? = withTracingContext {
         val meetingKey = "$MEETING_KEY_PREFIX$meetingId"
-        
+
         // 1. ZSET에서 점수(BaseScore)와 함께 상위 10개 ID 가져오기
         val placeIdWithScores = redisTemplate.opsForZSet().reverseRangeWithScores(meetingKey, 0, 9)
-        
+
         if (placeIdWithScores.isNullOrEmpty()) {
             return@withTracingContext null
         }
-        
+
         val placeIds = placeIdWithScores.mapNotNull { it.value }
         val scoreMap = placeIdWithScores.associate { (it.value ?: "") to (it.score ?: 0.0) }
 
@@ -96,11 +91,13 @@ class MeetingPlaceSearchService(
                 missingPlaceIds.add(dbId)
                 missingIndices.add(i)
                 // Placeholder
-                items.add(PlacesSearchResponse.PlaceItem(
-                    placeId = -1L, name = "", address = "", rating = null, userRatingsTotal = null,
-                    openNow = null, photos = null, link = "", weekdayText = null, topReview = null,
-                    priceRange = null, addressDescriptor = null
-                ))
+                items.add(
+                    PlacesSearchResponse.PlaceItem(
+                        placeId = -1L, name = "", address = "", rating = null, userRatingsTotal = null,
+                        openNow = null, photos = null, link = "", weekdayText = null, topReview = null,
+                        priceRange = null, addressDescriptor = null,
+                    ),
+                )
             }
         }
 
@@ -129,12 +126,16 @@ class MeetingPlaceSearchService(
                             val reviewText = entity.topReviewText
                             if (reviewRating != null && reviewText != null) {
                                 PlacesSearchResponse.PlaceItem.Review(rating = reviewRating.toInt(), text = reviewText)
-                            } else null
+                            } else {
+                                null
+                            }
                         },
                         priceRange = null,
                         addressDescriptor = entity.addressDescriptor?.let { desc ->
-                            PlacesSearchResponse.PlaceItem.AddressDescriptor(description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
-                        }
+                            PlacesSearchResponse.PlaceItem.AddressDescriptor(
+                                description = org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc),
+                            )
+                        },
                     )
                     items[missingIndices[idxInMissing]] = recovered
                     redisTemplate.opsForValue().set("$PLACE_KEY_PREFIX$dbId", objectMapper.writeValueAsString(recovered), 30, TimeUnit.DAYS)
@@ -161,10 +162,10 @@ class MeetingPlaceSearchService(
         val finalItemsWithLike = finalItemsToProcess.map { item ->
             val likeCount = (pipelineResults[resIdx++] as? Long) ?: 0L
             val isLiked = if (userId != null) (pipelineResults[resIdx++] as? Boolean) ?: false else false
-            
+
             item.copy(
                 likeCount = likeCount.toInt(),
-                isLiked = isLiked
+                isLiked = isLiked,
             )
         }
 
@@ -172,7 +173,7 @@ class MeetingPlaceSearchService(
         val sortedItems = finalItemsWithLike.sortedByDescending { item ->
             val baseScore = scoreMap[item.placeId.toString()] ?: 0.0
             val realtimeLikeScore = ln(item.likeCount + 1.0) * 50.0
-            
+
             baseScore + realtimeLikeScore
         }
 

@@ -18,6 +18,7 @@ import java.time.LocalDateTime
 class InviteTokenServiceTest {
 
     @Mock private lateinit var meetingRepository: MeetingRepository
+
     @Mock private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
 
     private lateinit var inviteTokenService: InviteTokenService

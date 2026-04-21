@@ -9,5 +9,5 @@ data class DeviceToken(
     val fcmToken: String,
     val platform: DevicePlatform,
     override val createdAt: LocalDateTime,
-    override val updatedAt: LocalDateTime? = null
+    override val updatedAt: LocalDateTime? = null,
 ) : BaseTimeDomain(createdAt, updatedAt)

@@ -1,25 +1,13 @@
 package org.depromeet.team3.place.client
-import io.micrometer.core.instrument.MeterRegistry
-
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.place.exception.PlaceSearchException
-import org.depromeet.team3.place.model.PlacesTextSearchRequest
-import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
-import org.springframework.web.client.HttpClientErrorException
-import org.springframework.web.client.RestClient
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runTest
-import org.mockito.Mockito.lenient
-import org.mockito.quality.Strictness
-import org.mockito.junit.jupiter.MockitoSettings
-import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.kotlin.*
+import org.mockito.quality.Strictness
+import org.springframework.web.client.HttpClientErrorException
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
@@ -33,17 +21,16 @@ class GooglePlacesClientRetryTest {
     fun setUp() {
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
-            baseUrl = "https://places.googleapis.com"
+            baseUrl = "https://places.googleapis.com",
         )
-        
+
         googlePlacesClient = GooglePlacesClient(
             httpClient = mock(),
             googlePlacesApiProperties = googlePlacesApiProperties,
             meterRegistry = mock(),
-            openTelemetry = io.opentelemetry.api.OpenTelemetry.noop()
+            openTelemetry = io.opentelemetry.api.OpenTelemetry.noop(),
         )
     }
-
 
     @org.junit.jupiter.api.Disabled("WebClient 마이그레이션으로 인한 테스트 수정 필요")
     @Test
@@ -52,11 +39,11 @@ class GooglePlacesClientRetryTest {
         runTest {
             val query = "맛집"
             val mockResponse = PlacesTextSearchResponse(emptyList())
-            
+
             val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
             val requestBodySpec = mock<RestClient.RequestBodySpec>()
             val responseSpec = mock<RestClient.ResponseSpec>()
-            
+
             whenever(restClient.post()).thenReturn(requestBodyUriSpec)
             whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
             whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
@@ -72,7 +59,7 @@ class GooglePlacesClientRetryTest {
             assertThat(result).isNotNull
             verify(responseSpec, times(2)).body(PlacesTextSearchResponse::class.java)
         }
-        */
+         */
     }
 
     @org.junit.jupiter.api.Disabled("WebClient 마이그레이션으로 인한 테스트 수정 필요")
@@ -84,7 +71,7 @@ class GooglePlacesClientRetryTest {
             val requestBodyUriSpec = mock<RestClient.RequestBodyUriSpec>()
             val requestBodySpec = mock<RestClient.RequestBodySpec>()
             val responseSpec = mock<RestClient.ResponseSpec>()
-            
+
             whenever(restClient.post()).thenReturn(requestBodyUriSpec)
             whenever(requestBodyUriSpec.uri(any<String>())).thenReturn(requestBodySpec)
             whenever(requestBodySpec.header(any<String>(), any<String>())).thenReturn(requestBodySpec)
@@ -99,19 +86,17 @@ class GooglePlacesClientRetryTest {
             } catch (e: PlaceSearchException) {
                 // Expected
             }
-            
+
             verify(responseSpec, times(3)).body(PlacesTextSearchResponse::class.java)
         }
-        */
+         */
     }
 
-    private fun createHttpClientErrorException(statusCode: Int): HttpClientErrorException {
-        return HttpClientErrorException.create(
-            org.springframework.http.HttpStatus.valueOf(statusCode),
-            "Error",
-            org.springframework.http.HttpHeaders.EMPTY,
-            ByteArray(0),
-            null
-        )
-    }
+    private fun createHttpClientErrorException(statusCode: Int): HttpClientErrorException = HttpClientErrorException.create(
+        org.springframework.http.HttpStatus.valueOf(statusCode),
+        "Error",
+        org.springframework.http.HttpHeaders.EMPTY,
+        ByteArray(0),
+        null,
+    )
 }

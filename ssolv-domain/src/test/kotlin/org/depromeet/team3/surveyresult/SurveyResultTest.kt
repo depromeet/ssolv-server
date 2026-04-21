@@ -18,7 +18,7 @@ class SurveyResultTest {
         // when
         val surveyResult = SurveyResult(
             surveyId = surveyId,
-            surveyCategoryId = surveyCategoryId
+            surveyCategoryId = surveyCategoryId,
         )
 
         // then

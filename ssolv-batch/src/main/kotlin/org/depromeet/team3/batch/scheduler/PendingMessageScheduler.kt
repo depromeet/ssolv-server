@@ -77,12 +77,14 @@ class PendingMessageScheduler(
                 .forEach { pending ->
                     logger.error(
                         "[watchdog] 최대 재시도 초과 메시지 폐기 (stream: {}, id: {}, deliveryCount: {})",
-                        streamKey, pending.id, pending.totalDeliveryCount,
+                        streamKey,
+                        pending.id,
+                        pending.totalDeliveryCount,
                     )
                     stringRedisTemplate.opsForStream<String, String>()
                         .acknowledge(streamKey, groupName, pending.id)
                     Sentry.captureMessage(
-                        "Dead letter: stream=$streamKey, id=${pending.id}, deliveryCount=${pending.totalDeliveryCount}"
+                        "Dead letter: stream=$streamKey, id=${pending.id}, deliveryCount=${pending.totalDeliveryCount}",
                     )
                 }
         } catch (e: Exception) {

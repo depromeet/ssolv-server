@@ -1,7 +1,6 @@
 package org.depromeet.team3.surveycategory.application
-import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.exception.SurveyCategoryException
 import org.springframework.stereotype.Service
@@ -13,13 +12,13 @@ class DeleteSurveyCategoryService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    suspend operator fun invoke(id: Long): Unit = withTracingContext() {
+    suspend operator fun invoke(id: Long): Unit = withTracingContext {
         transactionTemplate.execute {
             // 1. 삭제할 카테고리 조회
             val entity = surveyCategoryJpaRepository.findByIdAndIsDeletedFalse(id)
                 ?: throw SurveyCategoryException(
                     ErrorCode.CATEGORY_NOT_FOUND,
-                    mapOf("id" to id)
+                    mapOf("id" to id),
                 )
 
             // 2. 하위 카테고리 존재 여부 확인
@@ -30,8 +29,8 @@ class DeleteSurveyCategoryService(
                     ErrorCode.CATEGORY_HAS_CHILDREN,
                     mapOf(
                         "categoryName" to entity.name,
-                        "categoryId" to id
-                    )
+                        "categoryId" to id,
+                    ),
                 )
             }
 

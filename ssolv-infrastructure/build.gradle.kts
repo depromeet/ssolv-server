@@ -11,7 +11,7 @@ plugins {
 // kapt 설정
 kapt {
     correctErrorTypes = true
-    useBuildCache = false  // CI에서 캐시 문제 방지
+    useBuildCache = false // CI에서 캐시 문제 방지
     showProcessorStats = false
     javacOptions {
         option("-Xmaxerrs", 500)
@@ -24,7 +24,7 @@ dependencies {
 
     // WebFlux (for WebClient)
     implementation("org.springframework.boot:spring-boot-starter-webflux")
-    
+
     implementation("org.springframework.boot:spring-boot-starter-web")
     api("com.linecorp.kotlin-jdsl:jpql-dsl:3.8.0")
     api("com.linecorp.kotlin-jdsl:jpql-render:3.8.0")
@@ -35,7 +35,6 @@ dependencies {
     // Spring Boot 관리 버전 사용
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-
 
     // QueryDSL
     implementation("com.querydsl:querydsl-jpa:5.0.0:jakarta")

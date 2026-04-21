@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository
 @Repository
 class DeviceTokenCommandRepositoryImpl(
     private val deviceTokenJpaRepository: DeviceTokenJpaRepository,
-    private val deviceTokenMapper: DeviceTokenMapper
+    private val deviceTokenMapper: DeviceTokenMapper,
 ) : DeviceTokenCommandRepository {
 
     override fun save(deviceToken: DeviceToken): DeviceToken {

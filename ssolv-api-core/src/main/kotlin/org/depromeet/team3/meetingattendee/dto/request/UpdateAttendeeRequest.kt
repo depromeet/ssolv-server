@@ -10,5 +10,5 @@ data class UpdateAttendeeRequest(
     val attendeeNickname: String,
 
     @Schema(description = "모임에서 사용할 프로필 색상", example = "BANANA")
-    val color: String?
+    val color: String?,
 )

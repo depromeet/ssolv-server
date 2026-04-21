@@ -41,9 +41,8 @@ subprojects {
     // ktlint 설정: 기존 코드베이스에 대한 점진적 도입을 위해 baseline 전략 사용
     configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
         version.set("1.3.1") // Kotlin 1.9.x 호환
-        // Phase 1: baseline에 2,708건의 기존 위반이 존재하므로 ktlint는 harness에서도 리포팅만.
-        // 향후 cleanup PR(ktlintFormat 일괄 적용)에서 `!isHarness`로 전환 예정.
-        ignoreFailures.set(true)
+        // Phase 1.5 이후: baseline cleanup 완료 — harness 경로에서는 ktlint 실패도 차단.
+        ignoreFailures.set(!isHarness)
         outputToConsole.set(true)
         filter {
             exclude { element -> element.file.path.contains("/build/") }

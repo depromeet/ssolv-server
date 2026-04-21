@@ -29,10 +29,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @Component
 @Profile("!test")
-class RedisBusinessMetricsCollector(
-    private val redisTemplate: StringRedisTemplate,
-    private val meterRegistry: MeterRegistry
-) {
+class RedisBusinessMetricsCollector(private val redisTemplate: StringRedisTemplate, private val meterRegistry: MeterRegistry) {
     private val logger = LoggerFactory.getLogger(RedisBusinessMetricsCollector::class.java)
 
     private val activeMeetings = AtomicLong(0)
@@ -76,14 +73,14 @@ class RedisBusinessMetricsCollector(
             group = RedisStreamConstants.MEETING_CALCULATION_GROUP,
             pelGauge = calcStreamPel,
             lengthGauge = calcStreamLength,
-            consumersGauge = calcStreamConsumers
+            consumersGauge = calcStreamConsumers,
         )
         collectStreamMetrics(
             stream = RedisStreamConstants.MEETING_NOTIFICATION_STREAM,
             group = RedisStreamConstants.MEETING_NOTIFICATION_GROUP,
             pelGauge = notifStreamPel,
             lengthGauge = notifStreamLength,
-            consumersGauge = notifStreamConsumers
+            consumersGauge = notifStreamConsumers,
         )
     }
 
@@ -114,7 +111,7 @@ class RedisBusinessMetricsCollector(
         group: String,
         pelGauge: AtomicLong,
         lengthGauge: AtomicLong,
-        consumersGauge: AtomicLong
+        consumersGauge: AtomicLong,
     ) {
         runCatching {
             val ops = redisTemplate.opsForStream<String, String>()

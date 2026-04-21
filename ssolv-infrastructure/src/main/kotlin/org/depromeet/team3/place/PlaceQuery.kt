@@ -5,7 +5,6 @@ import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.support.TransactionTemplate
-import java.time.LocalDateTime
 
 @Repository
 @ConditionalOnProperty(prefix = "api.google.places", name = ["api-key"])
@@ -23,14 +22,10 @@ class PlaceQuery(
         maxResults: Int = 10,
         latitude: Double? = null,
         longitude: Double? = null,
-        radius: Double = 3000.0
-    ): PlacesTextSearchResponse {
-        return googlePlacesClient.textSearch(query, maxResults, latitude, longitude, radius)
-    }
+        radius: Double = 3000.0,
+    ): PlacesTextSearchResponse = googlePlacesClient.textSearch(query, maxResults, latitude, longitude, radius)
 
-    suspend fun savePlacesFromTextSearch(
-        places: List<PlacesTextSearchResponse.Place>
-    ): List<PlaceEntity> {
+    suspend fun savePlacesFromTextSearch(places: List<PlacesTextSearchResponse.Place>): List<PlaceEntity> {
         if (places.isEmpty()) return emptyList()
 
         return transactionTemplate.execute {
@@ -57,14 +52,14 @@ class PlaceQuery(
                     isDeleted = existing?.isDeleted ?: false,
                     // 장소 이름을 이용해 네이버 플레이스 링크 생성
                     link = org.depromeet.team3.place.util.PlaceFormatter.generateNaverPlaceLink(
-                        org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(place.displayName.text)
+                        org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(place.displayName.text),
                     ),
                     weekdayText = existing?.weekdayText,
                     topReviewRating = existing?.topReviewRating,
                     topReviewText = existing?.topReviewText,
                     priceRangeStart = existing?.priceRangeStart,
                     priceRangeEnd = existing?.priceRangeEnd,
-                    addressDescriptor = existing?.addressDescriptor
+                    addressDescriptor = existing?.addressDescriptor,
                 )
             }
 
@@ -73,12 +68,9 @@ class PlaceQuery(
     }
 
     // Google Place ID 목록으로 Place 엔티티 조회
-    suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> {
-        return placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
-    }
+    suspend fun findByGooglePlaceIds(googlePlaceIds: List<String>): List<PlaceEntity> =
+        placeJpaRepository.findByGooglePlaceIdIn(googlePlaceIds)
 
     // DB ID 목록으로 Place 엔티티 조회
-    suspend fun findByIds(ids: List<Long>): List<PlaceEntity> {
-        return placeJpaRepository.findAllById(ids)
-    }
+    suspend fun findByIds(ids: List<Long>): List<PlaceEntity> = placeJpaRepository.findAllById(ids)
 }

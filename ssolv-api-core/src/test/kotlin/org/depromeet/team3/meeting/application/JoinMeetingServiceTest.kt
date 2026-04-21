@@ -27,7 +27,9 @@ import java.time.LocalDateTime
 class JoinMeetingServiceTest {
 
     @Mock private lateinit var meetingRepository: MeetingRepository
+
     @Mock private lateinit var meetingAttendeeRepository: MeetingAttendeeRepository
+
     @Mock private lateinit var userRepository: UserRepository
 
     private lateinit var transactionTemplate: TransactionTemplate
@@ -41,7 +43,10 @@ class JoinMeetingServiceTest {
             callback.doInTransaction(mock())
         }
         joinMeetingService = JoinMeetingService(
-            meetingRepository, meetingAttendeeRepository, transactionTemplate, userRepository
+            meetingRepository,
+            meetingAttendeeRepository,
+            transactionTemplate,
+            userRepository,
         )
     }
 
@@ -128,9 +133,13 @@ class JoinMeetingServiceTest {
         val token = DataEncoder.encodeWithSeparator(":", meetingId.toString(), "validKey")
         val meeting = MeetingFixture.create(id = meetingId, attendeeCount = 5, isClosed = false, endAt = LocalDateTime.now().plusHours(2))
         val existingAttendee = MeetingAttendee(
-            id = 1L, meetingId = meetingId, userId = userId,
-            attendeeNickname = "기존닉네임", muzziColor = MuzziColor.DEFAULT,
-            createdAt = LocalDateTime.now(), updatedAt = LocalDateTime.now()
+            id = 1L,
+            meetingId = meetingId,
+            userId = userId,
+            attendeeNickname = "기존닉네임",
+            muzziColor = MuzziColor.DEFAULT,
+            createdAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now(),
         )
         whenever(meetingRepository.findById(meetingId)).thenReturn(meeting)
         whenever(meetingAttendeeRepository.findByMeetingIdAndUserId(meetingId, userId)).thenReturn(existingAttendee)

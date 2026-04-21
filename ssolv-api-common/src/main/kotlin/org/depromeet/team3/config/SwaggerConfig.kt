@@ -16,34 +16,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 class SwaggerConfig : WebMvcConfigurer {
 
     @Bean
-    fun customOpenAPI(): OpenAPI {
-        return OpenAPI()
-            .addServersItem(Server().url("/"))
-            .info(apiInfo())
-            .components(securityComponents())
-            .addSecurityItem(SecurityRequirement().addList("Bearer Authentication"))
-    }
+    fun customOpenAPI(): OpenAPI = OpenAPI()
+        .addServersItem(Server().url("/"))
+        .info(apiInfo())
+        .components(securityComponents())
+        .addSecurityItem(SecurityRequirement().addList("Bearer Authentication"))
 
-    private fun apiInfo(): Info {
-        return Info()
-            .title("디프만 3팀 Swagger")
-            .description("디프만 3팀의 Swagger API 문서입니다.")
-            .version("1.0")
-    }
+    private fun apiInfo(): Info = Info()
+        .title("디프만 3팀 Swagger")
+        .description("디프만 3팀의 Swagger API 문서입니다.")
+        .version("1.0")
 
-    private fun securityComponents(): Components {
-        return Components()
-            .addSecuritySchemes(
-                "Bearer Authentication",
-                SecurityScheme()
-                    .type(SecurityScheme.Type.HTTP)
-                    .scheme("bearer")
-                    .bearerFormat("JWT")
-                    .`in`(SecurityScheme.In.HEADER)
-                    .name("Authorization")
-                    .description("JWT Access Token 을 입력하세요 (Bearer 제외)")
-            )
-    }
+    private fun securityComponents(): Components = Components()
+        .addSecuritySchemes(
+            "Bearer Authentication",
+            SecurityScheme()
+                .type(SecurityScheme.Type.HTTP)
+                .scheme("bearer")
+                .bearerFormat("JWT")
+                .`in`(SecurityScheme.In.HEADER)
+                .name("Authorization")
+                .description("JWT Access Token 을 입력하세요 (Bearer 제외)"),
+        )
 
     override fun configureContentNegotiation(configurer: ContentNegotiationConfigurer) {
         configurer

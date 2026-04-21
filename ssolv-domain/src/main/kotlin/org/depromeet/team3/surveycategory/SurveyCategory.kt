@@ -3,7 +3,7 @@ package org.depromeet.team3.surveycategory
 import org.depromeet.team3.common.BaseTimeDomain
 import java.time.LocalDateTime
 
-data class SurveyCategory (
+data class SurveyCategory(
     val id: Long? = null,
     val parentId: Long? = null,
     val level: SurveyCategoryLevel,

@@ -17,7 +17,7 @@ class MdcPropagationTest {
     fun `Java_Thread_Tracking_Failure_Scenario`() {
         val requestId = "TRK-999-JAVA"
         MDC.put(requestIdKey, requestId)
-        
+
         logger.info(">>> API ENTRY - Service started")
         logger.info("Processing business logic step 1")
 
@@ -38,7 +38,7 @@ class MdcPropagationTest {
     fun `Coroutine_Tracking_Failure_Scenario`() = runBlocking {
         val requestId = "TRK-111-CORO-FAIL"
         MDC.put(requestIdKey, requestId)
-        
+
         logger.info(">>> API ENTRY - Coroutine service started")
         logger.info("Parent coroutine - Main task running")
 
@@ -58,7 +58,7 @@ class MdcPropagationTest {
     fun `Coroutine_Tracking_Success_Scenario`() = runBlocking {
         val requestId = "TRK-222-CORO-SUCCESS"
         MDC.put(requestIdKey, requestId)
-        
+
         logger.info(">>> API ENTRY - Coroutine service started")
         logger.info("Parent coroutine - Main task running")
 
@@ -77,7 +77,7 @@ class MdcPropagationTest {
     @Test
     fun `Thread_Pool_Pollution_Scenario`() {
         val executor = Executors.newFixedThreadPool(1)
-        
+
         // 1번 요청 (정상)
         val requestId1 = "REQ-101-CLEAN"
         executor.submit {
@@ -92,7 +92,7 @@ class MdcPropagationTest {
         executor.submit {
             // Filter에서 주입을 실패했거나, 아예 주입 로직이 빠진 경우
             logger.info("   [New Task] Request 2 starts by reusing thread...")
-            logger.info("   [New Task] Checking trace ID... (Expect pollution?)") 
+            logger.info("   [New Task] Checking trace ID... (Expect pollution?)")
             logger.info("<<< API EXIT - Request 2 finishes")
         }.get()
 

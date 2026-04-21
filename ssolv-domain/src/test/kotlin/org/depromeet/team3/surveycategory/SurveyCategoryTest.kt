@@ -21,7 +21,7 @@ class SurveyCategoryTest {
             level = level,
             name = name,
             sortOrder = sortOrder,
-            createdAt = now
+            createdAt = now,
         )
 
         // then
@@ -49,7 +49,7 @@ class SurveyCategoryTest {
             level = level,
             name = name,
             sortOrder = sortOrder,
-            createdAt = now
+            createdAt = now,
         )
 
         // then
@@ -71,7 +71,7 @@ class SurveyCategoryTest {
             level = SurveyCategoryLevel.BRANCH,
             name = "한식",
             sortOrder = 1,
-            createdAt = now
+            createdAt = now,
         )
 
         val surveyCategory2 = SurveyCategory(
@@ -79,7 +79,7 @@ class SurveyCategoryTest {
             level = SurveyCategoryLevel.BRANCH,
             name = "한식",
             sortOrder = 1,
-            createdAt = now
+            createdAt = now,
         )
 
         // when & then
@@ -95,14 +95,14 @@ class SurveyCategoryTest {
             level = SurveyCategoryLevel.BRANCH,
             name = "한식",
             sortOrder = 1,
-            createdAt = now
+            createdAt = now,
         )
 
         val japaneseCategory = SurveyCategory(
             level = SurveyCategoryLevel.BRANCH,
             name = "일식",
             sortOrder = 1,
-            createdAt = now
+            createdAt = now,
         )
 
         // when & then
@@ -122,14 +122,14 @@ class SurveyCategoryTest {
             sortOrder = 1,
             isDeleted = false,
             createdAt = now,
-            updatedAt = null
+            updatedAt = null,
         )
 
         // when
         val updatedCategory = originalCategory.copy(
             name = "전통한식",
             sortOrder = 2,
-            updatedAt = now
+            updatedAt = now,
         )
 
         // then
@@ -155,7 +155,7 @@ class SurveyCategoryTest {
             sortOrder = 1,
             isDeleted = false,
             createdAt = now,
-            updatedAt = null
+            updatedAt = null,
         )
 
         // when

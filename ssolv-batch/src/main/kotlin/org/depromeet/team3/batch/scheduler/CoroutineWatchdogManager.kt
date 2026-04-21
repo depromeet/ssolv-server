@@ -1,6 +1,6 @@
 package org.depromeet.team3.batch.scheduler
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
@@ -15,11 +15,9 @@ import java.util.UUID
  * - 작업이 끝나면 즉시 안전하게 락을 해제(Safe Release)하여 처리량을 극대화합니다.
  */
 @Component
-class CoroutineWatchdogManager(
-    private val stringRedisTemplate: StringRedisTemplate
-) {
+class CoroutineWatchdogManager(private val stringRedisTemplate: StringRedisTemplate) {
     private val logger = LoggerFactory.getLogger(CoroutineWatchdogManager::class.java)
-    
+
     companion object {
         private const val MIN_TTL_MILLIS = 5000L
         private const val MAX_CONSECUTIVE_FAILURES = 3
@@ -34,7 +32,7 @@ class CoroutineWatchdogManager(
             return 0
         end
         """.trimIndent(),
-        Long::class.java
+        Long::class.java,
     )
 
     // 2. 안전한 연장을 위한 루아 스크립트 (내가 잡은 락일 때만 연장)
@@ -47,7 +45,7 @@ class CoroutineWatchdogManager(
             return 0
         end
         """.trimIndent(),
-        Long::class.java
+        Long::class.java,
     )
 
     /**
@@ -60,7 +58,7 @@ class CoroutineWatchdogManager(
         lockKey: String,
         initialTtlMillis: Long = 10000,
         extensionMillis: Long = 10000,
-        action: suspend () -> Unit
+        action: suspend () -> Unit,
     ) {
         val actualInitialTtl = maxOf(initialTtlMillis, MIN_TTL_MILLIS)
         val actualExtensionTtl = maxOf(extensionMillis, MIN_TTL_MILLIS)
@@ -74,7 +72,6 @@ class CoroutineWatchdogManager(
             logger.debug("{} : Failed to acquire lock", lockKey)
             return
         }
-
 
         coroutineScope {
             // 2. 비즈니스 로직 코루틴 생성
@@ -92,7 +89,7 @@ class CoroutineWatchdogManager(
                             extendScript,
                             listOf(lockKey),
                             lockValue,
-                            actualExtensionTtl.toString()
+                            actualExtensionTtl.toString(),
                         )
 
                         if (result == null || result <= 0L) {
@@ -125,7 +122,7 @@ class CoroutineWatchdogManager(
                     val result = stringRedisTemplate.execute(
                         unlockScript,
                         listOf(lockKey),
-                        lockValue
+                        lockValue,
                     )
                     if (result != null && result > 0L) {
                         logger.debug("🔓 {} : Releasing lock.", lockKey)

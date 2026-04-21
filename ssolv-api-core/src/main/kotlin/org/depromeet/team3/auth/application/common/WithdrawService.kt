@@ -1,12 +1,13 @@
 package org.depromeet.team3.auth.application.common
-import org.depromeet.team3.common.util.withTracingContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.depromeet.team3.auth.AuthProvider
-import org.depromeet.team3.auth.UserEntity
 import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.client.KakaoOAuthClient
 import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.slf4j.LoggerFactory
@@ -16,8 +17,6 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * 회원 탈퇴 Service
@@ -39,7 +38,7 @@ class WithdrawService(
      * 2. 로컬 데이터 삭제
      * 3. 소셜 플랫폼 연동 해제 (트랜잭션 커밋 후 비동기)
      */
-    suspend fun withdraw(userId: Long): Unit = withTracingContext() {
+    suspend fun withdraw(userId: Long): Unit = withTracingContext {
         transactionTemplate.execute {
             val entity = userJpaRepository.findByIdOrNull(userId)
                 ?: throw AuthException(ErrorCode.USER_NOT_FOUND)
@@ -105,7 +104,7 @@ class WithdrawService(
         for (meeting in hostedMeetings) {
             // 1. 이미 종료되었거나 기간이 만료된 모임은 탈퇴를 방해하지 않음
             if (meeting.isClosed) continue
-            
+
             val endAt = meeting.endAt
             if (endAt != null && endAt.isBefore(now)) continue
 
@@ -114,7 +113,7 @@ class WithdrawService(
 
             // 2. 호스트 본인을 제외한 다른 참석자가 한 명이라도 있는지 확인
             val hasOtherAttendees = attendees.any { it.user.id != null && it.user.id != userId }
-            
+
             if (hasOtherAttendees) {
                 log.warn("탈퇴 시도 실패 - userId: {}, 다른 참석자가 있는 활성 모임 호스팅 중: meetingId: {}", userId, meetingId)
                 throw AuthException(ErrorCode.CANNOT_WITHDRAW_WITH_ACTIVE_MEETINGS)
@@ -122,4 +121,3 @@ class WithdrawService(
         }
     }
 }
-

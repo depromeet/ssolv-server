@@ -1,11 +1,11 @@
 package org.depromeet.team3.notification.config
 
 import org.depromeet.team3.common.constants.RedisStreamConstants
-import org.springframework.context.annotation.Profile
 import org.depromeet.team3.notification.application.MeetingNotificationConsumer
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.MapRecord
@@ -29,7 +29,7 @@ import java.util.UUID
 @Profile("!test")
 class NotificationStreamsConfig(
     private val meetingNotificationConsumer: MeetingNotificationConsumer,
-    private val stringRedisTemplate: StringRedisTemplate
+    private val stringRedisTemplate: StringRedisTemplate,
 ) {
     private val logger = LoggerFactory.getLogger(NotificationStreamsConfig::class.java)
 
@@ -37,9 +37,7 @@ class NotificationStreamsConfig(
     private lateinit var container: StreamMessageListenerContainer<String, MapRecord<String, String, String>>
 
     @Bean
-    fun notificationStreamMessageListenerContainer(
-        redisConnectionFactory: RedisConnectionFactory
-    ): Subscription {
+    fun notificationStreamMessageListenerContainer(redisConnectionFactory: RedisConnectionFactory): Subscription {
         savedFactory = redisConnectionFactory
         return createAndStart()
     }
@@ -73,7 +71,7 @@ class NotificationStreamsConfig(
         val subscription = container.receive(
             Consumer.from(groupName, consumerName),
             StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
-            meetingNotificationConsumer
+            meetingNotificationConsumer,
         )
         container.start()
         logger.info("Redis Stream 구독 시작 ($streamKey / $groupName / $consumerName)")

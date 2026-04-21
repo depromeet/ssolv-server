@@ -21,7 +21,7 @@ class FirebaseConfig(
 
         val fixedPath = "/home/ubuntu/17th-team3-Server/firebase-service-account.json"
         val fixedFile = File(fixedPath)
-        
+
         val cleanPath = serviceAccountPath.replace("file:", "").replace("classpath:", "").trim()
         val envFile = File(cleanPath)
 
@@ -39,7 +39,7 @@ class FirebaseConfig(
         try {
             val rawJson = inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
             val privateKeyRegex = Regex("(\"private_key\"\\s*:\\s*\")(.*?)(\")", RegexOption.DOT_MATCHES_ALL)
-            
+
             val cleanedJson = privateKeyRegex.replace(rawJson) { match ->
                 val prefix = match.groupValues[1]
                 val keyValue = match.groupValues[2]

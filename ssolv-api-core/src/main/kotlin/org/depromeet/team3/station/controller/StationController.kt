@@ -16,22 +16,18 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "지하철역", description = "역 관련 API")
 @RestController
 @RequestMapping("${ContextConstants.API_VERSION_V1}/stations")
-class StationController(
-    private val getStationService: GetStationService
-) {
+class StationController(private val getStationService: GetStationService) {
 
     @Operation(
         summary = "모든 지하철역 조회",
-        description = "모든 지하철역 목록을 반환합니다."
+        description = "모든 지하철역 목록을 반환합니다.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "모든 역 조회 성공")
+        ApiResponse(responseCode = "200", description = "모든 역 조회 성공"),
     )
     @GetMapping
-    suspend fun getAllStations(
-        @UserId userId: Long
-    ) : DpmApiResponse<List<StationResponse>> {
-        val response = getStationService.getAllStations();
+    suspend fun getAllStations(@UserId userId: Long): DpmApiResponse<List<StationResponse>> {
+        val response = getStationService.getAllStations()
 
         return DpmApiResponse.ok(response)
     }

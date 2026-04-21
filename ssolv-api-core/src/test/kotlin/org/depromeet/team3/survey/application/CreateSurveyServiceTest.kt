@@ -9,13 +9,13 @@ import org.depromeet.team3.fixture.StationFixture
 import org.depromeet.team3.fixture.SurveyCategoryFixture
 import org.depromeet.team3.fixture.SurveyFixture
 import org.depromeet.team3.fixture.UserFixture
-import org.depromeet.team3.survey.fixture.SurveyRequestFixture
 import org.depromeet.team3.meeting.MeetingJpaRepository
 import org.depromeet.team3.meeting.application.MeetingExpirationSchedulerService
 import org.depromeet.team3.meetingattendee.MeetingAttendeeJpaRepository
 import org.depromeet.team3.survey.SurveyEntity
 import org.depromeet.team3.survey.SurveyJpaRepository
 import org.depromeet.team3.survey.exception.SurveyException
+import org.depromeet.team3.survey.fixture.SurveyRequestFixture
 import org.depromeet.team3.surveycategory.SurveyCategoryJpaRepository
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
 import org.depromeet.team3.surveyresult.SurveyResultJpaRepository
@@ -36,11 +36,17 @@ import kotlin.test.assertEquals
 class CreateSurveyServiceTest {
 
     @Mock private lateinit var surveyJpaRepository: SurveyJpaRepository
+
     @Mock private lateinit var surveyResultJpaRepository: SurveyResultJpaRepository
+
     @Mock private lateinit var surveyCategoryJpaRepository: SurveyCategoryJpaRepository
+
     @Mock private lateinit var meetingJpaRepository: MeetingJpaRepository
+
     @Mock private lateinit var meetingAttendeeJpaRepository: MeetingAttendeeJpaRepository
+
     @Mock private lateinit var stringRedisTemplate: org.springframework.data.redis.core.StringRedisTemplate
+
     @Mock private lateinit var meetingExpirationSchedulerService: MeetingExpirationSchedulerService
 
     private lateinit var transactionTemplate: TransactionTemplate
@@ -52,7 +58,9 @@ class CreateSurveyServiceTest {
     private val station = StationFixture.createEntity(id = 1L)
     private val meetingEntity = MeetingFixture.createEntity(id = meetingId, hostUser = hostUser, station = station)
     private val attendeeEntity = MeetingAttendeeFixture.createEntity(
-        id = 10L, meeting = meetingEntity, user = UserFixture.createEntity(id = userId)
+        id = 10L,
+        meeting = meetingEntity,
+        user = UserFixture.createEntity(id = userId),
     )
     private val savedSurveyEntity = SurveyFixture.createEntity(id = 1L, meeting = meetingEntity, participant = attendeeEntity)
 
@@ -68,7 +76,7 @@ class CreateSurveyServiceTest {
             surveyJpaRepository, surveyResultJpaRepository, surveyCategoryJpaRepository,
             meetingJpaRepository, meetingAttendeeJpaRepository, transactionTemplate,
             stringRedisTemplate, meetingExpirationSchedulerService,
-            io.opentelemetry.api.OpenTelemetry.noop()
+            io.opentelemetry.api.OpenTelemetry.noop(),
         )
     }
 

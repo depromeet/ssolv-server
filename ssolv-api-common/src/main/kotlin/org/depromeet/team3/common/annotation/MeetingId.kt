@@ -6,6 +6,4 @@ package org.depromeet.team3.common.annotation
  */
 @Target(AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class MeetingId(
-    val value: String = ""
-)
+annotation class MeetingId(val value: String = "")

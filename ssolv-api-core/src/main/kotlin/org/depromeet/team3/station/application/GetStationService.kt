@@ -1,16 +1,13 @@
 package org.depromeet.team3.station.application
 import org.depromeet.team3.common.util.withTracingContext
-import kotlinx.coroutines.Dispatchers
-import org.depromeet.team3.station.dto.response.StationResponse
 import org.depromeet.team3.station.StationRepository
+import org.depromeet.team3.station.dto.response.StationResponse
 import org.springframework.stereotype.Service
 
 @Service
-class GetStationService(
-    private val stationRepository: StationRepository,
-) {
+class GetStationService(private val stationRepository: StationRepository) {
 
-    suspend fun getAllStations(): List<StationResponse> = withTracingContext() {
+    suspend fun getAllStations(): List<StationResponse> = withTracingContext {
         stationRepository.findAll().map { StationResponse(it.id!!, it.name) }
     }
 }

@@ -12,7 +12,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebMvcConfig(
     private val userIdArgumentResolver: UserIdArgumentResolver,
-    private val meetingIdArgumentResolver: MeetingIdArgumentResolver
+    private val meetingIdArgumentResolver: MeetingIdArgumentResolver,
 ) : WebMvcConfigurer {
 
     /**

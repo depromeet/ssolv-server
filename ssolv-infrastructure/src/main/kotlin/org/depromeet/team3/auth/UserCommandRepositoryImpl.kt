@@ -10,10 +10,8 @@ import org.springframework.stereotype.Repository
  * 쓰기 작업만 처리
  */
 @Repository
-class UserCommandRepositoryImpl(
-    private val userJpaRepository: UserRepository,
-    private val userMapper: UserMapper,
-) : UserCommandRepository {
+class UserCommandRepositoryImpl(private val userJpaRepository: UserRepository, private val userMapper: UserMapper) :
+    UserCommandRepository {
 
     override suspend fun save(user: User): User {
         val entity = userMapper.toEntity(user)
@@ -21,12 +19,12 @@ class UserCommandRepositoryImpl(
         return userMapper.toDomain(savedEntity)
     }
 
-    override suspend fun delete(user: User): Unit {
+    override suspend fun delete(user: User) {
         user.id?.let { userId ->
             userJpaRepository.deleteById(userId)
         } ?: throw UserException(
             errorCode = ErrorCode.USER_ID_REQUIRED,
-            message = "삭제할 사용자의 ID가 없습니다"
+            message = "삭제할 사용자의 ID가 없습니다",
         )
     }
 }

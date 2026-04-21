@@ -5,6 +5,4 @@ import org.springframework.stereotype.Component
 
 @Component
 @ConfigurationProperties(prefix = "app")
-data class AppProperties(
-    var env: String = "local"
-)
+data class AppProperties(var env: String = "local")

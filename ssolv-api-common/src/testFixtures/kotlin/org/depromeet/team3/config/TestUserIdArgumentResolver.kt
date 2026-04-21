@@ -1,7 +1,6 @@
 package org.depromeet.team3.config
 
 import org.depromeet.team3.common.annotation.UserId
-import org.depromeet.team3.common.resolver.UserIdArgumentResolver
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
@@ -28,21 +27,21 @@ class TestUserIdArgumentResolver : HandlerMethodArgumentResolver {
         this.testUserId = userId
     }
 
-    override fun supportsParameter(parameter: MethodParameter): Boolean {
-        return parameter.hasParameterAnnotation(UserId::class.java) &&
-                (parameter.parameterType == Long::class.java || 
-                 parameter.parameterType == Long::class.javaObjectType)
-    }
+    override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.hasParameterAnnotation(UserId::class.java) &&
+        (
+            parameter.parameterType == Long::class.java ||
+                parameter.parameterType == Long::class.javaObjectType
+            )
 
     override fun resolveArgument(
         parameter: MethodParameter,
         mavContainer: ModelAndViewContainer?,
         webRequest: NativeWebRequest,
-        binderFactory: WebDataBinderFactory?
+        binderFactory: WebDataBinderFactory?,
     ): Any? {
         val isNullable = parameter.parameterType == Long::class.javaObjectType ||
-                        parameter.parameterAnnotations.any { it.annotationClass.simpleName == "Nullable" }
-        
+            parameter.parameterAnnotations.any { it.annotationClass.simpleName == "Nullable" }
+
         return if (isNullable) {
             testUserId
         } else {
@@ -52,7 +51,5 @@ class TestUserIdArgumentResolver : HandlerMethodArgumentResolver {
 
     @Bean
     @Primary
-    fun testUserIdArgumentResolver(): TestUserIdArgumentResolver {
-        return this
-    }
+    fun testUserIdArgumentResolver(): TestUserIdArgumentResolver = this
 }

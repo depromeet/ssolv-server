@@ -3,16 +3,18 @@ package org.depromeet.team3.auth
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.auth.properties.KakaoProperties
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.TestPropertySource
-import org.springframework.beans.factory.annotation.Autowired
 
 @SpringBootTest(classes = [KakaoProperties::class])
 @EnableConfigurationProperties(KakaoProperties::class)
-@TestPropertySource(properties = [
-    "kakao.client-id=test-client-id"
-])
+@TestPropertySource(
+    properties = [
+        "kakao.client-id=test-client-id",
+    ],
+)
 class KakaoPropertiesTest {
 
     @Autowired

@@ -26,7 +26,7 @@ object AppleResponse {
         val refresh_token: String?,
 
         @JsonProperty("id_token")
-        val id_token: String  // JWT 형식의 ID 토큰
+        val id_token: String, // JWT 형식의 ID 토큰
     )
 
     /**
@@ -34,18 +34,18 @@ object AppleResponse {
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class IdTokenPayload(
-        val iss: String,  // https://appleid.apple.com
-        val aud: String,  // Client ID
-        val exp: Long,    // Expiration time
-        val iat: Long,    // Issued at
-        val sub: String,  // User identifier (Apple User ID)
+        val iss: String, // https://appleid.apple.com
+        val aud: String, // Client ID
+        val exp: Long, // Expiration time
+        val iat: Long, // Issued at
+        val sub: String, // User identifier (Apple User ID)
         val email: String?,
         @JsonProperty("email_verified")
         val email_verified: String?,
         @JsonProperty("is_private_email")
         val is_private_email: String?,
         @JsonProperty("nonce_supported")
-        val nonce_supported: Boolean?
+        val nonce_supported: Boolean?,
     )
 
     /**
@@ -53,32 +53,17 @@ object AppleResponse {
      * (첫 로그인 시에만 제공됨)
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    data class UserInfo(
-        val name: Name?,
-        val email: String?
-    )
+    data class UserInfo(val name: Name?, val email: String?)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    data class Name(
-        val firstName: String?,
-        val lastName: String?
-    )
+    data class Name(val firstName: String?, val lastName: String?)
 
     /**
      * 애플 Public Key 응답
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    data class PublicKeys(
-        val keys: List<PublicKey>
-    )
+    data class PublicKeys(val keys: List<PublicKey>)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    data class PublicKey(
-        val kty: String,
-        val kid: String,
-        val use: String,
-        val alg: String,
-        val n: String,
-        val e: String
-    )
+    data class PublicKey(val kty: String, val kid: String, val use: String, val alg: String, val n: String, val e: String)
 }

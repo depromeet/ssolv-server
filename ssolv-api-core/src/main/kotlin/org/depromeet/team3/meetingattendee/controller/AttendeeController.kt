@@ -15,29 +15,26 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "모임 참여자", description = "모임 참여자 API")
 @RestController
 @RequestMapping("${ContextConstants.API_VERSION_V1}/meetings/{meetingId}/attendees")
-class AttendeeController(
-    private val updateAttendeeService: UpdateAttendeeService
-) {
+class AttendeeController(private val updateAttendeeService: UpdateAttendeeService) {
 
     @Operation(
         summary = "참여자 정보 수정",
-        description = "참여자의 닉네임과 무찌 색상을 수정합니다."
+        description = "참여자의 닉네임과 무찌 색상을 수정합니다.",
     )
     @PutMapping()
     suspend fun updateAttendee(
         @UserId userId: Long,
-
         @Parameter(description = "모임 ID 또는 초대 토큰", required = true)
         @MeetingId("meetingId") meetingId: Long,
-
         @Parameter(description = "참여자 정보 수정 요청", required = true)
-        @RequestBody @Valid request: UpdateAttendeeRequest
+        @RequestBody
+        @Valid request: UpdateAttendeeRequest,
     ): DpmApiResponse<Unit> {
         updateAttendeeService(
             userId = userId,
             meetingId = meetingId,
             attendeeNickname = request.attendeeNickname,
-            color = request.color
+            color = request.color,
         )
 
         return DpmApiResponse.ok()

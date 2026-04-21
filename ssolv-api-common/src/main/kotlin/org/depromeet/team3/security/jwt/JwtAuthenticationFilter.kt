@@ -18,17 +18,11 @@ import org.springframework.web.filter.OncePerRequestFilter
 import java.io.IOException
 
 @Component
-class JwtAuthenticationFilter(
-    private val jwtTokenProvider: JwtTokenProvider,
-    private val objectMapper: ObjectMapper
-) : OncePerRequestFilter() {
-    
+class JwtAuthenticationFilter(private val jwtTokenProvider: JwtTokenProvider, private val objectMapper: ObjectMapper) :
+    OncePerRequestFilter() {
+
     @Throws(ServletException::class, IOException::class)
-    override fun doFilterInternal(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        filterChain: FilterChain
-    ) {
+    override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         // 1. 제외 URL 체크
         if (isExcludedUrl(request.requestURI)) {
             filterChain.doFilter(request, response)
@@ -53,9 +47,7 @@ class JwtAuthenticationFilter(
     /**
      * 인증 처리 로직
      */
-    private fun processAuthentication(
-        request: HttpServletRequest
-    ): AuthResult {
+    private fun processAuthentication(request: HttpServletRequest): AuthResult {
         val accessToken = jwtTokenProvider.extractToken(request)
             ?: return AuthResult.Failed
 
@@ -66,7 +58,7 @@ class JwtAuthenticationFilter(
                     ?: throw AuthException(ErrorCode.TOKEN_USER_ID_INVALID)
                 AuthResult.Success(userId)
             }
-            
+
             // Access Token이 유효하지 않은 경우
             else -> throw AuthException(ErrorCode.ACCESS_TOKEN_INVALID)
         }
@@ -75,9 +67,7 @@ class JwtAuthenticationFilter(
     /**
      * 토큰에서 사용자 ID 추출
      */
-    private fun extractUserId(token: String): Long? {
-        return jwtTokenProvider.getUserIdFromToken(token)?.toLongOrNull()
-    }
+    private fun extractUserId(token: String): Long? = jwtTokenProvider.getUserIdFromToken(token)?.toLongOrNull()
 
     /**
      * Security Context 설정
@@ -88,7 +78,7 @@ class JwtAuthenticationFilter(
                 val authorities = listOf<GrantedAuthority>(SimpleGrantedAuthority("ROLE_USER"))
                 val authentication = JwtAuthenticationToken(authResult.userId, authorities)
                 SecurityContextHolder.getContext().authentication = authentication
-                
+
                 // MDC에 사용자 ID 저장 (로그 추적용)
                 MDC.put(UserIdArgumentResolver.USER_ID, authResult.userId.toString())
             }
@@ -98,9 +88,7 @@ class JwtAuthenticationFilter(
         }
     }
 
-    private fun isExcludedUrl(requestURI: String): Boolean {
-        return EXCLUDED_URLS.any { prefix -> requestURI.startsWith(prefix) }
-    }
+    private fun isExcludedUrl(requestURI: String): Boolean = EXCLUDED_URLS.any { prefix -> requestURI.startsWith(prefix) }
 
     /**
      * 인증 실패 시 401 응답
@@ -133,11 +121,11 @@ class JwtAuthenticationFilter(
 
     companion object {
         private val EXCLUDED_URLS = listOf(
-            "/swagger-ui/**", 
-            "/v3/api-docs/**", 
-            "/swagger", 
-            "/api/auth/kakao-login", 
-            "/favicon.ico"
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger",
+            "/api/auth/kakao-login",
+            "/favicon.ico",
         )
     }
 }

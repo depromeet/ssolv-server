@@ -1,7 +1,6 @@
 package org.depromeet.team3.place.application.plan
 
 import org.assertj.core.api.Assertions.assertThat
-import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.application.model.PlaceSurveySummary
 import org.depromeet.team3.surveycategory.SurveyCategory
 import org.depromeet.team3.surveycategory.SurveyCategoryLevel
@@ -26,39 +25,39 @@ class SelectSurveyKeywordsServiceTest {
         val japanese = createLeafCategory(3L, "일식", 3L)
         val chinese = createLeafCategory(4L, "중식", 4L)
         val asian = createLeafCategory(5L, "동남아", 5L)
-        
+
         val summary = PlaceSurveySummary(
             stationName = "잠실",
             stationCoordinates = null,
             totalRespondents = 5,
             leafVotes = mapOf(
-                1L to 1,  // 한식 20%
-                2L to 1,  // 양식 20%
-                3L to 1,  // 일식 20%
-                4L to 1,  // 중식 20%
-                5L to 1   // 동남아 20%
+                1L to 1, // 한식 20%
+                2L to 1, // 양식 20%
+                3L to 1, // 일식 20%
+                4L to 1, // 중식 20%
+                5L to 1, // 동남아 20%
             ),
             branchVotes = mapOf(
                 1L to 1,
                 2L to 1,
                 3L to 1,
                 4L to 1,
-                5L to 1
+                5L to 1,
             ),
             leafCategories = mapOf(
                 1L to korean,
                 2L to western,
                 3L to japanese,
                 4L to chinese,
-                5L to asian
+                5L to asian,
             ),
             branchCategories = mapOf(
                 1L to createCategory(1L, "한식", SurveyCategoryLevel.BRANCH),
                 2L to createCategory(2L, "양식", SurveyCategoryLevel.BRANCH),
                 3L to createCategory(3L, "일식", SurveyCategoryLevel.BRANCH),
                 4L to createCategory(4L, "중식", SurveyCategoryLevel.BRANCH),
-                5L to createCategory(5L, "동남아", SurveyCategoryLevel.BRANCH)
-            )
+                5L to createCategory(5L, "동남아", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -71,24 +70,22 @@ class SelectSurveyKeywordsServiceTest {
             "잠실 양식 맛집",
             "잠실 일식 맛집",
             "잠실 중식 맛집",
-            "잠실 동남아 맛집"
+            "잠실 동남아 맛집",
         )
         // 모두 20% 득표 = 0.2 가중치
         assertThat(result.map { it.weight }).allMatch { it == 0.2 }
     }
-    
-    private fun createLeafCategory(id: Long, name: String, parentId: Long): SurveyCategory {
-        return SurveyCategory(
-            id = id,
-            parentId = parentId,
-            level = SurveyCategoryLevel.LEAF,
-            name = name,
-            sortOrder = id.toInt(),
-            isDeleted = false,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-    }
+
+    private fun createLeafCategory(id: Long, name: String, parentId: Long): SurveyCategory = SurveyCategory(
+        id = id,
+        parentId = parentId,
+        level = SurveyCategoryLevel.LEAF,
+        name = name,
+        sortOrder = id.toInt(),
+        isDeleted = false,
+        createdAt = LocalDateTime.now(),
+        updatedAt = LocalDateTime.now(),
+    )
 
     @Test
     fun `가중치 편향 분포 - 득표율이 높을수록 많은 키워드 할당`() {
@@ -97,31 +94,31 @@ class SelectSurveyKeywordsServiceTest {
         val korean2 = createLeafCategory(12L, "삼겹살", 10L)
         val western1 = createLeafCategory(21L, "파스타", 20L)
         val western2 = createLeafCategory(22L, "스테이크", 20L)
-        
+
         val summary = PlaceSurveySummary(
             stationName = "강남",
             stationCoordinates = null,
             totalRespondents = 5,
             leafVotes = mapOf(
-                11L to 2,  // 김치찌개 40%
-                12L to 1,  // 삼겹살 20%
-                21L to 1,  // 파스타 20%
-                22L to 1   // 스테이크 20%
+                11L to 2, // 김치찌개 40%
+                12L to 1, // 삼겹살 20%
+                21L to 1, // 파스타 20%
+                22L to 1, // 스테이크 20%
             ),
             branchVotes = mapOf(
-                10L to 3,  // 한식 60%
-                20L to 2   // 양식 40%
+                10L to 3, // 한식 60%
+                20L to 2, // 양식 40%
             ),
             leafCategories = mapOf(
                 11L to korean1,
                 12L to korean2,
                 21L to western1,
-                22L to western2
+                22L to western2,
             ),
             branchCategories = mapOf(
                 10L to createCategory(10L, "한식", SurveyCategoryLevel.BRANCH),
-                20L to createCategory(20L, "양식", SurveyCategoryLevel.BRANCH)
-            )
+                20L to createCategory(20L, "양식", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -131,7 +128,7 @@ class SelectSurveyKeywordsServiceTest {
         assertThat(result).hasSize(5)
         val koreanCount = result.count { it.keyword.contains("한식") || it.keyword.contains("김치찌개") || it.keyword.contains("삼겹살") }
         val westernCount = result.count { it.keyword.contains("양식") || it.keyword.contains("파스타") || it.keyword.contains("스테이크") }
-        
+
         // 60%:40% 비율로 3:2 분배
         assertThat(koreanCount).isEqualTo(3)
         assertThat(westernCount).isEqualTo(2)
@@ -145,21 +142,21 @@ class SelectSurveyKeywordsServiceTest {
             stationCoordinates = null,
             totalRespondents = 10,
             leafVotes = mapOf(
-                101L to 9,  // 한식 90%
-                102L to 1   // 양식 10% 미만 (정확히는 10%지만 임계값 체크용)
+                101L to 9, // 한식 90%
+                102L to 1, // 양식 10% 미만 (정확히는 10%지만 임계값 체크용)
             ),
             branchVotes = mapOf(
-                10L to 9,   // 한식 90%
-                20L to 1    // 양식 10%
+                10L to 9, // 한식 90%
+                20L to 1, // 양식 10%
             ),
             leafCategories = mapOf(
                 101L to createLeafCategory(101L, "김치찌개", 10L),
-                102L to createLeafCategory(102L, "파스타", 20L)
+                102L to createLeafCategory(102L, "파스타", 20L),
             ),
             branchCategories = mapOf(
                 10L to createCategory(10L, "한식", SurveyCategoryLevel.BRANCH),
-                20L to createCategory(20L, "양식", SurveyCategoryLevel.BRANCH)
-            )
+                20L to createCategory(20L, "양식", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -180,25 +177,25 @@ class SelectSurveyKeywordsServiceTest {
             stationCoordinates = null,
             totalRespondents = 10,
             leafVotes = mapOf(
-                101L to 5,  // 한식 50%
-                102L to 3,  // 양식 30%
-                103L to 2   // 일식 20%
+                101L to 5, // 한식 50%
+                102L to 3, // 양식 30%
+                103L to 2, // 일식 20%
             ),
             branchVotes = mapOf(
-                10L to 5,   // 한식 50%
-                20L to 3,   // 양식 30%
-                30L to 2    // 일식 20%
+                10L to 5, // 한식 50%
+                20L to 3, // 양식 30%
+                30L to 2, // 일식 20%
             ),
             leafCategories = mapOf(
                 101L to createLeafCategory(101L, "김치찌개", 10L),
                 102L to createLeafCategory(102L, "파스타", 20L),
-                103L to createLeafCategory(103L, "초밥", 30L)
+                103L to createLeafCategory(103L, "초밥", 30L),
             ),
             branchCategories = mapOf(
                 10L to createCategory(10L, "한식", SurveyCategoryLevel.BRANCH),
                 20L to createCategory(20L, "양식", SurveyCategoryLevel.BRANCH),
-                30L to createCategory(30L, "일식", SurveyCategoryLevel.BRANCH)
-            )
+                30L to createCategory(30L, "일식", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -209,7 +206,7 @@ class SelectSurveyKeywordsServiceTest {
         val korean = result.filter { it.keyword.contains("한식") || it.keyword.contains("김치찌개") }
         val western = result.filter { it.keyword.contains("양식") || it.keyword.contains("파스타") }
         val japanese = result.filter { it.keyword.contains("일식") || it.keyword.contains("초밥") }
-        
+
         // 50%:30%:20% 비율 확인 (대략적으로)
         assertThat(korean.size).isGreaterThanOrEqualTo(2)
         assertThat(western.size).isGreaterThanOrEqualTo(1)
@@ -224,21 +221,21 @@ class SelectSurveyKeywordsServiceTest {
             stationCoordinates = null,
             totalRespondents = 20,
             leafVotes = mapOf(
-                101L to 1,  // 5%
-                102L to 1   // 5%
+                101L to 1, // 5%
+                102L to 1, // 5%
             ),
             branchVotes = mapOf(
-                10L to 1,   // 5%
-                20L to 1    // 5%
+                10L to 1, // 5%
+                20L to 1, // 5%
             ),
             leafCategories = mapOf(
                 101L to createLeafCategory(101L, "파스타", 10L),
-                102L to createLeafCategory(102L, "초밥", 20L)
+                102L to createLeafCategory(102L, "초밥", 20L),
             ),
             branchCategories = mapOf(
                 10L to createCategory(10L, "양식", SurveyCategoryLevel.BRANCH),
-                20L to createCategory(20L, "일식", SurveyCategoryLevel.BRANCH)
-            )
+                20L to createCategory(20L, "일식", SurveyCategoryLevel.BRANCH),
+            ),
         )
 
         // when
@@ -260,7 +257,7 @@ class SelectSurveyKeywordsServiceTest {
             leafVotes = emptyMap(),
             branchVotes = emptyMap(),
             leafCategories = emptyMap(),
-            branchCategories = emptyMap()
+            branchCategories = emptyMap(),
         )
 
         // when
@@ -280,7 +277,7 @@ class SelectSurveyKeywordsServiceTest {
             30L to 4,
             40L to 3,
             50L to 2,
-            60L to 2
+            60L to 2,
         )
 
         val summary = PlaceSurveySummary(
@@ -298,7 +295,7 @@ class SelectSurveyKeywordsServiceTest {
             },
             branchCategories = branchIds.associateWith { branchId ->
                 createCategory(branchId, "브랜치$branchId", SurveyCategoryLevel.BRANCH)
-            }
+            },
         )
 
         // when
@@ -308,23 +305,20 @@ class SelectSurveyKeywordsServiceTest {
         assertThat(result.size).isLessThanOrEqualTo(5)
     }
 
-
     private fun createCategory(
         id: Long,
         name: String,
         level: SurveyCategoryLevel,
         parentId: Long? = null,
-        sortOrder: Int = 0
-    ): SurveyCategory {
-        return SurveyCategory(
-            id = id,
-            parentId = parentId,
-            level = level,
-            name = name,
-            sortOrder = sortOrder,
-            isDeleted = false,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-    }
+        sortOrder: Int = 0,
+    ): SurveyCategory = SurveyCategory(
+        id = id,
+        parentId = parentId,
+        level = level,
+        name = name,
+        sortOrder = sortOrder,
+        isDeleted = false,
+        createdAt = LocalDateTime.now(),
+        updatedAt = LocalDateTime.now(),
+    )
 }

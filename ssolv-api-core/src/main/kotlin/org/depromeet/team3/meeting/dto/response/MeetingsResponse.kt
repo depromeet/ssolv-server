@@ -9,5 +9,5 @@ data class MeetingsResponse(
     val meetingInfo: MeetingInfoResponse,
 
     @Schema(description = "모임 참여자 정보")
-    val participantList: List<GetRespondents>
+    val participantList: List<GetRespondents>,
 )

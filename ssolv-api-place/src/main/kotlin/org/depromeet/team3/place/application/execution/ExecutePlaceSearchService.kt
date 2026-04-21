@@ -1,20 +1,5 @@
 package org.depromeet.team3.place.application.execution
-import kotlinx.coroutines.Dispatchers
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlin.math.ln
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.slf4j.MDCContext
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
 import io.opentelemetry.api.OpenTelemetry
@@ -22,8 +7,24 @@ import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.context.Context
 import io.opentelemetry.extension.kotlin.asContextElement
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.slf4j.MDCContext
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.exception.ErrorCode
+import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.meeting.MeetingQuery
 import org.depromeet.team3.place.PlaceEntity
 import org.depromeet.team3.place.PlaceQuery
@@ -32,14 +33,12 @@ import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
-import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
-
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Duration
-import kotlinx.coroutines.delay
+import kotlin.math.ln
 
 /**
  * 설문 데이터를 기반으로 최적의 장소(식당)를 도출하는 핵심 서비스입니다.
@@ -74,7 +73,7 @@ class ExecutePlaceSearchService(
         val searchPlan = PlaceSearchPlan.Automatic(
             keywords = plan.keywords,
             stationCoordinates = plan.stationCoordinates,
-            fallbackKeyword = plan.fallbackKeyword
+            fallbackKeyword = plan.fallbackKeyword,
         )
         return search(searchRequest, searchPlan)
     }
@@ -85,16 +84,10 @@ class ExecutePlaceSearchService(
     suspend fun searchWithDispatcher(
         request: PlacesSearchRequest,
         plan: PlaceSearchPlan,
-        dispatcher: CoroutineDispatcher
-    ): PlacesSearchResponse {
-        return search(request, plan, dispatcher)
-    }
+        dispatcher: CoroutineDispatcher,
+    ): PlacesSearchResponse = search(request, plan, dispatcher)
 
-    suspend fun search(
-        request: PlacesSearchRequest,
-        plan: PlaceSearchPlan,
-        dispatcher: CoroutineDispatcher? = null
-    ): PlacesSearchResponse {
+    suspend fun search(request: PlacesSearchRequest, plan: PlaceSearchPlan, dispatcher: CoroutineDispatcher? = null): PlacesSearchResponse {
         val actualDispatcher = dispatcher ?: Dispatchers.IO
         return withContext(MDCContext() + Context.current().asContextElement() + actualDispatcher) {
             supervisorScope {
@@ -118,7 +111,7 @@ class ExecutePlaceSearchService(
                         // 캐시가 여전이 없으면 Raw 캐시 확인 (Google API 호출 방지)
                         val rawCacheKey = "meeting:places:raw:$meetingId"
                         val rawCacheJson = redisTemplate.opsForValue().get(rawCacheKey)
-                        
+
                         if (rawCacheJson != null) {
                             val rawCache = objectMapper.readValue(rawCacheJson, KeywordSearchResult::class.java)
                             return@withLock doProcessSearchResults(meetingId, rawCache, actualDispatcher)
@@ -143,10 +136,10 @@ class ExecutePlaceSearchService(
     private suspend fun doProcessSearchResults(
         meetingId: Long,
         keywordResult: KeywordSearchResult,
-        actualDispatcher: CoroutineDispatcher
+        actualDispatcher: CoroutineDispatcher,
     ): PlacesSearchResponse {
         val candidatePlaces = (keywordResult.places + keywordResult.fallbackPlaces).distinctBy { it.id }
-        
+
         // 거리 기반 필터링 (역 기준 5km 이상은 제외)
         val stationCoords = (createSurveyKeywordService.getStationCoordinates(meetingId)) ?: return PlacesSearchResponse(emptyList())
         val filteredPlaces = candidatePlaces.filter { place ->
@@ -172,7 +165,9 @@ class ExecutePlaceSearchService(
 
         val likesMap = if (meetingId != null) { // Use the passed meetingId
             buildLikesMapFromRedis(meetingId, savedEntities, null) // userId is null for cached result
-        } else emptyMap()
+        } else {
+            emptyMap()
+        }
 
         val items = savedEntities.mapNotNull { entity ->
             runCatching {
@@ -198,27 +193,29 @@ class ExecutePlaceSearchService(
                     },
                     priceRange = null,
                     addressDescriptor = entity.addressDescriptor?.let { desc ->
-                        PlacesSearchResponse.PlaceItem.AddressDescriptor(org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc))
+                        PlacesSearchResponse.PlaceItem.AddressDescriptor(
+                            org.depromeet.team3.place.util.PlaceFormatter.extractKoreanName(desc),
+                        )
                     },
                     likeCount = likeInfo.likeCount,
-                    isLiked = likeInfo.isLiked
+                    isLiked = likeInfo.isLiked,
                 )
             }.getOrNull()
         }
 
         val scoreByPlaceId = items.associate { item ->
             val entity = savedEntities.find { it.id == item.placeId } ?: return@associate item.placeId to 0.0
-            
+
             // 1. 설문 가중치 점수
             val weight = placeWeightByDbId[item.placeId] ?: 0.0
             val weightScore = weight * weightScoreMultiplier
-            
+
             // 2. 좋아요 점수: 로그 스케일 적용 (ln(count + 1))
             val likeScore = ln(item.likeCount + 1.0) * likeScoreMultiplier
-            
+
             // 3. 구글 신뢰도 점수 (별점 * ln(리뷰수+1) * 2) - 신규
             val googleScore = (entity.rating) * ln(entity.userRatingsTotal.toDouble() + 1.0) * 2.0
-            
+
             // 4. 거리 가중치 및 도보권 보너스 - 신규
             var distanceScore = 0.0
             var proximityBoost = 0.0
@@ -227,16 +224,22 @@ class ExecutePlaceSearchService(
                 distanceScore = maxOf(0.0, 100.0 - (dist * 20.0)) // 5km 이내일 때 0~100점
                 if (dist <= 1.0) proximityBoost = 50.0 // 1km 이내 도보권 보너스 50점
             }
-            
+
             // 5. 카테고리 매칭 보너스 (구글 타입과 검색 키워드 일치 여부) - 신규
-            val categoryMatchBoost = if (entity.types != null && keywordResult.usedKeywords.any { kw -> entity.types!!.contains(kw.lowercase().replace(" ", "")) }) 50.0 else 0.0
-            
+            val categoryMatchBoost = if (entity.types != null &&
+                keywordResult.usedKeywords.any { kw -> entity.types!!.contains(kw.lowercase().replace(" ", "")) }
+            ) {
+                50.0
+            } else {
+                0.0
+            }
+
             item.placeId to (weightScore + likeScore + googleScore + distanceScore + proximityBoost + categoryMatchBoost)
         }
 
         val sortedItems = items.sortedWith(
             compareByDescending<PlacesSearchResponse.PlaceItem> { scoreByPlaceId[it.placeId] ?: 0.0 }
-                .thenByDescending { it.likeCount }
+                .thenByDescending { it.likeCount },
         )
 
         val finalItems = sortedItems.take(totalFetchSize)
@@ -244,10 +247,15 @@ class ExecutePlaceSearchService(
 
         if (finalItems.isNotEmpty()) {
             searchService.save(meetingId, response, scoreByPlaceId)
-            
+
             // Raw 캐시 저장 (좋아요 시 ZSET 무효화 대응용)
             val rawCacheKey = "meeting:places:raw:$meetingId"
-            redisTemplate.opsForValue().set(rawCacheKey, objectMapper.writeValueAsString(keywordResult), 30, java.util.concurrent.TimeUnit.DAYS)
+            redisTemplate.opsForValue().set(
+                rawCacheKey,
+                objectMapper.writeValueAsString(keywordResult),
+                30,
+                java.util.concurrent.TimeUnit.DAYS,
+            )
         }
 
         return response
@@ -279,7 +287,7 @@ class ExecutePlaceSearchService(
     private suspend fun fetchPlacesForKeywords(
         plan: PlaceSearchPlan.Automatic,
         fallbackLimit: Int,
-        dispatcher: CoroutineDispatcher
+        dispatcher: CoroutineDispatcher,
     ): KeywordSearchResult {
         val fanOutSpan = tracer.spanBuilder("place.google.fan_out")
             .setAttribute("place.keyword.count", plan.keywords.size.toLong())
@@ -306,65 +314,73 @@ class ExecutePlaceSearchService(
 
                     val results = deferredResponses.awaitAll().filterNotNull()
 
-        val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
+                    val allocations = calculateKeywordAllocations(results.map { it.first.weight }, totalFetchSize)
 
-        val selectedPlaces = mutableListOf<PlacesTextSearchResponse.Place>()
-        val placeWeights = mutableMapOf<String, Double>()
-        val usedPlaceIds = mutableSetOf<String>()
-        val fallbackCandidates = mutableListOf<PlacesTextSearchResponse.Place>()
-        val fallbackIds = mutableSetOf<String>()
-        val appliedKeywords = mutableSetOf<String>()
+                    val selectedPlaces = mutableListOf<PlacesTextSearchResponse.Place>()
+                    val placeWeights = mutableMapOf<String, Double>()
+                    val usedPlaceIds = mutableSetOf<String>()
+                    val fallbackCandidates = mutableListOf<PlacesTextSearchResponse.Place>()
+                    val fallbackIds = mutableSetOf<String>()
+                    val appliedKeywords = mutableSetOf<String>()
 
-        results.forEach { appliedKeywords.add(it.first.keyword) }
+                    results.forEach { appliedKeywords.add(it.first.keyword) }
 
-        results.forEachIndexed { index, (candidate, response) ->
-            val allocation = allocations[index]
-            val rawPlaces = response.places ?: emptyList()
-            val candidatePlaces = filterPlacesByKeyword(rawPlaces, candidate).sortedByDescending { it.rating ?: 0.0 }
-            var addedCount = 0
+                    results.forEachIndexed { index, (candidate, response) ->
+                        val allocation = allocations[index]
+                        val rawPlaces = response.places ?: emptyList()
+                        val candidatePlaces = filterPlacesByKeyword(rawPlaces, candidate).sortedByDescending { it.rating ?: 0.0 }
+                        var addedCount = 0
 
-            candidatePlaces.forEach { place ->
-                if (usedPlaceIds.contains(place.id)) return@forEach
-                if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
-                    selectedPlaces.add(place)
-                    placeWeights[place.id] = candidate.weight
-                    usedPlaceIds.add(place.id)
-                    addedCount++
-                } else if (fallbackCandidates.size < fallbackLimit && fallbackIds.add(place.id)) {
-                    placeWeights.putIfAbsent(place.id, candidate.weight)
-                    fallbackCandidates.add(place)
-                }
-            }
-            
-            // Fallback keyword: primary 키워드와 동일하게 예외를 격리하여 전체 검색 실패 방지
-            if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
-                runCatching {
-                    val fbResponse = fetchPlacesFromGoogle(candidate.fallbackKeyword, plan.stationCoordinates, dispatcher, requestSemaphore)
-                    filterPlacesByKeyword(fbResponse.places ?: emptyList(), candidate, candidate.fallbackMatchKeywords).sortedByDescending { it.rating ?: 0.0 }
-                }.onFailure { e ->
-                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
-                    logger.warn("Fallback 키워드 [${candidate.fallbackKeyword}] 검색 중 오류 발생: ${e.message}")
-                }.getOrNull()?.forEach { place ->
-                    if (usedPlaceIds.contains(place.id)) return@forEach
-                    if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
-                        selectedPlaces.add(place)
-                        placeWeights[place.id] = candidate.weight
-                        usedPlaceIds.add(place.id)
-                        addedCount++
+                        candidatePlaces.forEach { place ->
+                            if (usedPlaceIds.contains(place.id)) return@forEach
+                            if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
+                                selectedPlaces.add(place)
+                                placeWeights[place.id] = candidate.weight
+                                usedPlaceIds.add(place.id)
+                                addedCount++
+                            } else if (fallbackCandidates.size < fallbackLimit && fallbackIds.add(place.id)) {
+                                placeWeights.putIfAbsent(place.id, candidate.weight)
+                                fallbackCandidates.add(place)
+                            }
+                        }
+
+                        // Fallback keyword: primary 키워드와 동일하게 예외를 격리하여 전체 검색 실패 방지
+                        if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
+                            runCatching {
+                                val fbResponse =
+                                    fetchPlacesFromGoogle(candidate.fallbackKeyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                                filterPlacesByKeyword(
+                                    fbResponse.places ?: emptyList(),
+                                    candidate,
+                                    candidate.fallbackMatchKeywords,
+                                ).sortedByDescending {
+                                    it.rating
+                                        ?: 0.0
+                                }
+                            }.onFailure { e ->
+                                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                                logger.warn("Fallback 키워드 [${candidate.fallbackKeyword}] 검색 중 오류 발생: ${e.message}")
+                            }.getOrNull()?.forEach { place ->
+                                if (usedPlaceIds.contains(place.id)) return@forEach
+                                if (addedCount < allocation && selectedPlaces.size < totalFetchSize) {
+                                    selectedPlaces.add(place)
+                                    placeWeights[place.id] = candidate.weight
+                                    usedPlaceIds.add(place.id)
+                                    addedCount++
+                                }
+                            }
+                        }
                     }
-                }
-            }
-        }
 
-        // 비즈니스 규칙: API 호출은 성공했지만 필터 결과가 모두 비어있는 경우도 실패 처리
-        if (selectedPlaces.isEmpty() && fallbackCandidates.isEmpty()) {
-            logger.error("모든 키워드 검색 결과가 비어 있습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
-            throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
-        }
+                    // 비즈니스 규칙: API 호출은 성공했지만 필터 결과가 모두 비어있는 경우도 실패 처리
+                    if (selectedPlaces.isEmpty() && fallbackCandidates.isEmpty()) {
+                        logger.error("모든 키워드 검색 결과가 비어 있습니다. (Keywords: ${plan.keywords.map { it.keyword }})")
+                        throw PlaceSearchException(ErrorCode.PLACE_NOT_FOUND)
+                    }
 
                     val finalPlaces = selectedPlaces.sortedWith(
                         compareByDescending<PlacesTextSearchResponse.Place> { placeWeights[it.id] ?: 0.0 }
-                            .thenByDescending { it.rating ?: 0.0 }
+                            .thenByDescending { it.rating ?: 0.0 },
                     ).take(totalFetchSize)
 
                     fanOutSpan.setAttribute("place.selected.count", finalPlaces.size.toLong())
@@ -383,7 +399,11 @@ class ExecutePlaceSearchService(
         }
     }
 
-    private fun filterPlacesByKeyword(places: List<PlacesTextSearchResponse.Place>, candidate: CreateSurveyKeywordService.KeywordCandidate, overrideKeywords: Set<String>? = null): List<PlacesTextSearchResponse.Place> {
+    private fun filterPlacesByKeyword(
+        places: List<PlacesTextSearchResponse.Place>,
+        candidate: CreateSurveyKeywordService.KeywordCandidate,
+        overrideKeywords: Set<String>? = null,
+    ): List<PlacesTextSearchResponse.Place> {
         val keywords = overrideKeywords ?: candidate.matchKeywords
         if (keywords.isEmpty()) return emptyList()
         return places.filter { place ->
@@ -410,7 +430,7 @@ class ExecutePlaceSearchService(
         query: String,
         stationCoordinates: MeetingQuery.StationCoordinates?,
         dispatcher: CoroutineDispatcher,
-        requestSemaphore: Semaphore
+        requestSemaphore: Semaphore,
     ): PlacesTextSearchResponse {
         val sanitizedQuery = CreateSurveyKeywordService.normalizeKeyword(query)
         if (sanitizedQuery.isBlank()) throw PlaceSearchException(ErrorCode.PLACE_INVALID_QUERY)
@@ -451,46 +471,51 @@ class ExecutePlaceSearchService(
                             fetchSpan.setAttribute("semaphore.wait_ms", globalWaitNanos / 1_000_000L)
                             fetchSpan.setAttribute("semaphore.global.available", globalApiSemaphore.availablePermits.toLong())
                             withContext(dispatcher) {
-                        try {
-                            logger.info("Google API 검색 실행: query={}, coords=({}, {})", query, stationCoordinates?.latitude, stationCoordinates?.longitude)
-                            val apiStart = System.nanoTime()
-                            val response = withTimeout(googleApiTimeoutMs) {
-                                placeQuery.textSearch(
-                                    sanitizedQuery,
-                                    keywordFetchSize,
-                                    stationCoordinates?.latitude,
-                                    stationCoordinates?.longitude,
-                                    3000.0
-                                )
+                                try {
+                                    logger.info(
+                                        "Google API 검색 실행: query={}, coords=({}, {})",
+                                        query,
+                                        stationCoordinates?.latitude,
+                                        stationCoordinates?.longitude,
+                                    )
+                                    val apiStart = System.nanoTime()
+                                    val response = withTimeout(googleApiTimeoutMs) {
+                                        placeQuery.textSearch(
+                                            sanitizedQuery,
+                                            keywordFetchSize,
+                                            stationCoordinates?.latitude,
+                                            stationCoordinates?.longitude,
+                                            3000.0,
+                                        )
+                                    }
+                                    meterRegistry.timer("google.api.response.latency", "result", "success")
+                                        .record(System.nanoTime() - apiStart, java.util.concurrent.TimeUnit.NANOSECONDS)
+                                    recordMetric("success")
+                                    response
+                                } catch (e: TimeoutCancellationException) {
+                                    meterRegistry.timer("google.api.response.latency", "result", "timeout")
+                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                    recordMetric("timeout")
+                                    logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
+                                    throw e
+                                } catch (e: PlaceSearchException) {
+                                    val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
+                                    meterRegistry.timer("google.api.response.latency", "result", reason)
+                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                    recordMetric(reason)
+                                    logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
+                                    throw e
+                                } catch (e: Exception) {
+                                    meterRegistry.timer("google.api.response.latency", "result", "unknown_error")
+                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                    recordMetric("unknown_error")
+                                    logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
+                                    throw e
+                                }
                             }
-                            meterRegistry.timer("google.api.response.latency", "result", "success")
-                                .record(System.nanoTime() - apiStart, java.util.concurrent.TimeUnit.NANOSECONDS)
-                            recordMetric("success")
-                            response
-                    } catch (e: TimeoutCancellationException) {
-                        meterRegistry.timer("google.api.response.latency", "result", "timeout")
-                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                        recordMetric("timeout")
-                        logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
-                        throw e
-                    } catch (e: PlaceSearchException) {
-                        val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
-                        meterRegistry.timer("google.api.response.latency", "result", reason)
-                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                        recordMetric(reason)
-                        logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
-                        throw e
-                    } catch (e: Exception) {
-                        meterRegistry.timer("google.api.response.latency", "result", "unknown_error")
-                            .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                        recordMetric("unknown_error")
-                        logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
-                        throw e
+                        }
                     }
                 }
-            }
-        }
-    }
             }
         } catch (e: Exception) {
             fetchSpan.recordException(e)
@@ -505,11 +530,12 @@ class ExecutePlaceSearchService(
         meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
     }
 
-    private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>, dispatcher: CoroutineDispatcher): Map<String, Long> {
-        return withContext(dispatcher) {
-            placeQuery.findByGooglePlaceIds(googlePlaceIds).mapNotNull { it.id?.let { id -> it.googlePlaceId?.let { gid -> gid to id } } }.toMap()
+    private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>, dispatcher: CoroutineDispatcher): Map<String, Long> =
+        withContext(dispatcher) {
+            placeQuery.findByGooglePlaceIds(googlePlaceIds).mapNotNull {
+                it.id?.let { id -> it.googlePlaceId?.let { gid -> gid to id } }
+            }.toMap()
         }
-    }
 
     /**
      * 하버사인 공식 (Haversine Formula) - 두 좌표 간의 직선 거리 계산 (단위: km)
@@ -519,12 +545,17 @@ class ExecutePlaceSearchService(
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
         val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         return r * c
     }
 
-    private data class KeywordSearchResult(val places: List<PlacesTextSearchResponse.Place>, val fallbackPlaces: List<PlacesTextSearchResponse.Place>, val placeWeights: Map<String, Double>, val usedKeywords: List<String>)
+    private data class KeywordSearchResult(
+        val places: List<PlacesTextSearchResponse.Place>,
+        val fallbackPlaces: List<PlacesTextSearchResponse.Place>,
+        val placeWeights: Map<String, Double>,
+        val usedKeywords: List<String>,
+    )
     private data class PlaceLikeInfo(val likeCount: Int, val isLiked: Boolean)
 }

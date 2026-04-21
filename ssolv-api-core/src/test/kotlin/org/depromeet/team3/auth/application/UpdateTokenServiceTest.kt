@@ -25,8 +25,11 @@ import java.time.LocalDateTime
 class UpdateTokenServiceTest {
 
     @Mock private lateinit var userQueryRepository: UserQueryRepository
+
     @Mock private lateinit var userCommandRepository: UserCommandRepository
+
     @Mock private lateinit var jwtTokenProvider: JwtTokenProvider
+
     @Mock private lateinit var transactionTemplate: TransactionTemplate
 
     private lateinit var updateTokenService: UpdateTokenService
@@ -38,7 +41,10 @@ class UpdateTokenServiceTest {
             callback.doInTransaction(mock())
         }
         updateTokenService = UpdateTokenService(
-            userQueryRepository, userCommandRepository, jwtTokenProvider, transactionTemplate
+            userQueryRepository,
+            userCommandRepository,
+            jwtTokenProvider,
+            transactionTemplate,
         )
     }
 

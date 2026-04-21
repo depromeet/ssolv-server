@@ -22,13 +22,13 @@ import java.time.Duration
 @org.springframework.context.annotation.Profile("!test")
 @EnableRedisRepositories(
     basePackageClasses = [RedisConfig::class],
-    enableKeyspaceEvents = org.springframework.data.redis.core.RedisKeyValueAdapter.EnableKeyspaceEvents.ON_STARTUP
+    enableKeyspaceEvents = org.springframework.data.redis.core.RedisKeyValueAdapter.EnableKeyspaceEvents.ON_STARTUP,
 )
 class RedisConfig {
 
     @Bean
-    fun lettuceClientConfigurationBuilderCustomizer(): LettuceClientConfigurationBuilderCustomizer {
-        return LettuceClientConfigurationBuilderCustomizer { builder ->
+    fun lettuceClientConfigurationBuilderCustomizer(): LettuceClientConfigurationBuilderCustomizer =
+        LettuceClientConfigurationBuilderCustomizer { builder ->
             builder.clientOptions(
                 ClientOptions.builder()
                     .autoReconnect(true)
@@ -40,14 +40,13 @@ class RedisConfig {
                                     .idle(Duration.ofMinutes(5))
                                     .interval(Duration.ofSeconds(30))
                                     .count(3)
-                                    .build()
+                                    .build(),
                             )
-                            .build()
+                            .build(),
                     )
-                    .build()
+                    .build(),
             )
         }
-    }
 
     @Bean
     fun redisMessageListenerContainer(redisConnectionFactory: RedisConnectionFactory): RedisMessageListenerContainer {
@@ -57,7 +56,6 @@ class RedisConfig {
     }
 
     @Bean
-    fun stringRedisTemplate(redisConnectionFactory: RedisConnectionFactory): org.springframework.data.redis.core.StringRedisTemplate {
-        return org.springframework.data.redis.core.StringRedisTemplate(redisConnectionFactory)
-    }
+    fun stringRedisTemplate(redisConnectionFactory: RedisConnectionFactory): org.springframework.data.redis.core.StringRedisTemplate =
+        org.springframework.data.redis.core.StringRedisTemplate(redisConnectionFactory)
 }

@@ -13,5 +13,5 @@ data class PlaceSurveySummary(
     val leafVotes: Map<Long, Int>,
     val branchVotes: Map<Long, Int>,
     val leafCategories: Map<Long, SurveyCategory>,
-    val branchCategories: Map<Long, SurveyCategory>
+    val branchCategories: Map<Long, SurveyCategory>,
 )

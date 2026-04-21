@@ -1,23 +1,12 @@
 package org.depromeet.team3.place.client
-import io.micrometer.core.instrument.MeterRegistry
-
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.common.GooglePlacesApiProperties
-import org.depromeet.team3.place.model.PlacesTextSearchRequest
-import org.depromeet.team3.place.model.PlacesTextSearchResponse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
-import org.springframework.web.client.RestClient
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runTest
-import org.mockito.Mockito.lenient
-import org.mockito.quality.Strictness
-import org.mockito.junit.jupiter.MockitoSettings
-import org.mockito.junit.jupiter.MockitoExtension
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.junit.jupiter.MockitoSettings
+import org.mockito.kotlin.*
+import org.mockito.quality.Strictness
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ExtendWith(MockitoExtension::class)
@@ -31,17 +20,16 @@ class GooglePlacesClientTest {
     fun setUp() {
         googlePlacesApiProperties = GooglePlacesApiProperties(
             apiKey = "test-api-key",
-            baseUrl = "https://places.googleapis.com"
+            baseUrl = "https://places.googleapis.com",
         )
-        
+
         googlePlacesClient = GooglePlacesClient(
             httpClient = mock(),
             googlePlacesApiProperties = googlePlacesApiProperties,
             meterRegistry = mock(),
-            openTelemetry = io.opentelemetry.api.OpenTelemetry.noop()
+            openTelemetry = io.opentelemetry.api.OpenTelemetry.noop(),
         )
     }
-
 
     @org.junit.jupiter.api.Disabled("WebClient 마이그레이션으로 인한 테스트 수정 필요")
     @Test
@@ -79,6 +67,6 @@ class GooglePlacesClientTest {
             assertThat(result.places).hasSize(1)
             assertThat(result.places!![0].displayName.text).isEqualTo("맛집 1")
         }
-        */
+         */
     }
 }

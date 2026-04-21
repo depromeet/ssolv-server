@@ -2,12 +2,11 @@ package org.depromeet.team3
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
-import org.springframework.scheduling.annotation.EnableScheduling
 
 @SpringBootApplication(
     scanBasePackages = [
-        "org.depromeet.team3"
-    ]
+        "org.depromeet.team3",
+    ],
 )
 class CoreApiApplication
 

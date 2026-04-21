@@ -15,11 +15,9 @@ data class Meeting(
     override val updatedAt: LocalDateTime? = null,
 ) : BaseTimeDomain(createdAt, updatedAt) {
 
-    fun close(meeting: Meeting): Meeting {
-        return meeting.copy(
-            isClosed = true,
-            endAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-    }
+    fun close(meeting: Meeting): Meeting = meeting.copy(
+        isClosed = true,
+        endAt = LocalDateTime.now(),
+        updatedAt = LocalDateTime.now(),
+    )
 }

@@ -1,8 +1,6 @@
 package org.depromeet.team3.place.dto.response
 
-data class PlacesSearchResponse(
-    val items: List<PlaceItem>
-) {
+data class PlacesSearchResponse(val items: List<PlaceItem>) {
     data class PlaceItem(
         val placeId: Long,
         val name: String,
@@ -17,20 +15,12 @@ data class PlacesSearchResponse(
         val priceRange: PriceRange?,
         val addressDescriptor: AddressDescriptor?,
         val likeCount: Int = 0,
-        val isLiked: Boolean = false
+        val isLiked: Boolean = false,
     ) {
-        data class Review(
-            val rating: Int,
-            val text: String
-        )
-        
-        data class PriceRange(
-            val startPrice: String?,
-            val endPrice: String?
-        )
-        
-        data class AddressDescriptor(
-            val description: String
-        )
+        data class Review(val rating: Int, val text: String)
+
+        data class PriceRange(val startPrice: String?, val endPrice: String?)
+
+        data class AddressDescriptor(val description: String)
     }
 }

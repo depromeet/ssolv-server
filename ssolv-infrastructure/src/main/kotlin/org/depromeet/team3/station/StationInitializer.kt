@@ -6,9 +6,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class StationInitializer(
-    private val stationJpaRepository: StationJpaRepository
-) : ApplicationRunner {
+class StationInitializer(private val stationJpaRepository: StationJpaRepository) : ApplicationRunner {
 
     @Transactional
     override fun run(args: ApplicationArguments) {
@@ -173,14 +171,10 @@ class StationInitializer(
             stationJpaRepository.saveAll(
                 newStations.map {
                     StationEntity(name = it.name, locX = it.locX, locY = it.locY)
-                }
+                },
             )
         }
     }
 
-    private data class StationData(
-        val name: String,
-        val locX: Double,
-        val locY: Double
-    )
+    private data class StationData(val name: String, val locX: Double, val locY: Double)
 }
