@@ -1,0 +1,17 @@
+#!/bin/bash
+# ssolv pre-commit hook
+# 커밋 전 빠른 스타일 검증 (ktlint, ~3초)
+# Phase 1: 리포팅만 (ignoreFailures=true) — 위반이 있어도 커밋 차단하지 않음
+# 향후 Phase: ktlintFormat 정리 후 ignoreFailures=false 로 전환하여 차단
+
+echo "🔍 Pre-commit: ktlintCheck 실행..."
+
+if ! ./gradlew ktlintCheck --daemon -q; then
+  echo ""
+  echo "⚠️  ktlint 플러그인/리포팅 오류."
+  echo "   수정: ./gradlew ktlintFormat"
+  echo "   그 후 다시 git add + git commit"
+  exit 1
+fi
+
+echo "✅ Pre-commit: ktlint 통과 (리포팅 전용 — 위반 여부는 리포트 참조)"

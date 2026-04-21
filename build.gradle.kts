@@ -7,11 +7,16 @@ plugins {
     kotlin("plugin.jpa") version "1.9.25" apply false
     kotlin("kapt") version "1.9.25" apply false
     id("org.sonarqube") version "5.1.0.4882"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1" apply false
 }
 
 // 중복 의존성 관리 및 보안 버전 중앙화
 extra["jjwtVersion"] = "0.13.0"
 extra["sentryVersion"] = "7.14.0"
+
+// harness 태스크로 호출된 빌드인지 감지 — harness 경로에서는 실패를 전파하여 차단,
+// 그 외(로컬 빌드, 단일 테스트, IDE 등)에서는 리포팅만 하고 실패 무시 (Phase 1 정책)
+val isHarness = gradle.startParameter.taskNames.any { it.contains("harness") }
 
 // 모든 프로젝트 공통 설정
 allprojects {
@@ -31,6 +36,25 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
     apply(plugin = "org.jetbrains.kotlin.plugin.jpa")
     apply(plugin = "jacoco")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+
+    // ktlint 설정: 기존 코드베이스에 대한 점진적 도입을 위해 baseline 전략 사용
+    configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
+        version.set("1.3.1") // Kotlin 1.9.x 호환
+        // Phase 1: baseline에 2,708건의 기존 위반이 존재하므로 ktlint는 harness에서도 리포팅만.
+        // 향후 cleanup PR(ktlintFormat 일괄 적용)에서 `!isHarness`로 전환 예정.
+        ignoreFailures.set(true)
+        outputToConsole.set(true)
+        filter {
+            exclude { element -> element.file.path.contains("/build/") }
+            exclude { element -> element.file.path.contains("/generated/") }
+            exclude("**/Q*.kt") // QueryDSL 생성 파일
+        }
+        reporters {
+            reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+            reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+        }
+    }
 
     configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
         imports {
@@ -86,8 +110,9 @@ subprojects {
             html.required.set(true)
         }
         
-        // 테스트 실패해도 계속 진행 (전체 리포트 생성을 위해)
-        ignoreFailures = true
+        // 일반 빌드에서는 전체 리포트 생성을 위해 실패 무시.
+        // harness 경로에서는 실패 전파 — pre-push 시 차단.
+        ignoreFailures = !isHarness
         
         // CI 환경에서만 테스트 캐시 비활성화 (로컬 개발 성능 저하 방지)
         val isCI = System.getenv("CI")?.toBoolean() ?: false
@@ -193,9 +218,54 @@ sonar {
     }
 }
 
-// 루트 프로젝트 빌드 비활성화 (sonar, jacoco 관련 태스크 제외)
+// ============================================================
+// Harness 통합 검증 태스크
+// ktlint + 전체 테스트를 한 번에 실행 (pre-push에서 호출)
+// ============================================================
+tasks.register("harness") {
+    group = "verification"
+    description = "Runs all harness validations (ktlint + tests)"
+    dependsOn(subprojects.map { "${it.path}:ktlintCheck" })
+    dependsOn(subprojects.map { "${it.path}:test" })
+}
+
+// ============================================================
+// Git Hooks 설치 태스크
+// 로컬 개발 환경에서 한 번만 실행: ./gradlew installGitHooks
+// ============================================================
+tasks.register("installGitHooks") {
+    group = "setup"
+    description = "Installs local git hooks (pre-commit, pre-push) for this repository."
+    inputs.dir("$rootDir/.githooks")
+
+    onlyIf {
+        file("$rootDir/.githooks").exists() && file("$rootDir/.git").exists()
+    }
+
+    doLast {
+        val hooksDir = providers.exec {
+            commandLine("git", "rev-parse", "--git-path", "hooks")
+        }.standardOutput.asText.get().trim()
+
+        if (hooksDir.isEmpty()) {
+            throw GradleException("Could not resolve git hooks directory.")
+        }
+
+        copy {
+            from("$rootDir/.githooks")
+            into(hooksDir)
+            filePermissions {
+                unix("rwxr-xr-x")
+            }
+        }
+        println("✅ Git hooks installed to $hooksDir")
+    }
+}
+
+// 루트 프로젝트 빌드 비활성화 (sonar, jacoco, harness 관련 태스크 제외)
 tasks.configureEach {
-    if (name == "sonar" || name.contains("jacoco") || name == "help") {
+    val allowedNames = setOf("sonar", "help", "harness", "installGitHooks")
+    if (name in allowedNames || name.contains("jacoco")) {
         onlyIf { true }
     } else {
         onlyIf { false }
