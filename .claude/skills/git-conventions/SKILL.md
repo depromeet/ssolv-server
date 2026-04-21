@@ -62,24 +62,38 @@ feat: migrate external clients from WebClient to Ktor Client
 
 ## PR 작성
 
-`.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다:
+`.github/PULL_REQUEST_TEMPLATE.md` 양식은 **무시하고** 아래 형식을 사용한다. 가치 중심 서술이 핵심 — "무엇을 바꿨는가"보다 "왜 이 변경이 필요했는가"를 먼저 전달한다.
 
 ```markdown
-## 🎋 이슈 및 작업중인 브랜치
+## Summary
 
-- closes #{issue-number}
+<변경의 맥락과 목적을 1~2문장으로>
 
-## 🔑 주요 내용
+### <변경 묶음 1 제목> (커밋이 여러 개거나 주제가 나뉠 때만 ### 사용)
 
-- 변경 사항 1
-- 변경 사항 2
+- 핵심 변경 사항과 이유
+- 설계 결정이 있으면 why를 포함
 
-## Check List
+### <변경 묶음 2 제목>
 
-- [ ] Assignees 등록을 하였나요?
-- [ ] 라벨(Label) 등록을 하였나요?
-- [ ] PR 머지하기 전 반드시 CI가 정상적으로 작동하는지 확인해주세요!
+- ...
+
+## Test plan
+
+- [x] 실제로 확인한 항목만 체크
+- [x] `./gradlew harness` 통과 여부
+- [x] CI 통과 여부
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
+
+### 작성 원칙
+
+- `## Summary` 바로 아래에 변경의 핵심을 먼저 — 리뷰어가 첫 문단만 읽어도 PR의 가치를 알 수 있어야 함
+- 커밋이 1개거나 주제가 단일하면 `###` 없이 `## Summary` 아래 바로 bullets
+- 커밋이 여러 개이거나 주제가 나뉠 때만 `###` 서브섹션 사용
+- 설계 결정이 있으면 **(a) / (b) / ...** 형식으로 명시 (왜 다른 방법이 아닌지 포함)
+- Test plan은 실제로 검증한 것만 — 형식적 체크리스트 금지
 
 **PR 머지 대상**: `dev` 브랜치 (CI는 `dev` 브랜치 PR에서 트리거됨)
 
