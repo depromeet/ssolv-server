@@ -31,10 +31,8 @@ Phase 1 정책: **ktlint는 리포팅 전용 (baseline 위반 때문), 테스트
 
 설치: `./gradlew installGitHooks` (repo clone 후 1회).
 
-### ktlint baseline 상태 (2026-04-21 기준)
-- 현재 위반 2,708건 / 269개 파일 (대부분 자동 수정 가능)
-- Phase 1: ktlint `ignoreFailures=true` 고정 (baseline 고려) / 테스트는 `!isHarness`
-- **후속 cleanup PR**에서 `./gradlew ktlintFormat`으로 일괄 정리 후 ktlint도 `!isHarness`로 전환 예정
+### ktlint 정책
+- ktlint는 **항상 리포팅 전용** (`ignoreFailures=true`). CI(PR)에서 검증하므로 로컬 push 블로킹 불필요.
 - 새 코드 작성 시 수동으로 `./gradlew ktlintFormat` 실행 권장
 
 ## Skills (auto-discovery)
