@@ -124,7 +124,9 @@ skill: 어느 스킬에 반영했는가 (없으면 새 스킬 필요)
 Phase 2는 **세션 회고 루프**를 추가해, 매 세션 종료 시 관찰이 memory / CLAUDE.md / thoughts/ / skills로 분배되도록 한다. 이로써 다음 세션은 "맨땅"이 아니라 "축적된 컨텍스트 위"에서 시작된다.
 
 ### 추가된 것
-- `.claude/commands/retro.md` — 세션 회고 엔진
+- `.claude/commands/retro.md` — 세션 회고 엔진 (`#### 저장 전 필수 — CLAUDE.md 충돌 점검` 서브섹션 포함)
+- `.claude/hooks/post-push-retro-nudge.sh` — `git push` 성공 후 `/retro` 리마인더 (노이즈 적은 stdout 메시지)
+- `.claude/settings.json` — PostToolUse(Bash)에 위 hook 등록
 - `thoughts/retros/` — 세션별 회고록 (git 커밋)
 - `thoughts/learning/resources.md` — 학습자료 누적 허브 (git 커밋)
 - `CLAUDE.local.md` — 민감 정보(SSH 키, 인스턴스 IP, RDS 엔드포인트) 분리 (git-ignored)
@@ -147,4 +149,6 @@ Phase 2 설계 시 4가지 결정사항을 사용자와 합의했다:
 ### 다음 Phase 후보 (미정 · 필요 시 재검토)
 - **Phase 3-a**: 세션 간 retro 상호 참조 — 누적된 회고록을 분석해 "반복된 실수 Top N" 추출 후 skill 고도화
 - **Phase 3-b**: Plan 기반 워크플로 선별 도입 — 대형 리팩터링/신규 도메인 추가 시 research→plan→implement→validate 4단계 적용
-- **Phase 3-c**: 커스텀 sub-agent 도입 — 현재는 built-in Explore로 충분하다 판단, 보류
+- **Phase 3-c**: 세션 시작 시 선제 `/retro` 제안 — 마지막 실행 시각 + 커밋 누적을 상태 파일로 추적. 현재는 push 후 hook 리마인더만으로 충분 판단, 보류.
+- **Phase 3-d**: memory ↔ `CLAUDE.md` 충돌 자동 감지 Hook — 현재는 `/retro` 내부 저장 단계에서 수동 점검. 충돌 사례가 쌓이면 LLM hook으로 승격 검토.
+- **Phase 3-e**: 커스텀 sub-agent 도입 — 현재는 built-in Explore로 충분하다 판단, 보류.

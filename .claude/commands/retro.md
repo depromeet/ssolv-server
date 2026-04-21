@@ -66,6 +66,21 @@ argument-hint: "[optional: focus area, e.g. 'infra' or 'frontend-pain']"
 | 5a. find-skills 매칭 성공 | 회고록에 참조 기록 | Skill 호출만 |
 | 5b. 신규 skill 필요 | `skill-creator` 자동 호출 → `.claude/skills/<new-name>/SKILL.md` | **자동 생성** (frontmatter 포함) |
 
+#### 저장 전 필수 — CLAUDE.md 충돌 점검
+
+memory·skills와 `CLAUDE.md`의 규칙이 시간이 지나면서 드리프트할 수 있습니다. **각 저장 후보를 확정하기 직전에 `CLAUDE.md` (및 `CLAUDE.local.md`) 규칙과 의미적 충돌이 없는지 확인**하세요.
+
+예시 충돌:
+- memory 후보: *"사용자가 커밋을 한국어로 쓰는 걸 선호함"*
+- `CLAUDE.md` 규칙: *"Commit messages: 영문만"*
+
+충돌 감지 시 사용자에게 **두 갈래 선택지**를 제시합니다:
+
+1. **후보 폐기** — memory 저장 취소 (과거 규칙이 여전히 유효한 경우)
+2. **`CLAUDE.md` 업데이트** — 규칙 자체가 낡은 경우. diff 제안 후 **(d) 원칙**(승인→Edit)에 따라 처리.
+
+충돌이 없다고 판단될 때만 아래 저장 세부 규칙으로 진행하세요.
+
 #### 저장 세부 규칙
 
 **Memory 파일 포맷** (항목 1):
