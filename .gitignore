@@ -81,3 +81,6 @@ ssolv-api-place/src/main/kotlin/org/depromeet/team3/place/controller/BenchmarkCo
 # K6 부하 테스트
 k6/
 *.html
+
+# Claude Code personal overrides (credentials, local paths)
+CLAUDE.local.md

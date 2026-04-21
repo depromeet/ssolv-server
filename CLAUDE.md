@@ -98,40 +98,9 @@ Cases that require manual follow-up:
 
 ## Production Server SSH Access
 
-For production operations (checking server status, restarting containers, reading logs, editing `.env`, etc.), **SSH in directly without asking the user**.
+실제 접속 자격증명(SSH 키 경로, 인스턴스 Public/Private IP, RDS 엔드포인트, 공통 SSH 명령 예시)은 **`CLAUDE.local.md`** 에 있습니다 — 개인 전용, git-ignored.
 
-```
-SSH Key  : /Users/parkmineum/.ssh/gdg-cicd-key.pem
-User     : ubuntu
-
-Instance A (t3.micro  — nginx + app-server)
-  Public IP  : 3.34.32.206
-  Private IP : 10.1.0.43 (ap-northeast-2a / 10.1.0.0/24)
-
-Instance B (t3.small — app-server + redis + registry + monitoring)
-  Public IP  : 52.79.62.33
-  Private IP : 10.1.1.160 (ap-northeast-2c / 10.1.1.0/24)
-
-RDS Endpoint : ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com
-```
-
-**Common SSH patterns:**
-```bash
-# Connect to Instance A / B
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33
-
-# Restart a container (Instance B example)
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33 "
-  cd ~/17th-team3-Server
-  docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate <service>
-"
-
-# Tail logs
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "docker logs app-server --tail 100"
-```
-
-> If IPs have changed, run `cd deploy/terraform && terraform output` to get the latest values first.
+Claude Code는 `CLAUDE.md`와 `CLAUDE.local.md`를 모두 자동 로드하므로, 운영 작업 시 로컬 파일의 정보를 그대로 사용하세요. 팀원에 따라 SSH 키 경로가 다를 수 있으니, 팀에 합류한 새 멤버는 본인 환경에 맞춰 `CLAUDE.local.md`를 생성해야 합니다.
 
 ## Ongoing Work
 
