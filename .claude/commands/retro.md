@@ -1,5 +1,5 @@
 ---
-description: Session retrospective — extract learnings from current conversation and distribute them into memory, CLAUDE.md, thoughts/retros, thoughts/learning, and skills. Core engine of Compounding Engineering loop. Invoke at session end or major milestones.
+description: Session retrospective — extract learnings from current conversation and distribute them into memory, CLAUDE.md, .claude/thoughts/retros, .claude/thoughts/learning, and skills. Core engine of Compounding Engineering loop. Invoke at session end or major milestones.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, ToolSearch
 argument-hint: "[optional: focus area, e.g. 'infra' or 'frontend-pain']"
 ---
@@ -61,8 +61,8 @@ argument-hint: "[optional: focus area, e.g. 'infra' or 'frontend-pain']"
 | 1. 사실 | `~/.claude/projects/-Users-parkmineum-17th-team3-Server/memory/{user,project,reference}_*.md` | frontmatter 포함 파일 생성 + `MEMORY.md` 인덱스 한 줄 추가 |
 | 2. 업무 스타일 (팀 공유) | `CLAUDE.md` | **diff 제안만** → 사용자 승인 → Edit |
 | 2. 업무 스타일 (개인용) | `CLAUDE.local.md` | 직접 Edit 가능 |
-| 3. 프롬프팅 습관 | `thoughts/retros/YYYY-MM-DD.md` | 날짜별 회고록 (같은 날 2회 이상이면 append) |
-| 4. 학습자료 | `thoughts/learning/resources.md` | 카테고리별 append. 이유 한 줄 + 날짜 필수 |
+| 3. 프롬프팅 습관 | `.claude/thoughts/retros/YYYY-MM-DD.md` | 날짜별 회고록 (같은 날 2회 이상이면 append) |
+| 4. 학습자료 | `.claude/thoughts/learning/resources.md` | 카테고리별 append. 이유 한 줄 + 날짜 필수 |
 | 5a. find-skills 매칭 성공 | 회고록에 참조 기록 | Skill 호출만 |
 | 5b. 신규 skill 필요 | `skill-creator` 자동 호출 → `.claude/skills/<new-name>/SKILL.md` | **자동 생성** (frontmatter 포함) |
 
@@ -100,7 +100,7 @@ type: user | project | reference | feedback
 - diff 형태로 출력 → "적용해주세요" 응답 받은 경우에만 Edit 실행.
 - 섹션 중복 금지 — 기존 섹션 업데이트 우선.
 
-**thoughts/retros/ 회고록 포맷**:
+**.claude/thoughts/retros/ 회고록 포맷**:
 ```markdown
 # Retro — YYYY-MM-DD
 
@@ -140,8 +140,8 @@ type: user | project | reference | feedback
   - user_xxx.md
   - project_yyy.md
 - CLAUDE.md 제안: N건 (승인 대기 중)
-- thoughts/retros/YYYY-MM-DD.md: 기록 완료
-- thoughts/learning/resources.md: +N개 링크 추가
+- .claude/thoughts/retros/YYYY-MM-DD.md: 기록 완료
+- .claude/thoughts/learning/resources.md: +N개 링크 추가
 - Skills: +N개 생성 (이름 목록)
 - Skipped: N건 (회고록에 로그)
 
@@ -168,7 +168,7 @@ type: user | project | reference | feedback
 
 ## 금지 사항
 
-- ❌ 민감 정보(SSH 키 경로, 토큰, 개인 경로)를 `thoughts/`·커밋 대상 memory에 저장 금지 → `CLAUDE.local.md`에만.
+- ❌ 민감 정보(SSH 키 경로, 토큰, 개인 경로)를 `.claude/thoughts/`·커밋 대상 memory에 저장 금지 → `CLAUDE.local.md`에만.
 - ❌ 확신 없는 후보를 사용자 확인 없이 저장.
 - ❌ `CLAUDE.md`에 자동 write (항상 diff 제안 → 승인 후 Edit).
 - ❌ 동일 항목을 매 세션 중복 저장 (memory 기존 항목 체크 후 업데이트 우선).

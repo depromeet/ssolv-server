@@ -121,14 +121,14 @@ skill: 어느 스킬에 반영했는가 (없으면 새 스킬 필요)
 
 여기까지는 "쌓이는 인프라(뼈대)"를 준비한 단계. 하지만 **세션이 끝나면 관찰이 휘발**되는 구조 — 매 세션 교정·발견이 다음 세션에 전달되지 않음.
 
-Phase 2는 **세션 회고 루프**를 추가해, 매 세션 종료 시 관찰이 memory / CLAUDE.md / thoughts/ / skills로 분배되도록 한다. 이로써 다음 세션은 "맨땅"이 아니라 "축적된 컨텍스트 위"에서 시작된다.
+Phase 2는 **세션 회고 루프**를 추가해, 매 세션 종료 시 관찰이 memory / CLAUDE.md / .claude/thoughts/ / skills로 분배되도록 한다. 이로써 다음 세션은 "맨땅"이 아니라 "축적된 컨텍스트 위"에서 시작된다.
 
 ### 추가된 것
 - `.claude/commands/retro.md` — 세션 회고 엔진 (`#### 저장 전 필수 — CLAUDE.md 충돌 점검` 서브섹션 포함)
 - `.claude/hooks/post-push-retro-nudge.sh` — `git push` 성공 후 `/retro` 리마인더 (노이즈 적은 stdout 메시지)
 - `.claude/settings.json` — PostToolUse(Bash)에 위 hook 등록
-- `thoughts/retros/` — 세션별 회고록 (git 커밋)
-- `thoughts/learning/resources.md` — 학습자료 누적 허브 (git 커밋)
+- `.claude/thoughts/retros/` — 세션별 회고록 (git 커밋)
+- `.claude/thoughts/learning/resources.md` — 학습자료 누적 허브 (git 커밋)
 - `CLAUDE.local.md` — 민감 정보(SSH 키, 인스턴스 IP, RDS 엔드포인트) 분리 (git-ignored)
 - `CLAUDE.md` 정리 — 팀 공유 규칙만 남고 민감 정보는 로컬 파일 참조로 변경
 - `.gitignore` — `CLAUDE.local.md` 추가
@@ -143,8 +143,8 @@ Phase 2 설계 시 4가지 결정사항을 사용자와 합의했다:
 - **(d) `CLAUDE.md` 수정은 diff 제안 → 사용자 승인 → Edit.** 팀 공유 파일이므로 자동 쓰기 금지. `CLAUDE.local.md`는 직접 Edit 허용.
 
 ### 참고자료
-- [진정한 Claude Code 사용법 — Dr. Dan](https://babelai.tistory.com/42): 4단계 워크플로(research/plan/implement/validate) + `thoughts/` 구조 제안. 이 프로젝트엔 **회고 루프만 선별 도입**. 이유: token 비용, ssolv 규모 대비 4단계 워크플로는 오버킬. 필요 시 Phase 3에서 대형 작업 전용으로 재검토.
-- humanlayer 방식의 `thoughts/{personal,shared,searchable}` 3-tier는 도입 안 함 (팀 2~3명에 과잉 구조).
+- [진정한 Claude Code 사용법 — Dr. Dan](https://babelai.tistory.com/42): 4단계 워크플로(research/plan/implement/validate) + `.claude/thoughts/` 구조 제안. 이 프로젝트엔 **회고 루프만 선별 도입**. 이유: token 비용, ssolv 규모 대비 4단계 워크플로는 오버킬. 필요 시 Phase 3에서 대형 작업 전용으로 재검토.
+- humanlayer 방식의 `.claude/thoughts/{personal,shared,searchable}` 3-tier는 도입 안 함 (팀 2~3명에 과잉 구조).
 
 ### 다음 Phase 후보 (미정 · 필요 시 재검토)
 - **Phase 3-a**: 세션 간 retro 상호 참조 — 누적된 회고록을 분석해 "반복된 실수 Top N" 추출 후 skill 고도화
