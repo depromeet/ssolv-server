@@ -9,6 +9,12 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
+# .kt / .kts 변경이 없으면 테스트 생략 (문서/설정/YAML/훅 등만 수정한 턴에서 불필요한 지연 방지)
+if ! echo "$CHANGED" | grep -qE '\.(kt|kts)$'; then
+  echo "[test-changed-modules] No .kt/.kts changes, skipping tests."
+  exit 0
+fi
+
 run_core=false
 run_place=false
 
