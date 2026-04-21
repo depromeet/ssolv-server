@@ -37,20 +37,25 @@ Phase 1 정책: **ktlint는 리포팅 전용 (baseline 위반 때문), 테스트
 - **후속 cleanup PR**에서 `./gradlew ktlintFormat`으로 일괄 정리 후 ktlint도 `!isHarness`로 전환 예정
 - 새 코드 작성 시 수동으로 `./gradlew ktlintFormat` 실행 권장
 
-## Mandatory Pre-Task Protocol
+## Skills (auto-discovery)
 
-Load relevant skills before coding:
-- `/api-patterns` for controller/endpoint work
-- `/architecture` for design decisions or adding new domains
-- `/testing` for writing or modifying tests
-- `/async-processing` for Redis Stream or async task work
-- `/git-conventions` for commits, branches, PRs, and issues
-- `/auth` for JWT, OAuth, @UserId patterns
-- `/observability` for Sentry, Micrometer, OpenTelemetry patterns
-- `/notification` for FCM push notification patterns
-- `/place` for ssolv-api-place module (Google Places, Redis ranking, SSE like)
-- `/domain-model` for Domain/Entity separation, Mapper, JDSL, ErrorCode, @ConfigurationProperties
-- `/batch` for scheduler, CoroutineWatchdogManager, dead-letter patterns
+모든 skill은 `.claude/skills/<name>/SKILL.md`에 frontmatter `description`을 가지며, Claude는 현재 작업 컨텍스트와 description을 매칭하여 **자동으로** 관련 skill을 참조합니다. 아래는 수동 확인용 요약표입니다 — 작업 성격이 일치하면 해당 skill이 자동 트리거됩니다.
+
+| Skill | 언제 쓰이나 |
+|---|---|
+| `api-patterns` | `*Controller.kt` 작성/수정, 신규 API 라우트 |
+| `architecture` | 모듈 간 경계 설계, 신규 도메인 추가 |
+| `testing` | `src/test/`, `src/testFixtures/` 하위 작업 |
+| `async-processing` | Redis Streams 프로듀서/컨슈머, 코루틴 디스패처 전환 |
+| `git-conventions` | 커밋/브랜치/PR/이슈 작성 |
+| `auth` | JWT, Kakao/Apple OAuth, `@UserId` |
+| `observability` | Sentry, Micrometer, OpenTelemetry, MDC |
+| `notification` | FCM 푸시 알림 |
+| `place` | `ssolv-api-place` 모듈 (Google Places, Redis ZSET, SSE) |
+| `domain-model` | 도메인/엔티티 분리, Mapper, JDSL, `@ConfigurationProperties` |
+| `batch` | `ssolv-batch` 모듈 스케줄러, dead-letter |
+
+> description이 없던 과거 구조에서는 `/skill-name` 수동 호출에 의존했으나, 현재는 `ls .claude/skills/*/SKILL.md`로 전부 frontmatter를 확인할 수 있습니다. 새 skill 추가 시 반드시 `name` + `description` frontmatter를 포함하세요 (설명이 구체적일수록 트리거 정확도 ↑).
 
 ## Critical Rules
 

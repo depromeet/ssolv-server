@@ -1,3 +1,8 @@
+---
+name: testing
+description: Use when writing or modifying tests — JUnit 5 + MockK + Kotlin coroutines test support, WebMvcTest slices, @SpringBootTest integration tests, Testcontainers for MySQL/Redis, fixture patterns under src/testFixtures, and Jacoco coverage conventions. Trigger on any file under src/test/ or src/testFixtures/, or when adding a new test for a new feature.
+---
+
 # Testing Guide
 
 ## 테스트 원칙

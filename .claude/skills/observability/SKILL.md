@@ -1,3 +1,8 @@
+---
+name: observability
+description: Use when instrumenting code with Sentry error reporting, Micrometer metrics (Prometheus registry), or OpenTelemetry tracing. Also covers MDC-based logging (request_id, user_id), propagating OpenTelemetry Context across coroutine dispatcher switches, and Grafana/Prometheus dashboard config. Trigger on `span`, `meter`, `Sentry.capture`, `withTracingContext`, or logging/metrics related edits.
+---
+
 # Observability Patterns
 
 ## 구성 요소

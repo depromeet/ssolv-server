@@ -1,3 +1,8 @@
+---
+name: auth
+description: Use when working on JWT tokens, Kakao/Apple OAuth flows, `@UserId` custom annotation + `UserIdArgumentResolver`, `SecurityConfig`, `JwtAuthenticationFilter`, or login/logout/withdraw/refresh endpoints. Never use `@AuthenticationPrincipal` directly — always `@UserId`. Trigger on any auth-related controller, service, or filter.
+---
+
 # Auth Patterns
 
 ## 핵심 원칙

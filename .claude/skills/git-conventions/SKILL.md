@@ -1,3 +1,8 @@
+---
+name: git-conventions
+description: Use when creating commits, branches, pull requests, or GitHub issues. Covers Conventional Commits format (English only — enforced by commit-msg-check.sh hook), branch naming, PR/issue templates, and merge etiquette. Trigger any time a git/gh command is about to run or when drafting a PR description.
+---
+
 # Git Conventions
 
 ## 커밋 메시지

@@ -1,3 +1,9 @@
+---
+description: Restart a service on a production instance via SSH (docker compose up --no-deps --force-recreate).
+argument-hint: "<service> [instance]"
+allowed-tools: Bash
+---
+
 특정 인스턴스의 서비스를 재시작합니다.
 
 ## 사용법

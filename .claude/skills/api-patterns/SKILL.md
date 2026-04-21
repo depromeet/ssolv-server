@@ -1,3 +1,8 @@
+---
+name: api-patterns
+description: Use when writing or modifying Spring WebMVC controllers and REST endpoints. Covers the `DpmApiResponse<T>` response wrapper, `DpmException` + `ErrorCode` for errors, `@Operation`/`@Tag` Swagger docs (mandatory on every endpoint), request DTO validation, and HTTP status conventions. Trigger on any file ending in `Controller.kt` or when adding a new API route.
+---
+
 # API Patterns
 
 ## Response Wrapper

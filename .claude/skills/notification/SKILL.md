@@ -1,3 +1,8 @@
+---
+name: notification
+description: Use when sending Firebase Cloud Messaging (FCM) push notifications. Covers `FcmClient` in ssolv-infrastructure, device token storage/rotation (`DeviceTokenEntity`), notification event payloads, and opt-out policy. Trigger on any FCM / push / device token / notification-related code.
+---
+
 # Notification Patterns (FCM)
 
 ## 개요

@@ -1,3 +1,8 @@
+---
+name: place
+description: Use when working in the ssolv-api-place module — Google Places API client, Redis ZSET-based place ranking, Server-Sent Events for like updates, `MeetingPlaceSearchService`, `PlaceLikeService`, and place scoring. Detailed docs live in `.claude/docs/place-*.md`. Trigger on any file under ssolv-api-place/ or when touching place search/like/SSE flows.
+---
+
 # Place Module (ssolv-api-place)
 
 > 상세 문서: `.claude/docs/place-recommendation-logic.md`, `place-redis-caching-strategy.md`, `place-like-flow.md`

@@ -1,3 +1,8 @@
+---
+name: async-processing
+description: Use when working with Redis Streams for asynchronous task dispatch — place search job producers/consumers, coroutine scopes, retry logic, dead-letter handling, OpenTelemetry Context propagation across dispatcher switches. Trigger when touching `RedisStream*`, `*Dispatcher`, `*Consumer`, job queue code, or when designing any async/background workflow.
+---
+
 # Async Processing (Redis Streams)
 
 ## 개요
