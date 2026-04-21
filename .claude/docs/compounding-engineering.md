@@ -110,3 +110,45 @@ skill: 어느 스킬에 반영했는가 (없으면 새 스킬 필요)
 - [ ] 자주 SSH 접속하는 패턴이 있는가? → commands로 추상화
 - [ ] 같은 hook 오류가 반복되는가? → hook 조건 개선
 - [ ] 새 도메인이 추가됐는가? → 해당 skill 필요한지 검토
+
+---
+
+## 2026-04-21 Phase 2: 회고 루프 도입
+
+### 배경
+- Phase 1 ([PR #181](https://github.com/depromeet/ssolv-server/pull/181)): harness + 기본 인프라
+- Phase 1.5 ([PR #182](https://github.com/depromeet/ssolv-server/pull/182)): frontmatter 기반 auto-discovery
+
+여기까지는 "쌓이는 인프라(뼈대)"를 준비한 단계. 하지만 **세션이 끝나면 관찰이 휘발**되는 구조 — 매 세션 교정·발견이 다음 세션에 전달되지 않음.
+
+Phase 2는 **세션 회고 루프**를 추가해, 매 세션 종료 시 관찰이 memory / CLAUDE.md / thoughts/ / skills로 분배되도록 한다. 이로써 다음 세션은 "맨땅"이 아니라 "축적된 컨텍스트 위"에서 시작된다.
+
+### 추가된 것
+- `.claude/commands/retro.md` — 세션 회고 엔진 (`#### 저장 전 필수 — CLAUDE.md 충돌 점검` 서브섹션 포함)
+- `.claude/hooks/post-push-retro-nudge.sh` — `git push` 성공 후 `/retro` 리마인더 (노이즈 적은 stdout 메시지)
+- `.claude/settings.json` — PostToolUse(Bash)에 위 hook 등록
+- `thoughts/retros/` — 세션별 회고록 (git 커밋)
+- `thoughts/learning/resources.md` — 학습자료 누적 허브 (git 커밋)
+- `CLAUDE.local.md` — 민감 정보(SSH 키, 인스턴스 IP, RDS 엔드포인트) 분리 (git-ignored)
+- `CLAUDE.md` 정리 — 팀 공유 규칙만 남고 민감 정보는 로컬 파일 참조로 변경
+- `.gitignore` — `CLAUDE.local.md` 추가
+
+### 실행 원칙 (결정사항)
+
+Phase 2 설계 시 4가지 결정사항을 사용자와 합의했다:
+
+- **(a) `thoughts/` git 커밋함.** 팀 공유 + 미래 본인에게 공유. 민감 내용은 어차피 `CLAUDE.local.md` / memory로 분리되므로 회고록에 쓰이지 않음.
+- **(b) `/retro`는 수동 호출 + Claude가 세션 중 리마인드 제안.** 자동 Stop hook은 노이즈 누적 위험이 커서 보류. 대신 리마인더 기준을 커맨드 문서에 명시.
+- **(c) 신규 skill은 `skill-creator`로 자동 생성.** `find-skills`가 빈 결과 반환하면 바로 초안 생성. 이름·description은 사용자 확인 후.
+- **(d) `CLAUDE.md` 수정은 diff 제안 → 사용자 승인 → Edit.** 팀 공유 파일이므로 자동 쓰기 금지. `CLAUDE.local.md`는 직접 Edit 허용.
+
+### 참고자료
+- [진정한 Claude Code 사용법 — Dr. Dan](https://babelai.tistory.com/42): 4단계 워크플로(research/plan/implement/validate) + `thoughts/` 구조 제안. 이 프로젝트엔 **회고 루프만 선별 도입**. 이유: token 비용, ssolv 규모 대비 4단계 워크플로는 오버킬. 필요 시 Phase 3에서 대형 작업 전용으로 재검토.
+- humanlayer 방식의 `thoughts/{personal,shared,searchable}` 3-tier는 도입 안 함 (팀 2~3명에 과잉 구조).
+
+### 다음 Phase 후보 (미정 · 필요 시 재검토)
+- **Phase 3-a**: 세션 간 retro 상호 참조 — 누적된 회고록을 분석해 "반복된 실수 Top N" 추출 후 skill 고도화
+- **Phase 3-b**: Plan 기반 워크플로 선별 도입 — 대형 리팩터링/신규 도메인 추가 시 research→plan→implement→validate 4단계 적용
+- **Phase 3-c**: 세션 시작 시 선제 `/retro` 제안 — 마지막 실행 시각 + 커밋 누적을 상태 파일로 추적. 현재는 push 후 hook 리마인더만으로 충분 판단, 보류.
+- **Phase 3-d**: memory ↔ `CLAUDE.md` 충돌 자동 감지 Hook — 현재는 `/retro` 내부 저장 단계에서 수동 점검. 충돌 사례가 쌓이면 LLM hook으로 승격 검토.
+- **Phase 3-e**: 커스텀 sub-agent 도입 — 현재는 built-in Explore로 충분하다 판단, 보류.

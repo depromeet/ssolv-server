@@ -39,7 +39,9 @@ Phase 1 정책: **ktlint는 리포팅 전용 (baseline 위반 때문), 테스트
 
 ## Skills (auto-discovery)
 
-모든 skill은 `.claude/skills/<name>/SKILL.md`에 frontmatter `description`을 가지며, Claude는 현재 작업 컨텍스트와 description을 매칭하여 **자동으로** 관련 skill을 참조합니다. 아래는 수동 확인용 요약표입니다 — 작업 성격이 일치하면 해당 skill이 자동 트리거됩니다.
+모든 skill은 `.claude/skills/<name>/SKILL.md`에 frontmatter `description`을 가지며, Claude는 현재 작업 컨텍스트와 description을 매칭하여 관련 skill을 **탐색**합니다. 아래는 수동 확인용 요약표입니다 — 작업 성격이 일치하면 해당 skill이 탐색 후보에 올라옵니다.
+
+> ⚠️ **중요 — "탐색" ≠ "자동 로드"**: description 매칭으로 후보가 보인다고 해서 skill 본문이 컨텍스트에 자동 주입되지 않습니다. Claude는 git/PR/배포 같은 규칙성이 강한 작업을 **시작하기 전에 반드시 `Skill` 도구로 해당 skill 본문을 로드**해야 하며, description만 보고 규칙을 추측하지 말아야 합니다 (과잉 일반화로 프로젝트 컨벤션을 위반한 사례 있음 — PR #183 참조).
 
 | Skill | 언제 쓰이나 |
 |---|---|
@@ -80,9 +82,12 @@ See `/architecture` skill for full module dependency graph and layer rules.
 - **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
 - **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
 
-## Commit Message Language
+## Language Conventions
 
-All commit messages must be written in **English**. No Korean in commit messages.
+- **Commit messages**: 영문만 (Conventional Commits 형식, `commit-msg-check.sh` hook이 강제).
+- **PR 본문·이슈 본문**: 한국어 (`.github/PULL_REQUEST_TEMPLATE.md` 및 `.github/ISSUE_TEMPLATE/*.md` 템플릿 준수).
+- **CLAUDE.md·skill 문서 본문**: 한국어 중심, 코드·명령·프레임워크명·어노테이션은 영문 유지.
+- **코드 주석**: 원칙적으로 영문. 한국어 비즈니스 용어가 꼭 필요한 경우만 예외.
 
 ## Post-Task Follow-up Guidelines
 
@@ -98,40 +103,9 @@ Cases that require manual follow-up:
 
 ## Production Server SSH Access
 
-For production operations (checking server status, restarting containers, reading logs, editing `.env`, etc.), **SSH in directly without asking the user**.
+실제 접속 자격증명(SSH 키 경로, 인스턴스 Public/Private IP, RDS 엔드포인트, 공통 SSH 명령 예시)은 **`CLAUDE.local.md`** 에 있습니다 — 개인 전용, git-ignored.
 
-```
-SSH Key  : /Users/parkmineum/.ssh/gdg-cicd-key.pem
-User     : ubuntu
-
-Instance A (t3.micro  — nginx + app-server)
-  Public IP  : 3.34.32.206
-  Private IP : 10.1.0.43 (ap-northeast-2a / 10.1.0.0/24)
-
-Instance B (t3.small — app-server + redis + registry + monitoring)
-  Public IP  : 52.79.62.33
-  Private IP : 10.1.1.160 (ap-northeast-2c / 10.1.1.0/24)
-
-RDS Endpoint : ssolv-mysql.cvosykk4qy21.ap-northeast-2.rds.amazonaws.com
-```
-
-**Common SSH patterns:**
-```bash
-# Connect to Instance A / B
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33
-
-# Restart a container (Instance B example)
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@52.79.62.33 "
-  cd ~/17th-team3-Server
-  docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate <service>
-"
-
-# Tail logs
-ssh -i /Users/parkmineum/.ssh/gdg-cicd-key.pem -o StrictHostKeyChecking=no ubuntu@3.34.32.206 "docker logs app-server --tail 100"
-```
-
-> If IPs have changed, run `cd deploy/terraform && terraform output` to get the latest values first.
+Claude Code는 `CLAUDE.md`와 `CLAUDE.local.md`를 모두 자동 로드하므로, 운영 작업 시 로컬 파일의 정보를 그대로 사용하세요. 팀원에 따라 SSH 키 경로가 다를 수 있으니, 팀에 합류한 새 멤버는 본인 환경에 맞춰 `CLAUDE.local.md`를 생성해야 합니다.
 
 ## Ongoing Work
 
