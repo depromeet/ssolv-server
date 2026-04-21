@@ -50,6 +50,18 @@ jobs:
       - name: Check Java Version
         run: java -version
         
+      - name: ktlint 스타일 검증
+        run: ./gradlew ktlintCheck --continue
+        continue-on-error: true
+
+      - name: Upload ktlint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ktlint-report
+          path: '**/build/reports/ktlint/'
+          if-no-files-found: ignore
+
       - name: Build project (kapt 먼저 실행)
         run: ./gradlew build -x test --stacktrace
         env:

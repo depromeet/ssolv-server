@@ -1,0 +1,23 @@
+#!/bin/bash
+# ssolv pre-push hook
+# 푸시 전 전체 harness 검증 (ktlint + 전체 테스트, ~수 분)
+# 실패 시 푸시 차단
+#
+# 긴급하게 스킵해야 할 때: git push --no-verify (권장하지 않음)
+
+set -e
+
+echo "🔍 Pre-push: harness 전체 검증 실행..."
+echo "   (ktlint + 전체 테스트, 시간이 소요됩니다)"
+
+./gradlew harness --daemon -q
+
+STATUS=$?
+if [ $STATUS -ne 0 ]; then
+  echo ""
+  echo "❌ Harness 검증 실패. 모든 검증 통과 후 다시 push 하세요."
+  echo "   상세 로그: ./gradlew harness --info"
+  exit 1
+fi
+
+echo "✅ Pre-push: harness 전체 검증 통과"

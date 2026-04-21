@@ -9,12 +9,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ```bash
-./gradlew build -x test       # Compile project
+./gradlew installGitHooks      # (최초 1회) 로컬 git pre-commit / pre-push 설치
+./gradlew build -x test        # Compile project
 ./gradlew test                 # Execute test suite
+./gradlew harness              # ktlint + 전체 테스트 (pre-push와 동일)
+./gradlew ktlintCheck          # 스타일 검증만
+./gradlew ktlintFormat         # 스타일 자동 수정
 ./gradlew test jacocoTestReport --continue --stacktrace  # Tests + coverage report
 ./gradlew :ssolv-api-core:test --tests "org.depromeet.team3.SomeTest"  # Single test class
 ./gradlew :ssolv-api-place:test --tests "org.depromeet.team3.SomeTest"
 ```
+
+## Harness (코드 품질 가드레일)
+
+- **pre-commit**: `ktlintCheck` (~3초). 스타일 위반 시 커밋 차단
+- **pre-push**: `./gradlew harness` (ktlint + 전체 테스트). 실패 시 푸시 차단
+- **CI**: PR 생성 시 ktlintCheck + build + test + SonarCloud 실행
+- **긴급 우회**: `git commit/push --no-verify` (권장하지 않음)
+
+설치: `./gradlew installGitHooks` (repo clone 후 1회).
+
+### ktlint baseline 상태 (2026-04-21 기준)
+- 현재 위반 2,708건 / 269개 파일 (대부분 자동 수정 가능)
+- `ignoreFailures=true`로 설정되어 Phase 1에서는 빌드/커밋 차단 없음
+- **후속 cleanup PR**에서 `./gradlew ktlintFormat`으로 일괄 정리 후 `ignoreFailures=false`로 전환 예정
+- 새 코드 작성 시 수동으로 `./gradlew ktlintFormat` 실행 권장
 
 ## Mandatory Pre-Task Protocol
 

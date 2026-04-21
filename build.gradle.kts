@@ -7,6 +7,7 @@ plugins {
     kotlin("plugin.jpa") version "1.9.25" apply false
     kotlin("kapt") version "1.9.25" apply false
     id("org.sonarqube") version "5.1.0.4882"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1" apply false
 }
 
 // 중복 의존성 관리 및 보안 버전 중앙화
@@ -31,6 +32,23 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
     apply(plugin = "org.jetbrains.kotlin.plugin.jpa")
     apply(plugin = "jacoco")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+
+    // ktlint 설정: 기존 코드베이스에 대한 점진적 도입을 위해 baseline 전략 사용
+    configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
+        version.set("1.3.1") // Kotlin 1.9.x 호환
+        ignoreFailures.set(true) // Phase 1: baseline 수집 단계에서는 빌드 실패시키지 않음
+        outputToConsole.set(true)
+        filter {
+            exclude { element -> element.file.path.contains("/build/") }
+            exclude { element -> element.file.path.contains("/generated/") }
+            exclude("**/Q*.kt") // QueryDSL 생성 파일
+        }
+        reporters {
+            reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+            reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+        }
+    }
 
     configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
         imports {
@@ -193,9 +211,54 @@ sonar {
     }
 }
 
-// 루트 프로젝트 빌드 비활성화 (sonar, jacoco 관련 태스크 제외)
+// ============================================================
+// Harness 통합 검증 태스크
+// ktlint + 전체 테스트를 한 번에 실행 (pre-push에서 호출)
+// ============================================================
+tasks.register("harness") {
+    group = "verification"
+    description = "Runs all harness validations (ktlint + tests)"
+    dependsOn(subprojects.map { "${it.path}:ktlintCheck" })
+    dependsOn(subprojects.map { "${it.path}:test" })
+}
+
+// ============================================================
+// Git Hooks 설치 태스크
+// 로컬 개발 환경에서 한 번만 실행: ./gradlew installGitHooks
+// ============================================================
+tasks.register("installGitHooks") {
+    group = "setup"
+    description = "Installs local git hooks (pre-commit, pre-push) for this repository."
+    inputs.dir("$rootDir/.githooks")
+
+    onlyIf {
+        file("$rootDir/.githooks").exists() && file("$rootDir/.git").exists()
+    }
+
+    doLast {
+        val hooksDir = providers.exec {
+            commandLine("git", "rev-parse", "--git-path", "hooks")
+        }.standardOutput.asText.get().trim()
+
+        if (hooksDir.isEmpty()) {
+            throw GradleException("Could not resolve git hooks directory.")
+        }
+
+        copy {
+            from("$rootDir/.githooks")
+            into(hooksDir)
+            filePermissions {
+                unix("rwxr-xr-x")
+            }
+        }
+        println("✅ Git hooks installed to $hooksDir")
+    }
+}
+
+// 루트 프로젝트 빌드 비활성화 (sonar, jacoco, harness 관련 태스크 제외)
 tasks.configureEach {
-    if (name == "sonar" || name.contains("jacoco") || name == "help") {
+    val allowedNames = setOf("sonar", "help", "harness", "installGitHooks")
+    if (name in allowedNames || name.contains("jacoco")) {
         onlyIf { true }
     } else {
         onlyIf { false }
