@@ -7,16 +7,18 @@
 
 ## 1. Harness 전체 아키텍처
 
-Harness는 **3개 계층**으로 구성된다. 계층마다 블로킹 강도가 다르다.
+Harness는 **2개 로컬 계층 + CI** 로 구성된다.
 
 ```
 [로컬 작업] ──────────────────────────────────────────────────────► [원격]
      │
      ▼
- pre-commit (git hook)         ktlintCheck — 리포팅 전용, 차단 없음
+ (pre-commit 없음 — 과거에는 ktlintCheck 였으나 리포팅 중복이라 제거)
      │
      ▼
- pre-push (git hook)           ktlint(리포팅) + 전체 테스트 — 테스트 실패 시 push 차단
+ pre-push (git hook)           ./gradlew harness
+                                 = ktlint(리포팅) + 전체 테스트
+                                 테스트 실패 시 push 차단
      │
      ▼
  CI (GitHub Actions)           ktlintCheck + build + test + SonarCloud
@@ -36,46 +38,47 @@ tasks.register("harness") {
 }
 ```
 
-- **ktlint**: `ignoreFailures = true` → 위반 있어도 태스크 자체는 통과. 스타일 리포트만 출력.
-- **test**: `Test.ignoreFailures = !isHarness` → harness 경로에서는 테스트 실패가 빌드 실패로 전파.
-- `isHarness` 플래그: Gradle property `harness=true`로 활성화되며, `installGitHooks`가 생성한 pre-push hook이 이 플래그를 자동으로 주입.
+- **ktlint**: `ignoreFailures = true` 로 고정 → 위반 있어도 태스크 자체는 통과. 스타일 리포트만 출력.
+  - 이유: dev 브랜치 직접 push 시 harness가 막히지 않도록 한 의도적 정책. baseline 위반이 있기 때문에 차단으로 돌리면 개발이 멈춘다. **CI에서 리포팅을 확인하는 것이 정답.**
+- **test**: `Test.ignoreFailures = !isHarness` → harness 경로에서만 테스트 실패가 빌드 실패로 전파.
+- `isHarness` 플래그: `gradle.startParameter.taskNames.any { it == "harness" || it.endsWith(":harness") }` — 정확 매칭으로 오작동 방지.
 
 ### 1.2 Git Hooks (로컬)
 
-`./gradlew installGitHooks` 가 `.git/hooks/` 에 심볼릭 링크 또는 스크립트를 생성한다.
+`./gradlew installGitHooks` 가 `.git/hooks/` 에 훅 스크립트를 복사한다. 복사 전에 **`.githooks/` 에 더 이상 존재하지 않는 관리 대상 훅(예: 과거의 pre-commit)을 hooks 디렉토리에서 정리**한다 — 정책이 바뀐 뒤에도 오래된 훅이 남아있는 사태를 막기 위함.
 
 | Hook | 실행 시점 | 실행 내용 | 차단 여부 |
 |---|---|---|---|
-| `pre-commit` | `git commit` 전 | `./gradlew ktlintCheck` | ❌ 차단 없음 (`ignoreFailures=true`) |
 | `pre-push` | `git push` 전 | `./gradlew harness` (ktlint + test) | ✅ 테스트 실패 시 push 차단 |
 
 긴급 우회: `git push --no-verify` (권장하지 않음)
+
+### 1.3 Worktree에서의 git hooks 동작
+
+`git worktree add` 로 만든 작업 트리에서도 git은 **원본 repo의 `.git/hooks/` 를 공유**한다 (`git rev-parse --git-path hooks` 로 확인 가능). 즉:
+
+- **`./gradlew installGitHooks` 는 clone 직후 단 1회만 실행하면 된다** — worktree마다 다시 설치할 필요 없음.
+- 반대로, 어떤 worktree에서 `.githooks/` 를 수정한 뒤 `installGitHooks` 를 재실행하면 **모든 worktree가 즉시 새 훅을 공유**한다.
 
 ---
 
 ## 2. Claude Code Hook 아키텍처
 
-Claude Code 세션 중 툴 호출 이벤트에 반응하는 훅이 별도로 존재한다.
-설정 파일: `.claude/settings.json`
+Claude Code 세션 중 툴 호출 이벤트에 반응하는 훅. 설정 파일: `.claude/settings.json`
 
-### 2.1 settings.json 전체 구조
+### 2.1 settings.json 구조
 
 ```json
 {
   "hooks": {
-    "PreToolUse": [
-      { "matcher": "Bash",       "hooks": [commit-msg-check.sh] }
-    ],
-    "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [post-edit-dispatch.sh] },
-      { "matcher": "Bash",       "hooks": [post-push-retro-nudge.sh] }
-    ],
-    "Stop": [
-      { "matcher": "",           "hooks": [test-changed-modules.sh] }
-    ]
+    "PreToolUse":  [ { "matcher": "Bash",       "hooks": [commit-msg-check.sh] } ],
+    "PostToolUse": [ { "matcher": "Edit|Write", "hooks": [post-edit-dispatch.sh] },
+                     { "matcher": "Bash",       "hooks": [post-push-retro-nudge.sh] } ]
   }
 }
 ```
+
+> **Stop hook 제거됨**: 과거에는 `test-changed-modules.sh` 가 매 응답마다 변경 모듈을 테스트했으나, **pre-push harness와 100% 중복**이면서 읽기 전용 턴에도 Gradle daemon이 깨어나고, 타임아웃 5분까지 세션이 블로킹되는 UX 문제로 제거했다. 테스트 검증은 **pre-push 단일 지점**에 위임한다.
 
 ### 2.2 훅 트리거 흐름
 
@@ -83,8 +86,9 @@ Claude Code 세션 중 툴 호출 이벤트에 반응하는 훅이 별도로 존
 Claude 툴 호출
     │
     ├─ Bash 호출 전 ────────────► commit-msg-check.sh
-    │                              └─ git commit 명령일 때만 검증
-    │                                 Conventional Commits + 영문 강제
+    │                              └─ early-exit: "git commit" 문자열이 없으면 즉시 종료
+    │                                 (python3 프로세스 스폰 비용 회피)
+    │                                 └─ Conventional Commits + 영문 강제
     │
     ├─ Edit|Write 완료 후 ──────► post-edit-dispatch.sh  (디스패처)
     │                              ├─ *.tf            → iac-security-check.sh
@@ -94,108 +98,79 @@ Claude 툴 호출
     │                              └─ *.kt / *.kts    → value-injection-check.sh
     │                                                 → module-import-check.sh
     │
-    ├─ Bash 완료 후 ────────────► post-push-retro-nudge.sh
-    │                              └─ git push 성공 시 /retro 리마인더 출력
-    │
-    └─ Claude 응답 완료 (Stop) ─► test-changed-modules.sh
-                                   └─ .kt/.kts 변경 있을 때만 해당 모듈 테스트 실행
+    └─ Bash 완료 후 ────────────► post-push-retro-nudge.sh
+                                   └─ early-exit: "git push" 문자열이 없으면 즉시 종료
+                                      └─ /retro 리마인더 출력
 ```
+
+### 2.3 Bash 훅 오버헤드 대책
+
+`PreToolUse(Bash)` / `PostToolUse(Bash)` 는 **모든 Bash 호출**에 트리거된다 — `ls`, `cat`, `gradlew` 를 포함해 세션 당 수백 번. 따라서 훅 스크립트는 반드시 **쉘 레벨 early-exit** 를 먼저 실행한 뒤에만 python3 파싱으로 넘어간다:
+
+```bash
+if ! printf '%s' "$TOOL_INPUT" | grep -q '"git commit'; then
+    exit 0
+fi
+# ↓ 여기서부터 python3 파싱 ↓
+```
+
+이 가드가 없으면 세션 전반에 걸쳐 수 초 단위의 누적 지연이 발생한다.
 
 ---
 
 ## 3. 각 훅 상세
 
 ### 3.1 commit-msg-check.sh
-
 - **트리거**: `PreToolUse(Bash)` — `git commit` 명령 실행 전
-- **역할**: 커밋 메시지 형식 사전 차단
-- **검증 항목**:
-  1. 한국어(비 ASCII) 포함 여부 → 영문 강제
-  2. Conventional Commits 패턴 `type(scope): message` 형식
-- **종료 코드**: `exit 2` 시 Claude가 툴 실행을 중단하고 오류 메시지 출력
-- **우회 조건**: `--no-verify` 플래그 있으면 건너뜀
-
-```
-유효한 type: feat | fix | refactor | test | docs | perf | chore | build | ci | revert
-```
+- **차단 정책**: ✅ `exit 2` — 한국어 포함 / Conventional Commits 위반 시 차단
+- **우회 조건**: `--no-verify` 플래그 또는 훅에서 `git commit` 매칭 실패 시 즉시 종료
 
 ### 3.2 post-edit-dispatch.sh (디스패처)
-
-- **트리거**: `PostToolUse(Edit|Write)` — 파일 저장 직후
-- **역할**: 4개 검증 훅을 매번 실행하는 대신, 파일 경로 패턴을 보고 필요한 훅만 선택 실행
-
-이전 구조에서 훅 4개를 전부 실행하면 프로세스 4개 스폰 + JSON 파싱 4회가 발생했다. 디스패처 패턴으로 단일 프로세스 실행 후 내부에서 라우팅한다.
-
-```bash
-case "$FILE_PATH" in
-    *.tf)          → iac-security-check.sh
-    *Controller.kt)→ controller-annotation-check.sh + value-injection-check.sh + module-import-check.sh
-    *.kt|*.kts)    → value-injection-check.sh + module-import-check.sh
-esac
-```
+- **역할**: 파일 경로 패턴을 보고 필요한 훅만 선택 실행 — 단일 프로세스에서 라우팅하여 훅 4개 중복 실행을 방지
 
 ### 3.3 controller-annotation-check.sh
-
-- **트리거**: 디스패처 경유 — `*Controller.kt` 저장 시
-- **검증 항목**:
-  1. 클래스 레벨 `@Tag` 누락
-  2. `@Operation` 누락 (최소 1개)
-  3. `@AuthenticationPrincipal` 직접 사용 (`@UserId` 로 교체 필요)
-  4. `DpmApiResponse` 래핑 누락
-- **종료 코드**: 경고는 `exit 0` 으로 계속 진행 (차단 없음, 경고만 출력)
+- **차단 정책 (H7 결정)**:
+  - ✅ **차단 (exit 2)** — 아키텍처/계약 위반
+    - `@AuthenticationPrincipal` 직접 사용 → `@UserId` 로 교체
+    - `DpmApiResponse` 래핑 누락
+  - ⚠️ **경고만 (exit 0)** — 문서 품질 미비
+    - `@Tag` 누락
+    - `@Operation` 누락
 
 ### 3.4 value-injection-check.sh
-
-- **트리거**: 디스패처 경유 — `*.kt` 저장 시 (테스트 파일 제외)
-- **검증 항목**: `@Value(...)` 직접 주입 패턴 탐지
-- **올바른 대안**: `@ConfigurationProperties` 클래스 생성
-- **종료 코드**: 위반 시 `exit 2` → Claude 실행 중단
+- **차단 정책**: ✅ `exit 2` — `@Value` 직접 주입 금지 (`@ConfigurationProperties` 로 대체)
 
 ### 3.5 module-import-check.sh
-
-- **트리거**: 디스패처 경유 — `*.kt` 저장 시 (테스트 파일 제외)
-- **금지된 import 방향**:
-
-```
-ssolv-api-core  ↔  ssolv-api-place          (상호 참조 금지)
-ssolv-domain       ssolv-infrastructure      (domain → infra 금지)
-ssolv-domain       ssolv-api-*               (domain → api 금지)
-ssolv-domain       jakarta.persistence       (JPA 어노테이션 금지)
-```
-
-- **종료 코드**: 위반 시 `exit 2` → Claude 실행 중단
+- **차단 정책**: ✅ `exit 2` — 아래 방향 위반 시 차단
+  - `ssolv-api-core` ↔ `ssolv-api-place` (상호 참조)
+  - `ssolv-domain` → `ssolv-infrastructure` / `ssolv-api-*` / JPA 어노테이션
 
 ### 3.6 iac-security-check.sh
-
-- **트리거**: 디스패처 경유 — `*.tf` 저장 시
-- **검증 항목**:
-  1. RDS: `storage_encrypted`, `deletion_protection`, `publicly_accessible = false`
-  2. EC2: IMDSv2 (`http_tokens = "required"`)
-  3. EBS: `encrypted = false` 명시 감지
-  4. Security Group: 3306/6379 포트 `0.0.0.0/0` 노출
-  5. `tags` 블록 누락
-- **종료 코드**: 경고는 `exit 0` (차단 없음, 경고 출력)
+- **차단 정책**: ⚠️ 경고만. 상세 감사는 `/iac-audit` 커맨드로.
 
 ### 3.7 post-push-retro-nudge.sh
+- **역할**: `git push` 성공 시 `/retro` 리마인더 출력 (non-blocking)
 
-- **트리거**: `PostToolUse(Bash)` — `git push` 성공 완료 후
-- **역할**: `/retro` 실행을 권유하는 stdout 메시지 출력
-- **제외 조건**: `--delete`, `--dry-run` 플래그가 있거나 push exit code ≠ 0
+### 3.8 차단 vs 경고의 정책 기준
 
-### 3.8 test-changed-modules.sh
+일관성을 위해 아래 기준을 따른다:
 
-- **트리거**: `Stop` (Claude 응답 완료 시)
-- **역할**: 세션 중 변경된 모듈만 선택적으로 테스트 실행
-- **로직**:
-  - `.kt/.kts` 변경 없으면 건너뜀
-  - 공유 모듈(`api-common`, `domain`, `infrastructure`, `global-utils`, `batch`) 변경 시 두 서비스 모두 테스트
-  - `ssolv-api-core` 변경 → core만, `ssolv-api-place` 변경 → place만
+| 위반 유형 | 처리 |
+|---|---|
+| 아키텍처 경계 위반 (모듈 import 방향) | ✅ 차단 |
+| 보안 계약 위반 (`@AuthenticationPrincipal`, `@Value`) | ✅ 차단 |
+| API 응답 계약 위반 (`DpmApiResponse` 누락) | ✅ 차단 |
+| 커밋 메시지 컨벤션 | ✅ 차단 |
+| IaC 보안 권고 | ⚠️ 경고 (상세는 `/iac-audit`) |
+| 문서 품질 미비 (`@Tag`, `@Operation`) | ⚠️ 경고 |
+
+**기준 한 줄 요약**: "나중에 고치면 된다" = 경고. "이 상태로 merge되면 안 된다" = 차단.
 
 ---
 
 ## 4. Compounding Engineering 레이어 구조
 
-매 세션이 다음 세션을 더 빠르게 만드는 **4개 계층**으로 이루어진다.
+매 세션이 다음 세션을 더 빠르게 만드는 **4개 계층**.
 
 ```
 Memory     — 과거 경험 보존      (교정 내역, 결정 근거)
@@ -208,148 +183,130 @@ Commands   — 반복 절차 추상화   (워크플로우 템플릿)
 
 경로: `/Users/parkmineum/.claude/projects/.../memory/`
 
-세션 간 지속되는 4가지 타입:
-
-| 타입 | 내용 | 예시 |
-|---|---|---|
-| `user` | 사용자 역할/선호/배경 | "Kotlin 시니어, React 초보" |
-| `feedback` | 교정받은 접근 방식 규칙 | "DB 테스트는 mock 금지 — 실 DB 사용" |
-| `project` | 진행 중인 작업·결정 | "AWS 계정 이전 완료" |
-| `reference` | 외부 시스템 위치 포인터 | "Linear 프로젝트 INGEST = 파이프라인 버그" |
-
-`MEMORY.md` 는 인덱스 파일 — 각 항목은 1줄, 150자 이내.
-
-### 4.2 Skills
-
-경로: `.claude/skills/<name>/SKILL.md`
-
-각 SKILL.md는 `name` + `description` frontmatter를 반드시 포함해야 한다. 이 두 필드가 있어야 Claude가 현재 작업 컨텍스트와 자동 매칭한다.
-
-현재 등록된 Skills (11개):
-
-| Skill | 트리거 조건 |
+| 타입 | 내용 |
 |---|---|
-| `api-patterns` | `*Controller.kt` 작성/수정, 신규 API 라우트 |
-| `architecture` | 모듈 간 경계 설계, 신규 도메인 추가 |
-| `testing` | `src/test/`, `src/testFixtures/` 하위 작업 |
-| `async-processing` | Redis Streams 프로듀서/컨슈머, 코루틴 디스패처 전환 |
-| `git-conventions` | 커밋/브랜치/PR/이슈 작성 |
-| `auth` | JWT, Kakao/Apple OAuth, `@UserId` |
-| `observability` | Sentry, Micrometer, OpenTelemetry, MDC |
-| `notification` | FCM 푸시 알림 |
-| `place` | `ssolv-api-place` 모듈 (Google Places, Redis ZSET, SSE) |
-| `domain-model` | 도메인/엔티티 분리, Mapper, JDSL, `@ConfigurationProperties` |
-| `batch` | `ssolv-batch` 모듈 스케줄러, dead-letter |
+| `user` | 사용자 역할/선호/배경 |
+| `feedback` | 교정받은 접근 방식 규칙 |
+| `project` | 진행 중인 작업·결정 |
+| `reference` | 외부 시스템 위치 포인터 |
 
-> **중요**: description 매칭으로 후보가 보인다고 해서 skill 본문이 자동 주입되지 않는다. Claude는 `Skill` 도구로 명시적 로드를 해야 한다. description만 보고 규칙을 추측하면 컨벤션 위반 사례가 생긴다 (PR #183 참조).
+### 4.2 Skills (11개)
 
-### 4.3 Hooks
+`api-patterns`, `architecture`, `testing`, `async-processing`, `git-conventions`, `auth`, `observability`, `notification`, `place`, `domain-model`, `batch`
 
-현재 등록된 Hooks:
+### 4.3 Skill auto-discovery의 한계 (F5)
 
-| Hook 파일 | 이벤트 | 역할 | 차단 |
-|---|---|---|---|
-| `commit-msg-check.sh` | PreToolUse(Bash) | Conventional Commits + 영문 강제 | ✅ exit 2 |
-| `post-edit-dispatch.sh` | PostToolUse(Edit\|Write) | 경로 기반 훅 라우터 | — |
-| `iac-security-check.sh` | (dispatcher) | `.tf` 보안 감사 | ❌ 경고만 |
-| `controller-annotation-check.sh` | (dispatcher) | `@Tag`/`@Operation`/`DpmApiResponse` 검증 | ❌ 경고만 |
-| `value-injection-check.sh` | (dispatcher) | `@Value` 직접 주입 금지 | ✅ exit 2 |
-| `module-import-check.sh` | (dispatcher) | 금지된 모듈 import 방향 차단 | ✅ exit 2 |
-| `post-push-retro-nudge.sh` | PostToolUse(Bash) | push 후 `/retro` 리마인더 | ❌ 안내만 |
-| `test-changed-modules.sh` | Stop | 변경 모듈 자동 테스트 | ✅ 테스트 실패 시 |
+Claude가 description 매칭으로 skill을 **탐색**하지만, 본문은 `Skill` 툴로 **명시 로드**해야만 컨텍스트에 들어온다. 따라서:
 
-### 4.4 Commands
+- **핵심 불변 규칙은 description 기반 자동 트리거에만 의존하지 말 것.** 훅 차단 + CLAUDE.md inline 명시로 이중화한다.
+- Skills는 "참고 자료"이지 "강제 수단"이 아니다. 강제는 훅이 한다.
 
-경로: `.claude/commands/<name>.md`
+### 4.4 Hooks
 
-현재 등록된 Commands (7개):
+위 3절 참조.
 
-| Command | 역할 |
-|---|---|
-| `new-domain` | 신규 도메인 스캐폴딩 |
-| `iac-audit` | Terraform 전체 보안 감사 |
-| `deploy` | EC2 인스턴스 서비스 재시작 |
-| `logs` | EC2 인스턴스 로그 조회 |
-| `health-check` | 프로덕션 헬스 체크 |
-| `env-update` | `.env` 키-값 업데이트 |
-| `retro` | 세션 회고 엔진 |
+### 4.5 Commands (7개)
+
+`new-domain`, `iac-audit`, `deploy`, `logs`, `health-check`, `env-update`, `retro`
 
 ---
 
 ## 5. 세션 회고 루프 (Phase 2)
 
-push 성공 후 `/retro` 가 권유된다. 회고는 세션 중 발생한 관찰을 4개 저장소로 분배한다:
+push 성공 후 `/retro` 가 권유된다. 회고는 세션 중 관찰을 분배한다:
 
 ```
 세션 관찰
     │
-    ├─ 사용자/조직/프로젝트 사실  → memory/ (user·project·reference 타입)
-    ├─ 교정·발견된 갭            → memory/ (feedback 타입) + skill 업데이트
+    ├─ 사용자/조직/프로젝트 사실  → memory/ (user·project·reference)
+    ├─ 교정·발견된 갭            → memory/ (feedback) + skill 업데이트
     ├─ 패턴·결정사항             → .claude/thoughts/retros/<date>.md (git 커밋)
-    └─ 팀 공유 규칙 변경         → CLAUDE.md (diff 제안 → 사용자 승인 → Edit)
+    └─ 팀 공유 규칙 변경         → CLAUDE.md (diff 제안 → 승인 → Edit)
 ```
 
-`CLAUDE.md` 는 팀 공유 파일이므로 자동 쓰기 금지 — `/retro` 내부에서도 diff 제안 후 승인 후 Edit.
+### 5.1 루프 효과성 — 정직한 현재 평가 (F4)
+
+2026-04-22 기준:
+
+- `.claude/thoughts/retros/` 는 `.gitkeep` 외에 비어 있음 → `/retro` 가 아직 한 번도 유효 실행되지 않았거나, 실행했지만 축적할 관찰이 없었음
+- feedback 타입 memory는 1개 (`branch_instruction`) — Phase 2 도입 후 유의미한 누적 없음
+- 즉 **"컴파운딩 루프는 인프라만 깔렸고 데이터는 아직 쌓이지 않은 상태"** 라고 정직하게 기록해둔다. 다음 retro 때 **최소 1건의 feedback memory를 생성하는 것**이 Phase 2 실효성의 첫 증거가 된다. 3회 연속 retro에서 새로운 memory가 하나도 안 나오면 루프 설계 자체를 재점검한다.
 
 ---
 
-## 6. 확장 가이드
+## 6. 폴더 구조
+
+```
+.claude/
+├── commands/           # 슬래시 커맨드 7개
+├── docs/
+│   ├── workflow/       # 워크플로우/메타 문서 (이 파일, compounding-engineering.md)
+│   └── domain/         # 도메인 구현 가이드 (place-*, otel-instrumentation 등)
+├── hooks/              # PreToolUse/PostToolUse 훅 스크립트
+├── infra/
+│   ├── DECISIONS.md    # 진행형 ADR
+│   └── archive/        # 완료된 마이그레이션 로그
+├── skills/             # 11개 skill (frontmatter 기반 auto-discovery)
+├── thoughts/
+│   ├── learning/       # 학습 자료 누적
+│   └── retros/         # 세션별 회고록 (git 커밋)
+├── settings.json       # 팀 공유 hook 설정
+└── settings.local.json # 개인 설정 (gitignored)
+```
+
+**.gitignore 주의**: `.claude/settings.local.json` 과 `.claude/**/*.local.json` 은 git-ignored다. 개인 SSH 키 경로·서버 IP·MCP UUID 등이 들어가므로 절대 커밋하지 않는다.
+
+---
+
+## 7. 확장 가이드
 
 ### 새 Hook 추가
 
 1. `.claude/hooks/<name>.sh` 작성
-2. `stdin` 으로 JSON 읽어서 필요한 필드 추출
-3. `exit 0` = 통과, `exit 2` = 차단 (Claude 실행 중단)
-4. 파일 경로 기반 검증이라면 `post-edit-dispatch.sh` case 절에 라우팅 추가
-5. 새 이벤트 타입이면 `settings.json` 에 matcher + command 추가
-
-```bash
-# stdin에서 file_path 추출하는 표준 패턴
-FILE_PATH=$(cat | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    print(d.get('tool_input', {}).get('file_path', ''))
-except:
-    print('')
-" 2>/dev/null)
-```
+2. **첫 줄에 쉘 레벨 early-exit** (Bash matcher 훅일 경우 필수)
+3. `stdin` 으로 JSON 읽기
+4. `exit 0` = 통과, `exit 2` = 차단
+5. 파일 경로 기반 검증이라면 `post-edit-dispatch.sh` case 절에 라우팅 추가
+6. 차단/경고 기준은 3.8절 정책에 맞춤
 
 ### 새 Skill 추가
 
 1. `.claude/skills/<name>/SKILL.md` 생성
-2. frontmatter에 `name` + `description` 반드시 포함
-3. `description` 은 구체적일수록 자동 트리거 정확도가 올라감
-4. CLAUDE.md 스킬 표에 항목 추가
-
-```markdown
----
-name: my-skill
-description: Use when working on X — covers Y, Z patterns
----
-```
+2. frontmatter에 `name` + `description` 필수
+3. description은 구체적일수록 자동 트리거 정확도 ↑
+4. 핵심 규칙이라면 description에 의존하지 말고 **훅 차단 + CLAUDE.md inline** 으로 이중화
 
 ### 새 Command 추가
 
 1. `.claude/commands/<name>.md` 생성
-2. frontmatter에 `description` + `allowed-tools` + `argument-hint` 포함
-3. CLAUDE.md 커맨드 표에 항목 추가
+2. frontmatter에 `description` + `allowed-tools` + `argument-hint`
 
 ---
 
-## 7. 현재 성숙도 (2026-04-22 기준)
+## 8. 현재 성숙도 (2026-04-22 기준)
 
 ```
-Memory     ████░░░░░░  (40%) ← feedback 타입 축적 진행 중
-Skills     ████████░░  (80%) ← 11개 완비, frontmatter 기반 auto-discovery 동작
-Commands   ████████░░  (80%) ← 7개, retro 루프 완비
-Hooks      ████████░░  (80%) ← 디스패처 패턴으로 성능 최적화 완료
+Memory     ████░░░░░░  (40%) ← 인프라 완비, 데이터 누적 진행 중
+Skills     ████████░░  (80%) ← 11개 완비, frontmatter auto-discovery 동작
+Commands   ████████░░  (80%) ← 7개
+Hooks      █████████░  (90%) ← 디스패처 패턴 + early-exit로 오버헤드 최소화
 ```
 
-### 다음 Phase 후보 (미정)
+### 최근 정리 내역 (이 문서와 함께 적용)
 
-- **Phase 3-a**: 세션 간 retro 상호 참조 — 반복된 실수 Top N 추출 후 skill 고도화
-- **Phase 3-b**: Plan 기반 워크플로 선별 도입 — 대형 리팩터링 전 research→plan→implement→validate 4단계
-- **Phase 3-c**: 세션 시작 시 선제 `/retro` 제안 — 마지막 실행 시각 + 커밋 누적 추적
+- pre-commit ktlint 훅 제거 — 리포팅 전용이라 3번 실행이 의미 없었음
+- Stop hook (`test-changed-modules.sh`) 제거 — pre-push와 중복
+- Bash 훅 2개에 쉘 레벨 early-exit 추가
+- `controller-annotation-check` 차단/경고 기준 정책화
+- `isHarness` 플래그를 정확 매칭으로 강화
+- docs 폴더를 `workflow/` + `domain/` 으로 분리
+- `.claude/infra/WORKFLOW.md` 를 `archive/2026-03-aws-migration.md` 로 이동
+- `CLAUDE.md` 슬림화 — terraform 규칙은 `/iac-audit` 커맨드 문서로 이동
+
+### 다음 Phase 후보
+
+- **Phase 3-a**: retro 상호 참조 — 반복된 실수 Top N 추출 후 skill 고도화
+- **Phase 3-b**: Plan 기반 워크플로 대형 작업에 선별 도입
+- **Phase 3-c**: 세션 시작 시 선제 `/retro` 제안
 - **Phase 3-d**: memory ↔ `CLAUDE.md` 충돌 자동 감지 Hook
 - **Phase 3-e**: 커스텀 sub-agent 도입

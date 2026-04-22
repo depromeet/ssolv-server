@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ```bash
-./gradlew installGitHooks      # (최초 1회) 로컬 git pre-commit / pre-push 설치
+./gradlew installGitHooks      # (최초 1회) 로컬 git pre-push 설치
 ./gradlew build -x test        # Compile project
 ./gradlew test                 # Execute test suite
 ./gradlew harness              # ktlint + 전체 테스트 (pre-push와 동일)
@@ -22,24 +22,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Harness (코드 품질 가드레일)
 
-Phase 1 정책: **ktlint는 리포팅 전용 (baseline 위반 때문), 테스트는 harness 경로에서 실패 전파.**
+전체 설계와 훅 동작은 **[.claude/docs/workflow/harness-and-compounding-design.md](.claude/docs/workflow/harness-and-compounding-design.md)** 참조.
 
-- **pre-commit**: `ktlintCheck` (~3초). 리포팅만 — 스타일 위반이 있어도 커밋 차단 없음 (`ignoreFailures=true`). 플러그인/리포팅 자체 오류 시에만 차단.
-- **pre-push**: `./gradlew harness` (ktlint + 전체 테스트). **ktlint는 리포팅만, 테스트는 실패 시 푸시 차단** (`Test.ignoreFailures = !isHarness`).
-- **CI**: PR 생성 시 ktlintCheck + build + test + SonarCloud 실행 (ktlint 위반은 차단하지 않음).
+요약:
+
+- **pre-push**: `./gradlew harness` — ktlint(리포팅) + 전체 테스트(실패 시 차단).
+- **CI**: PR 생성 시 ktlintCheck + build + test + SonarCloud.
 - **긴급 우회**: `git push --no-verify` (권장하지 않음).
+- **ktlint 정책**: 항상 `ignoreFailures=true` (리포팅 전용). CI에서 시각 확인.
 
-설치: `./gradlew installGitHooks` (repo clone 후 1회).
-
-### ktlint 정책
-- ktlint는 **항상 리포팅 전용** (`ignoreFailures=true`). CI(PR)에서 검증하므로 로컬 push 블로킹 불필요.
-- 새 코드 작성 시 수동으로 `./gradlew ktlintFormat` 실행 권장
+설치: `./gradlew installGitHooks` (repo clone 후 1회). Worktree 사용 시에도 한 번만 — git hooks는 main repo `.git/hooks/` 에 설치되어 모든 worktree가 공유함.
 
 ## Skills (auto-discovery)
 
-모든 skill은 `.claude/skills/<name>/SKILL.md`에 frontmatter `description`을 가지며, Claude는 현재 작업 컨텍스트와 description을 매칭하여 관련 skill을 **탐색**합니다. 아래는 수동 확인용 요약표입니다 — 작업 성격이 일치하면 해당 skill이 탐색 후보에 올라옵니다.
+모든 skill은 `.claude/skills/<name>/SKILL.md`에 frontmatter `description`을 가지며, Claude는 현재 작업 컨텍스트와 description을 매칭하여 관련 skill을 **탐색**합니다.
 
-> ⚠️ **중요 — "탐색" ≠ "자동 로드"**: description 매칭으로 후보가 보인다고 해서 skill 본문이 컨텍스트에 자동 주입되지 않습니다. Claude는 git/PR/배포 같은 규칙성이 강한 작업을 **시작하기 전에 반드시 `Skill` 도구로 해당 skill 본문을 로드**해야 하며, description만 보고 규칙을 추측하지 말아야 합니다 (과잉 일반화로 프로젝트 컨벤션을 위반한 사례 있음 — PR #183 참조).
+> ⚠️ **중요 — "탐색" ≠ "자동 로드"**: description 매칭으로 후보가 보여도 skill 본문은 자동 주입되지 않습니다. 규칙성이 강한 작업을 시작하기 전에 반드시 `Skill` 도구로 해당 skill 본문을 로드해야 하며, description만 보고 규칙을 추측하지 말아야 합니다 (PR #183 참조). 핵심 불변 규칙은 description이 아니라 **아래 Critical Rules + 훅 차단**으로 이중화되어 있습니다.
 
 | Skill | 언제 쓰이나 |
 |---|---|
@@ -55,21 +53,29 @@ Phase 1 정책: **ktlint는 리포팅 전용 (baseline 위반 때문), 테스트
 | `domain-model` | 도메인/엔티티 분리, Mapper, JDSL, `@ConfigurationProperties` |
 | `batch` | `ssolv-batch` 모듈 스케줄러, dead-letter |
 
-> description이 없던 과거 구조에서는 `/skill-name` 수동 호출에 의존했으나, 현재는 `ls .claude/skills/*/SKILL.md`로 전부 frontmatter를 확인할 수 있습니다. 새 skill 추가 시 반드시 `name` + `description` frontmatter를 포함하세요 (설명이 구체적일수록 트리거 정확도 ↑).
+## Critical Rules (훅이 차단하는 규칙)
 
-## Critical Rules
+아래 규칙은 `.claude/hooks/` 가 **exit 2 로 차단**합니다 — 실수로 작성해도 반영되지 않습니다.
 
-**Never:** Import across modules in the wrong direction (see architecture skill). Cross-domain communication must go through repository interfaces.
+- **모듈 import 방향**: `ssolv-api-core` ↔ `ssolv-api-place` 상호 참조 금지. `ssolv-domain` → infrastructure/JPA 금지.
+- **`@Value` 직접 주입 금지**: `@ConfigurationProperties` 클래스 사용.
+- **`@AuthenticationPrincipal` 직접 사용 금지**: `@UserId` 커스텀 어노테이션 사용.
+- **컨트롤러 응답**: 모든 응답은 `DpmApiResponse<T>` 로 감쌀 것.
+- **커밋 메시지**: Conventional Commits 형식 + 영문만.
 
-**Always:** Wrap responses in `DpmApiResponse`, use `DpmException` subclasses with `ErrorCode` for errors, use `suspend fun` for service methods, add `@Operation`/`@Tag` Swagger docs on every endpoint, use `@UserId` custom annotation (not `@AuthenticationPrincipal` directly).
+차단 정책 기준: **아키텍처/보안 계약 위반 → 차단**, **문서 품질 미비(@Tag, @Operation 등) → 경고만**.
 
-## Code Standards
+## Other Always-rules (훅이 경고만)
 
-Use `operator fun invoke(...)` pattern for single-responsibility services. Match existing coroutine patterns (`withContext(Dispatchers.IO)` for blocking I/O). Use `@ConfigurationProperties` for new configuration groups — never inject properties directly with `@Value`.
+- `DpmException` 서브클래스 + `ErrorCode` 로 에러 처리
+- 서비스 메서드는 `suspend fun`
+- 모든 엔드포인트에 `@Operation` / `@Tag` Swagger 문서
+- `operator fun invoke(...)` 패턴을 단일 책임 서비스에 사용
+- 블로킹 I/O는 `withContext(Dispatchers.IO)`
 
 ## Tech Foundation
 
-Kotlin 1.9.25 + Java 21, Spring Boot 3.4.9, JPA/Hibernate for persistence, Kotlin-JDSL 3.8.0 for complex queries, JWT + OAuth2 (Kakao, Apple) for auth, Ktor Client for external HTTP (Google Places, OAuth), Firebase FCM for push notifications, Redis for caching and async streams, Micrometer + OpenTelemetry + Sentry for observability.
+Kotlin 1.9.25 + Java 21, Spring Boot 3.4.9, JPA/Hibernate, Kotlin-JDSL 3.8.0, JWT + OAuth2 (Kakao, Apple), Ktor Client (Google Places, OAuth), Firebase FCM, Redis, Micrometer + OpenTelemetry + Sentry.
 
 ## Architecture
 
@@ -77,78 +83,38 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci-test.yml`): triggered on PRs to `dev`; runs build + tests + Jacoco
-- **CD** (`.github/workflows/cd-deploy.yml`): triggered on push to `main`; builds Jib images → deploys to EC2 via SSH
+- **CI** (`.github/workflows/ci-test.yml`): PR to `dev` — build + tests + Jacoco
+- **CD** (`.github/workflows/cd-deploy.yml`): push to `main` — Jib → EC2 via SSH
 
 ## Language Conventions
 
-- **Commit messages**: 영문만 (Conventional Commits 형식, `commit-msg-check.sh` hook이 강제).
-- **PR 본문·이슈 본문**: 한국어 (`.github/PULL_REQUEST_TEMPLATE.md` 및 `.github/ISSUE_TEMPLATE/*.md` 템플릿 준수).
-- **CLAUDE.md·skill 문서 본문**: 한국어 중심, 코드·명령·프레임워크명·어노테이션은 영문 유지.
-- **코드 주석**: 원칙적으로 영문. 한국어 비즈니스 용어가 꼭 필요한 경우만 예외.
+- **Commit messages**: 영문 (Conventional Commits, `commit-msg-check.sh` 훅이 강제)
+- **PR·이슈 본문**: 한국어 (`.github/*_TEMPLATE` 준수)
+- **CLAUDE.md·skill 문서**: 한국어 중심, 코드·명령·어노테이션은 영문
+- **코드 주석**: 원칙적으로 영문. 한국어 비즈니스 용어가 꼭 필요한 경우만 예외
 
 ## Post-Task Follow-up Guidelines
 
-After completing a commit/push, only surface follow-up actions when something **cannot be handled by CI/CD alone**.
-If CI/CD covers it automatically, finish without further comment.
+커밋/푸시 후에는 **CI/CD가 처리할 수 없는 경우에만** 후속 조치를 언급한다.
 
-Cases that require manual follow-up:
-- CD uses `--no-deps` to restart a specific service — other services may also need restarting
-- A newly added service is not yet in the CD script — requires manual `docker compose up`
-- `.env` values need to be added or changed
-- `terraform apply` is required
-- DB migrations or other manual operations are needed
+수동 후속 필요:
+- CD가 `--no-deps` 로 특정 서비스만 재시작 → 다른 서비스도 재시작 필요할 수 있음
+- 새로 추가된 서비스가 CD 스크립트에 아직 없음 → 수동 `docker compose up`
+- `.env` 값 추가·변경
+- `terraform apply` 필요
+- DB 마이그레이션·수동 작업 필요
 
 ## Production Server SSH Access
 
-실제 접속 자격증명(SSH 키 경로, 인스턴스 Public/Private IP, RDS 엔드포인트, 공통 SSH 명령 예시)은 **`CLAUDE.local.md`** 에 있습니다 — 개인 전용, git-ignored.
+접속 자격증명(SSH 키 경로, 인스턴스 IP, RDS 엔드포인트)은 `CLAUDE.local.md` 에 있습니다 — 개인 전용, git-ignored.
 
-Claude Code는 `CLAUDE.md`와 `CLAUDE.local.md`를 모두 자동 로드하므로, 운영 작업 시 로컬 파일의 정보를 그대로 사용하세요. 팀원에 따라 SSH 키 경로가 다를 수 있으니, 팀에 합류한 새 멤버는 본인 환경에 맞춰 `CLAUDE.local.md`를 생성해야 합니다.
+팀원에 따라 SSH 키 경로가 다를 수 있으니, 새 멤버는 본인 환경에 맞춰 `CLAUDE.local.md` 를 생성합니다.
 
-## Ongoing Work
+## Terraform (IaC)
 
-AWS account migration + multi-server migration complete.
-Workload and progress: `.claude/infra/WORKFLOW.md`
-Infrastructure decision records: `.claude/infra/DECISIONS.md`
+ssolv 인프라 전체 규칙 + 감사 체크리스트는 **[`/iac-audit`](/.claude/commands/iac-audit.md)** 커맨드 문서에 있습니다. `.tf` 저장 시 경량 감사는 `iac-security-check.sh` 훅이 자동 실행합니다. 새 인프라 결정은 `.claude/infra/DECISIONS.md` 에 ADR로 기록합니다.
 
-## Terraform Authoring Rules (IaC)
+## Historical Context
 
-> ssolv infrastructure: **EC2 + Elastic IP + RDS (MySQL) + Route53** only.
-> Do NOT create resources for ALB, S3, ElastiCache, or CloudFront.
-> Route53 is used exclusively for health-check-based DNS failover (Multivalue Answer routing).
-
-### Required Settings per Resource
-
-**EC2 (`aws_instance`)**
-- Instance A: `instance_type = "t3.micro"` (nginx + app-server only, JVM `-Xmx400m`)
-- Instance B: `instance_type = "t3.small"` (app-server + redis + registry + alloy + exporters)
-- `http_tokens = "required"` — enforce IMDSv2 (security requirement)
-- `encrypted = true` — encrypt EBS root volume
-- `instance_type` and `ami` must be variables — no hardcoding
-- Instance count must be controlled solely via the `app_instance_count` variable
-
-**Elastic IP (`aws_eip`)**
-- Associate with EC2 instances via `aws_eip_association`
-- EIP must be a separate resource from EC2 (for reusability)
-
-**RDS (`aws_db_instance`)**
-- `engine = "mysql"`, `engine_version = "8.0.43"` — fixed
-- `publicly_accessible = false` — no public access
-- `storage_encrypted = true`
-- `deletion_protection = true`
-- `backup_retention_period >= 1`
-- `db_subnet_group_name` must use a subnet group composed of private subnets only
-
-**Security Groups (`aws_security_group`)**
-- Ports 3306 (MySQL) and 6379 (Redis) must use `source_security_group_id` referencing the EC2 SG — no direct CIDR
-- Egress: allow `0.0.0.0/0` (intentional)
-- Inbound `0.0.0.0/0` allowed only on ports 80, 443, 22
-
-**General**
-- All resources must include a `tags` block: `{ Project = "ssolv", ManagedBy = "terraform" }`
-- Sensitive values (passwords, keys) must use `var` or AWS Secrets Manager — never hardcode
-
-### Automated Audit
-- PostToolUse Hook runs a security audit automatically when any `.tf` file is modified
-- On-demand full audit: `/iac-audit` slash command
-- New infrastructure decisions must be recorded as ADRs in `.claude/infra/DECISIONS.md`
+- `.claude/infra/DECISIONS.md` — 인프라 ADR (진행형)
+- `.claude/infra/archive/` — 완료된 마이그레이션 로그
