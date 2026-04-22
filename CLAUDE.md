@@ -88,12 +88,12 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 CI는 3개 워크플로우로 분리 — PR 시 lint·build-test 는 병렬 실행, analysis 는 build-test 완료 후.
 
-| 워크플로우 | 트리거 | 내용 |
-|---|---|---|
-| `ci-lint.yml` | PR/push to dev | ktlintCheck + 리포트 업로드 |
-| `ci-build-test.yml` | PR/push to dev | build + test + Jacoco 아티팩트 |
-| `ci-analysis.yml` | `ci-build-test` 완료 후 | SonarCloud (Jacoco 커버리지 포함) |
-| `cd-deploy.yml` | push to main | Jib 이미지 빌드 → EC2 SSH 배포 |
+| 워크플로우 | Job | 트리거 | 내용 |
+|---|---|---|---|
+| `ci.yml` | `lint` | PR/push to dev | ktlintCheck (병렬, ~30초) |
+| `ci.yml` | `build-test` | PR/push to dev | build + test + Jacoco (병렬) |
+| `ci.yml` | `analysis` | build-test 완료 후 | SonarCloud (Jacoco 커버리지 포함) |
+| `cd-deploy.yml` | — | push to main | Jib 이미지 빌드 → EC2 SSH 배포 |
 
 ## Language Conventions
 
