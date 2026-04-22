@@ -84,3 +84,5 @@ k6/
 
 # Claude Code personal overrides (credentials, local paths)
 CLAUDE.local.md
+.claude/settings.local.json
+.claude/**/*.local.json

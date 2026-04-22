@@ -27,43 +27,54 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📋 Controller Swagger 어노테이션 검증: $(basename "$FILE_PATH")"
+echo "📋 Controller 어노테이션 검증: $(basename "$FILE_PATH")"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# 차단 vs 경고 정책 (하네스 설계 문서 참조):
+#   차단 (exit 2)  — 아키텍처/보안 계약 위반: @AuthenticationPrincipal, DpmApiResponse 누락
+#   경고 (exit 0)  — 문서 품질 미비: @Tag, @Operation 누락
+BLOCKERS=0
 WARNINGS=0
 
-# 1. 클래스 레벨 @Tag 확인
+# [BLOCK] @AuthenticationPrincipal 직접 사용 (@UserId 어노테이션으로 교체해야 함)
+if grep -q "@AuthenticationPrincipal" "$FILE_PATH"; then
+    echo "❌ @AuthenticationPrincipal 직접 사용 — @UserId 로 교체 필요 (CLAUDE.md 규칙)"
+    BLOCKERS=$((BLOCKERS + 1))
+fi
+
+# [BLOCK] DpmApiResponse 래핑 누락 — API 응답 계약
+MAPPING_COUNT=$(grep -cE '^[[:space:]]*@(Get|Post|Put|Delete|Patch)Mapping' "$FILE_PATH" 2>/dev/null || echo 0)
+RESPONSE_COUNT=$(grep -cE ':[[:space:]]*DpmApiResponse<[^>]+>' "$FILE_PATH" 2>/dev/null || echo 0)
+if [[ "$MAPPING_COUNT" -gt 0 && "$RESPONSE_COUNT" -eq 0 ]]; then
+    echo "❌ DpmApiResponse 래핑 누락 — 모든 응답은 DpmApiResponse<T>로 감싸야 함 (CLAUDE.md 규칙)"
+    BLOCKERS=$((BLOCKERS + 1))
+fi
+
+# [WARN] 클래스 레벨 @Tag 누락 — Swagger 문서 품질
 if ! grep -Eq '^[[:space:]]*@Tag\(' "$FILE_PATH"; then
     echo "⚠️  @Tag(name = \"...\", description = \"...\") 누락 — 클래스 레벨 필수"
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# 2. @Operation 확인 (최소 1개 이상)
+# [WARN] @Operation 누락
 if ! grep -Eq '^[[:space:]]*@Operation\(' "$FILE_PATH"; then
     echo "⚠️  @Operation(summary = \"...\") 누락 — 각 엔드포인트 메서드에 필요"
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# 3. @AuthenticationPrincipal 직접 사용 금지 (@UserId 사용해야 함)
-if grep -q "@AuthenticationPrincipal" "$FILE_PATH"; then
-    echo "❌  @AuthenticationPrincipal 직접 사용 — @UserId 어노테이션으로 교체 필요"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# 4. DpmApiResponse 래핑 확인 (반환 타입 기준)
-MAPPING_COUNT=$(grep -cE '^[[:space:]]*@(Get|Post|Put|Delete|Patch)Mapping' "$FILE_PATH" 2>/dev/null || echo 0)
-RESPONSE_COUNT=$(grep -cE ':[[:space:]]*DpmApiResponse<[^>]+>' "$FILE_PATH" 2>/dev/null || echo 0)
-if [[ "$MAPPING_COUNT" -gt 0 && "$RESPONSE_COUNT" -eq 0 ]]; then
-    echo "⚠️  DpmApiResponse 래핑 없음 — 모든 응답은 DpmApiResponse<T>로 감싸야 함"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
 # 결과 출력
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [[ "$WARNINGS" -eq 0 ]]; then
+if [[ "$BLOCKERS" -eq 0 && "$WARNINGS" -eq 0 ]]; then
     echo "✅ Controller 어노테이션 검증 통과"
+elif [[ "$BLOCKERS" -eq 0 ]]; then
+    echo "⚠️  $WARNINGS 개 경고 — /api-patterns 스킬 참고 (차단 아님)"
 else
-    echo "⚠️  $WARNINGS 개 항목 검토 필요 — /api-patterns 스킬 참고"
+    echo "❌ $BLOCKERS 개 위반으로 차단 — 위 항목을 수정 후 다시 시도하세요."
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+if [[ "$BLOCKERS" -gt 0 ]]; then
+    exit 2
+fi
+exit 0

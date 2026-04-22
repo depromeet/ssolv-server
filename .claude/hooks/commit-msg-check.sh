@@ -4,6 +4,12 @@
 
 TOOL_INPUT=$(cat)
 
+# Early-exit: 대부분의 Bash 호출은 git commit이 아님.
+# python3 프로세스 스폰 비용을 피하기 위해 쉘 레벨에서 먼저 필터.
+if ! printf '%s' "$TOOL_INPUT" | grep -q '"git commit'; then
+    exit 0
+fi
+
 # Bash 명령어 추출
 COMMAND=$(echo "$TOOL_INPUT" | python3 -c "
 import sys, json
