@@ -36,8 +36,12 @@ Harness는 **3개 로컬 계층 + CI** 로 구성된다.
 
 ```kotlin
 // build.gradle.kts (루트)
+// 루트에는 ktlint/test 가 없으므로 모든 서브프로젝트 task 를 명시적으로 의존.
 tasks.register("harness") {
-    dependsOn("ktlintCheck", "test")
+    group = "verification"
+    description = "Runs all harness validations (ktlint + tests)"
+    dependsOn(subprojects.map { "${it.path}:ktlintCheck" })
+    dependsOn(subprojects.map { "${it.path}:test" })
 }
 ```
 
