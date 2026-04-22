@@ -21,10 +21,18 @@ except:
 
 HOOKS_DIR="$(dirname "$0")"
 
-# 파일 확장자/패턴별로 필요한 훅만 실행
+# 차단 신호(exit 2)는 반드시 상위로 전파되어야 함 — 안 그러면 모든 blocking 훅이 무음 실패함.
+# 정책: 하나라도 exit 2 면 최종 exit 2. 그 외 비정상은 로그만 남기고 통과.
+FINAL_EXIT=0
 run_hook() {
     local hook="$1"
     echo "$TOOL_INPUT" | bash "$HOOKS_DIR/$hook"
+    local rc=$?
+    if [ "$rc" -eq 2 ]; then
+        FINAL_EXIT=2
+    elif [ "$rc" -ne 0 ]; then
+        echo "⚠️  $hook exited with code $rc (non-blocking)" >&2
+    fi
 }
 
 case "$FILE_PATH" in
@@ -42,4 +50,4 @@ case "$FILE_PATH" in
         ;;
 esac
 
-exit 0
+exit "$FINAL_EXIT"

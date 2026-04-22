@@ -252,16 +252,18 @@ tasks.register("installGitHooks") {
         }
 
         // Remove any previously installed hooks that no longer exist in .githooks/.
-        // Reason: installGitHooks copies from .githooks → hooks dir, but does not clean up
-        // stale files. Without this, a removed hook (e.g. the old pre-commit ktlint check)
-        // would keep running indefinitely for developers who installed it earlier.
+        // Only delete files we installed — detected via the "# ssolv-managed" marker — so
+        // user-authored hooks (e.g. a local pre-commit they wrote themselves) are never touched.
         val managedHookNames = setOf("pre-commit", "pre-push", "commit-msg")
         val shippedHookNames = file("$rootDir/.githooks").listFiles()?.map { it.name }?.toSet() ?: emptySet()
+        val marker = "# ssolv-managed"
         managedHookNames.minus(shippedHookNames).forEach { name ->
             val stale = file("$hooksDir/$name")
-            if (stale.exists()) {
+            if (stale.exists() && stale.readText().contains(marker)) {
                 stale.delete()
-                println("🧹 Removed stale git hook: $name")
+                println("🧹 Removed stale ssolv-managed git hook: $name")
+            } else if (stale.exists()) {
+                println("ℹ️  Skipped $name — not ssolv-managed (user-authored hook preserved)")
             }
         }
 

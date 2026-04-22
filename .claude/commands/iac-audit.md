@@ -24,11 +24,11 @@ ALB, S3, ElastiCache, CloudFront 는 도입하지 않는다.
 ## 리소스별 필수 설정
 
 ### EC2 (`aws_instance`)
-- Instance A: `instance_type = "t3.micro"` (nginx + app-server only, JVM `-Xmx400m`)
-- Instance B: `instance_type = "t3.small"` (app-server + redis + registry + alloy + exporters)
+- Instance A: 기본값 `t3.micro` (nginx + app-server only, JVM `-Xmx400m`)
+- Instance B: 기본값 `t3.small` (app-server + redis + registry + alloy + exporters)
 - `http_tokens = "required"` — IMDSv2 강제 (보안 요구사항)
 - 루트 EBS `encrypted = true`
-- `instance_type`, `ami` 는 반드시 변수 — 하드코딩 금지
+- `instance_type`, `ami` 는 반드시 변수로 주입 — 리소스 내 리터럴 하드코딩 금지 (변수 `default` 에는 위 기본값 허용)
 - 인스턴스 수는 `app_instance_count` 변수로만 제어
 
 ### Elastic IP (`aws_eip`)
@@ -59,7 +59,6 @@ ALB, S3, ElastiCache, CloudFront 는 도입하지 않는다.
 ### 1. 암호화
 - [ ] RDS `storage_encrypted = true`
 - [ ] EBS 볼륨 `encrypted = true`
-- [ ] S3 버킷 서버사이드 암호화 (해당 시)
 
 ### 2. 네트워크 보안
 - [ ] RDS `publicly_accessible = false` 및 private 서브넷 배치

@@ -43,10 +43,12 @@ if grep -q "@AuthenticationPrincipal" "$FILE_PATH"; then
 fi
 
 # [BLOCK] DpmApiResponse 래핑 누락 — API 응답 계약
+# 파일 단위 existence 검사가 아니라 매핑 수 vs 응답 타입 수를 비교해 누락 엔드포인트를 잡아냄.
 MAPPING_COUNT=$(grep -cE '^[[:space:]]*@(Get|Post|Put|Delete|Patch)Mapping' "$FILE_PATH" 2>/dev/null || echo 0)
-RESPONSE_COUNT=$(grep -cE ':[[:space:]]*DpmApiResponse<[^>]+>' "$FILE_PATH" 2>/dev/null || echo 0)
-if [[ "$MAPPING_COUNT" -gt 0 && "$RESPONSE_COUNT" -eq 0 ]]; then
-    echo "❌ DpmApiResponse 래핑 누락 — 모든 응답은 DpmApiResponse<T>로 감싸야 함 (CLAUDE.md 규칙)"
+RESPONSE_COUNT=$(grep -cE ':[[:space:]]*DpmApiResponse<' "$FILE_PATH" 2>/dev/null || echo 0)
+if [[ "$MAPPING_COUNT" -gt 0 && "$RESPONSE_COUNT" -lt "$MAPPING_COUNT" ]]; then
+    MISSING=$((MAPPING_COUNT - RESPONSE_COUNT))
+    echo "❌ DpmApiResponse 래핑 누락 — 매핑 $MAPPING_COUNT 개 중 $MISSING 개 미래핑 (CLAUDE.md 규칙)"
     BLOCKERS=$((BLOCKERS + 1))
 fi
 

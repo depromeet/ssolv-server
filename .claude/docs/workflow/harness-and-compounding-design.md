@@ -181,7 +181,7 @@ Commands   — 반복 절차 추상화   (워크플로우 템플릿)
 
 ### 4.1 Memory
 
-경로: `/Users/parkmineum/.claude/projects/.../memory/`
+경로: `~/.claude/projects/<project-slug>/memory/` (사용자별 홈 디렉토리, git 추적 안 됨)
 
 | 타입 | 내용 |
 |---|---|

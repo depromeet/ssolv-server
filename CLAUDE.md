@@ -65,11 +65,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 차단 정책 기준: **아키텍처/보안 계약 위반 → 차단**, **문서 품질 미비(@Tag, @Operation 등) → 경고만**.
 
-## Other Always-rules (훅이 경고만)
+## Other Always-rules (코드 리뷰에서 확인)
+
+훅이 강제하지 않는 코드 컨벤션. Controller 의 `@Tag` / `@Operation` 누락만 `controller-annotation-check.sh` 가 경고로 알려주고, 나머지는 리뷰/PR 에서 확인한다.
 
 - `DpmException` 서브클래스 + `ErrorCode` 로 에러 처리
 - 서비스 메서드는 `suspend fun`
-- 모든 엔드포인트에 `@Operation` / `@Tag` Swagger 문서
+- 모든 엔드포인트에 `@Operation` / `@Tag` Swagger 문서 (훅이 경고)
 - `operator fun invoke(...)` 패턴을 단일 책임 서비스에 사용
 - 블로킹 I/O는 `withContext(Dispatchers.IO)`
 
@@ -112,7 +114,7 @@ See `/architecture` skill for full module dependency graph and layer rules.
 
 ## Terraform (IaC)
 
-ssolv 인프라 전체 규칙 + 감사 체크리스트는 **[`/iac-audit`](/.claude/commands/iac-audit.md)** 커맨드 문서에 있습니다. `.tf` 저장 시 경량 감사는 `iac-security-check.sh` 훅이 자동 실행합니다. 새 인프라 결정은 `.claude/infra/DECISIONS.md` 에 ADR로 기록합니다.
+ssolv 인프라 전체 규칙 + 감사 체크리스트는 **[`/iac-audit`](.claude/commands/iac-audit.md)** 커맨드 문서에 있습니다. `.tf` 저장 시 경량 감사는 `iac-security-check.sh` 훅이 자동 실행합니다. 새 인프라 결정은 `.claude/infra/DECISIONS.md` 에 ADR로 기록합니다.
 
 ## Historical Context
 
