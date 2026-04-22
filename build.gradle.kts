@@ -16,7 +16,8 @@ extra["sentryVersion"] = "7.14.0"
 
 // harness 태스크로 호출된 빌드인지 감지 — harness 경로에서는 실패를 전파하여 차단,
 // 그 외(로컬 빌드, 단일 테스트, IDE 등)에서는 리포팅만 하고 실패 무시 (Phase 1 정책)
-val isHarness = gradle.startParameter.taskNames.any { it.contains("harness") }
+// 정확 매칭: "harness" 또는 ":harness" 접미사만 허용 (오타/유사 이름 태스크에 오작동 방지).
+val isHarness = gradle.startParameter.taskNames.any { it == "harness" || it.endsWith(":harness") }
 
 // 모든 프로젝트 공통 설정
 allprojects {
@@ -248,6 +249,22 @@ tasks.register("installGitHooks") {
 
         if (hooksDir.isEmpty()) {
             throw GradleException("Could not resolve git hooks directory.")
+        }
+
+        // Remove any previously installed hooks that no longer exist in .githooks/.
+        // Only delete files we installed — detected via the "# ssolv-managed" marker — so
+        // user-authored hooks (e.g. a local pre-commit they wrote themselves) are never touched.
+        val managedHookNames = setOf("pre-commit", "pre-push", "commit-msg")
+        val shippedHookNames = file("$rootDir/.githooks").listFiles()?.map { it.name }?.toSet() ?: emptySet()
+        val marker = "# ssolv-managed"
+        managedHookNames.minus(shippedHookNames).forEach { name ->
+            val stale = file("$hooksDir/$name")
+            if (stale.exists() && stale.readText().contains(marker)) {
+                stale.delete()
+                println("🧹 Removed stale ssolv-managed git hook: $name")
+            } else if (stale.exists()) {
+                println("ℹ️  Skipped $name — not ssolv-managed (user-authored hook preserved)")
+            }
         }
 
         copy {

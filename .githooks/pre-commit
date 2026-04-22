@@ -1,17 +1,51 @@
 #!/bin/bash
+# ssolv-managed
 # ssolv pre-commit hook
-# 커밋 전 빠른 스타일 검증 (ktlint, ~3초)
-# Phase 1: 리포팅만 (ignoreFailures=true) — 위반이 있어도 커밋 차단하지 않음
-# 향후 Phase: ktlintFormat 정리 후 ignoreFailures=false 로 전환하여 차단
+# 가벼운 스타일 자동 교정 (staged .kt/.kts 만)
+#
+# 정책:
+#   - ktlintFormat 으로 자동 수정 후 git add 로 재스테이지 → diff 깨끗
+#   - 검증/차단은 CI 의 ktlintCheck 가 담당 (로컬은 수정만)
+#   - 머지/리베이스/체리픽 진행 중에는 스킵 (자동 수정이 충돌 처리에 위험)
+#
+# 우회: git commit --no-verify
 
-echo "🔍 Pre-commit: ktlintCheck 실행..."
-
-if ! ./gradlew ktlintCheck --daemon -q; then
-  echo ""
-  echo "⚠️  ktlint 플러그인/리포팅 오류."
-  echo "   수정: ./gradlew ktlintFormat"
-  echo "   그 후 다시 git add + git commit"
-  exit 1
+# Merge/rebase/cherry-pick 진행 중이면 스킵
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+if [ -e "$GIT_DIR/MERGE_HEAD" ] || [ -e "$GIT_DIR/CHERRY_PICK_HEAD" ] || \
+   [ -e "$GIT_DIR/REBASE_HEAD" ] || [ -d "$GIT_DIR/rebase-merge" ] || \
+   [ -d "$GIT_DIR/rebase-apply" ]; then
+    exit 0
 fi
 
-echo "✅ Pre-commit: ktlint 통과 (리포팅 전용 — 위반 여부는 리포트 참조)"
+# Staged Kotlin 파일만 추출 (Added/Copied/Modified/Renamed)
+STAGED_KT=$(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n' | grep -E '\.(kt|kts)$' || true)
+
+if [ -z "$STAGED_KT" ]; then
+    exit 0
+fi
+
+echo "🎨 Pre-commit: ktlintFormat 자동 교정..."
+
+# ktlintFormat 은 변경되지 않은 파일을 incremental 로 스킵하므로 전체 task 호출이 안전.
+# staged 파일에 한정된 수정만 재스테이지 → unstaged 노이즈 방지.
+if ! ./gradlew ktlintFormat -q --daemon; then
+    echo "⚠️  ktlintFormat 실패 — 커밋은 진행 (CI 에서 검증)"
+    exit 0
+fi
+
+RESTAGED=0
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    if [ -f "$file" ]; then
+        git add -- "$file"
+        RESTAGED=$((RESTAGED + 1))
+    fi
+done <<< "$STAGED_KT"
+
+if [ "$RESTAGED" -gt 0 ]; then
+    echo "✅ Pre-commit: $RESTAGED 개 staged 파일 재스테이지"
+else
+    echo "✅ Pre-commit: 스타일 통과"
+fi
+exit 0

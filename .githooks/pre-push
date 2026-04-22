@@ -1,4 +1,5 @@
 #!/bin/bash
+# ssolv-managed
 # ssolv pre-push hook
 # 푸시 전 전체 harness 검증 (ktlint + 전체 테스트, ~수 분)
 # harness 경로에서는 ignoreFailures=false 로 동작하므로 실패 시 푸시 차단
