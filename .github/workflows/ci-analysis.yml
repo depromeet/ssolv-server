@@ -1,0 +1,86 @@
+name: CI Analysis (SonarCloud)
+
+# CI Build & Test 완료 후 트리거 — Jacoco 커버리지 아티팩트를 내려받아 분석.
+# build-test 가 실패해도 코드 품질 분석은 실행 (커버리지 없이 정적 분석만).
+on:
+  workflow_run:
+    workflows: [ "CI Build & Test" ]
+    types: [ completed ]
+
+jobs:
+  sonar:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'cancelled'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Gradle properties
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx2g" >> ~/.gradle/gradle.properties
+          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+          echo "sonar.gradle.skipCompile=true" >> ~/.gradle/gradle.properties
+
+      - name: Download Jacoco reports from build-test run
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+          name: jacoco-reports
+          path: .
+
+      - name: Extract PR context
+        id: pr-ctx
+        run: |
+          echo '${{ toJSON(github.event.workflow_run.pull_requests) }}' > /tmp/prs.json
+          PR_NUMBER=$(python3 -c "
+          import json
+          prs = json.load(open('/tmp/prs.json'))
+          print(prs[0]['number'] if prs else '')
+          " 2>/dev/null || echo "")
+          PR_BRANCH=$(python3 -c "
+          import json
+          prs = json.load(open('/tmp/prs.json'))
+          print(prs[0]['head']['ref'] if prs else '')
+          " 2>/dev/null || echo "")
+          PR_BASE=$(python3 -c "
+          import json
+          prs = json.load(open('/tmp/prs.json'))
+          print(prs[0]['base']['ref'] if prs else '')
+          " 2>/dev/null || echo "")
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_base=$PR_BASE" >> $GITHUB_OUTPUT
+
+      - name: SonarCloud Analysis
+        continue-on-error: true
+        run: |
+          SONAR_ARGS="-Dsonar.gradle.skipCompile=true"
+          PR_NUMBER="${{ steps.pr-ctx.outputs.pr_number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            SONAR_ARGS="$SONAR_ARGS \
+              -Dsonar.pullrequest.key=$PR_NUMBER \
+              -Dsonar.pullrequest.branch=${{ steps.pr-ctx.outputs.pr_branch }} \
+              -Dsonar.pullrequest.base=${{ steps.pr-ctx.outputs.pr_base }}"
+          fi
+          ./gradlew sonar $SONAR_ARGS --info
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TZ: Asia/Seoul
