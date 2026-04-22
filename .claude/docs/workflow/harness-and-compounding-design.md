@@ -7,13 +7,14 @@
 
 ## 1. Harness 전체 아키텍처
 
-Harness는 **2개 로컬 계층 + CI** 로 구성된다.
+Harness는 **3개 로컬 계층 + CI** 로 구성된다.
 
 ```
 [로컬 작업] ──────────────────────────────────────────────────────► [원격]
      │
      ▼
- (pre-commit 없음 — 과거에는 ktlintCheck 였으나 리포팅 중복이라 제거)
+ pre-commit (git hook)         staged .kt 에 ktlintFormat 자동 교정
+                                 + 자동 재스테이지 (1~3초, 차단 없음)
      │
      ▼
  pre-push (git hook)           ./gradlew harness
@@ -26,6 +27,8 @@ Harness는 **2개 로컬 계층 + CI** 로 구성된다.
      ▼
  CD (GitHub Actions)           Jib 이미지 빌드 → EC2 배포
 ```
+
+**계층 분담 원칙**: pre-commit 은 **교정만** (검증 X), pre-push 가 **테스트 차단**, CI 가 **스타일 최종 게이트**. 같은 검사를 여러 단계에서 중복 차단하지 않는다.
 
 ### 1.1 Gradle harness 태스크
 
@@ -49,9 +52,14 @@ tasks.register("harness") {
 
 | Hook | 실행 시점 | 실행 내용 | 차단 여부 |
 |---|---|---|---|
+| `pre-commit` | `git commit` 전 | staged `.kt` 에 `ktlintFormat` + 자동 재스테이지. merge/rebase 중에는 스킵. | ❌ 교정만 |
 | `pre-push` | `git push` 전 | `./gradlew harness` (ktlint + test) | ✅ 테스트 실패 시 push 차단 |
 
-긴급 우회: `git push --no-verify` (권장하지 않음)
+관리 메커니즘:
+- 모든 ssolv 관리 훅은 본문에 `# ssolv-managed` 마커 포함
+- `installGitHooks` 는 `.githooks/` 에서 사라진 훅 중 마커가 있는 것만 자동 정리 — 사용자 작성 훅은 보존
+
+긴급 우회: `git commit --no-verify` / `git push --no-verify` (권장하지 않음)
 
 ### 1.3 Worktree에서의 git hooks 동작
 

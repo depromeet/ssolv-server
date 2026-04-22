@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ```bash
-./gradlew installGitHooks      # (최초 1회) 로컬 git pre-push 설치
+./gradlew installGitHooks      # (최초 1회) 로컬 git pre-commit + pre-push 설치
 ./gradlew build -x test        # Compile project
 ./gradlew test                 # Execute test suite
 ./gradlew harness              # ktlint + 전체 테스트 (pre-push와 동일)
@@ -26,10 +26,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 요약:
 
+- **pre-commit**: staged `.kt`/`.kts` 에 `ktlintFormat` 자동 교정 + 재스테이지 (1~3초). 검증 아니라 교정만.
 - **pre-push**: `./gradlew harness` — ktlint(리포팅) + 전체 테스트(실패 시 차단).
 - **CI**: PR 생성 시 ktlintCheck + build + test + SonarCloud.
-- **긴급 우회**: `git push --no-verify` (권장하지 않음).
-- **ktlint 정책**: 항상 `ignoreFailures=true` (리포팅 전용). CI에서 시각 확인.
+- **긴급 우회**: `git commit --no-verify` / `git push --no-verify` (권장하지 않음).
+- **ktlint 정책**: 항상 `ignoreFailures=true` (리포팅 전용). CI 의 `ktlintCheck` 가 최종 게이트.
 
 설치: `./gradlew installGitHooks` (repo clone 후 1회). Worktree 사용 시에도 한 번만 — git hooks는 main repo `.git/hooks/` 에 설치되어 모든 worktree가 공유함.
 
