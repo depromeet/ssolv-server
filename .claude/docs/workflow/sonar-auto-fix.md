@@ -11,7 +11,7 @@ SonarCloud 결과를 GitHub Issue 체크리스트로 큐잉하고, 승인된 그
 |---|---|
 | `.claude/sonar-allowlist.yml` | 룰별 자동화 안전성 분류 (`auto_safe` / `auto_with_review` / `manual_only`) + 공통 필터 |
 | `.claude/scripts/sonar-fetch.py` | SonarCloud API 조회 + 필터 + (rule × module) 그룹핑 + Markdown/JSON 렌더 |
-| `.github/workflows/sonar-issue.yml` | 매주 월요일 09:00 KST · GitHub Issue 갱신 |
+| `.github/workflows/sonar-issue.yml` | 매일 00:00 KST · GitHub Issue 갱신 |
 | `.github/workflows/sonar-fix.yml` | `/sonar-fix run` 코멘트 → 그룹별 PR 자동 생성 (Claude Code Action) |
 
 ## 분류 규칙
@@ -51,7 +51,7 @@ PR 1개 = `(분류 × 룰 × 모듈)` 1조합. 같은 파일을 건드리는 그
 ## 운영 루프
 
 ```text
-월요일 09:00 KST
+매일 00:00 KST
   ↓
 sonar-issue.yml → SonarCloud API → 그룹핑 → Issue 갱신
   ↓

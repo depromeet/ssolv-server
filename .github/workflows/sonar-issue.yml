@@ -1,11 +1,11 @@
 name: Sonar Auto-Fix Queue (Issue)
 
-# 매주 월요일 09:00 KST (= 일요일 24:00 UTC) 또는 수동 트리거 시 SonarCloud 결과를
+# 매일 00:00 KST (= 전날 15:00 UTC) 또는 수동 트리거 시 SonarCloud 결과를
 # 그룹화하여 GitHub Issue 체크리스트로 갱신한다.
 
 on:
   schedule:
-    - cron: '0 0 * * 1'   # Mon 00:00 UTC = Mon 09:00 KST
+    - cron: '0 15 * * *'   # 15:00 UTC = 00:00 KST (다음날)
   workflow_dispatch:
 
 permissions:
