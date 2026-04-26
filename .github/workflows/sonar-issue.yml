@@ -5,7 +5,7 @@ name: Sonar Auto-Fix Queue (Issue)
 
 on:
   schedule:
-    - cron: '0 15 * * *'   # 15:00 UTC = 00:00 KST (다음날)
+    - cron: '0 15 */3 * *'  # 15:00 UTC = 00:00 KST, 3일마다
   workflow_dispatch:
 
 permissions:
@@ -53,36 +53,17 @@ jobs:
               --color BFD4F2
           fi
 
-      - name: Find existing open issue
-        id: find
+      - name: Create issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          number=$(gh issue list \
+          issue_number=$(gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body-file issue-body.md \
             --label "$ISSUE_LABEL" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-          echo "number=${number}" >> "$GITHUB_OUTPUT"
+            --json number --jq '.number')
+          echo "Created issue #$issue_number"
 
-      - name: Update or create issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EXISTING: ${{ steps.find.outputs.number }}
-        run: |
-          if [ -n "$EXISTING" ]; then
-            issue_number="$EXISTING"
-            gh issue edit "$issue_number" --body-file issue-body.md
-          else
-            issue_number=$(gh issue create \
-              --title "$ISSUE_TITLE" \
-              --body-file issue-body.md \
-              --label "$ISSUE_LABEL" \
-              --json number --jq '.number')
-            echo "Created issue #$issue_number"
-          fi
-
-          # 이슈 번호를 알게 된 시점에 실행 명령어를 본문 상단에 추가
           {
             echo '## 실행 방법'
             echo ''
