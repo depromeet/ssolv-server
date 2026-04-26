@@ -196,6 +196,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────
       - name: Run Claude Code Action
         if: vars.SONAR_FIX_ACTIVE == 'true'
+        continue-on-error: true
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
