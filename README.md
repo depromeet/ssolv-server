@@ -33,7 +33,7 @@
 
 Claude Code를 단순 코드 생성 도구가 아닌 **팀의 코드 품질 루프에 통합된 에이전트**로 운영합니다.
 
-<img width="100%" alt="claude architecture" src="docs/assets/claude-architecture.png" />
+<img src="https://github.com/user-attachments/assets/d2e72edb-8d85-4247-b685-911d452a5fcc" width="100%" alt="claude architecture">
 
 | 레이어 | 구성 요소 | 역할 |
 |---|---|---|
