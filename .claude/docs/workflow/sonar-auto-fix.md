@@ -50,14 +50,14 @@ PR 1개 = `(분류 × 룰 × 모듈)` 1조합. 같은 파일을 건드리는 그
 
 ## 운영 루프
 
-```
+```text
 월요일 09:00 KST
   ↓
 sonar-issue.yml → SonarCloud API → 그룹핑 → Issue 갱신
   ↓
 담당자 체크박스 선택 → 코멘트 `/sonar-fix run`
   ↓
-sonar-fix.yml: 권한 체크 → 매트릭스 빌드 → 그룹별 작업
+sonar-fix.yml: 권한 체크 → 매트릭스 빌드 → 그룹별 직렬 처리 (max-parallel: 1)
   ├─ Claude 가 파일만 수정 → 로컬 harness 실행
   ├─ ✅ 성공: PR 생성 (🟢 auto-merge / 🟡 review-required)
   └─ ❌ 실패: Issue 에 escalate 코멘트

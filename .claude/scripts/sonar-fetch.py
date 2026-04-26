@@ -49,6 +49,9 @@ class Allowlist:
     max_effort_minutes: int = 30
     min_age_days: int = 7
     exclude_paths: list[str] = field(default_factory=list)
+    # required_assignee = None → 미배정 이슈만 처리 (현재 정책)
+    # 문자열 값 → 해당 사용자에게 배정된 이슈만 처리
+    required_assignee: str | None = None
 
     def classify(self, rule: str) -> str | None:
         if rule in self.auto_safe:
@@ -116,6 +119,8 @@ def load_allowlist(path: Path) -> Allowlist:
                     a.max_effort_minutes = int(v)
                 elif k == "min_age_days":
                     a.min_age_days = int(v)
+                elif k == "required_assignee":
+                    a.required_assignee = None if v in ("null", "~", "") else v
                 elif k.startswith("- "):
                     a.exclude_paths.append(k[2:].strip().strip('"'))
             elif stripped.startswith("- "):
@@ -214,51 +219,85 @@ def days_since(iso_ts: str) -> int:
     return (datetime.now(timezone.utc) - dt).days
 
 
-def issue_classification(issue: dict[str, Any], allow: Allowlist) -> str | None:
-    """Return classification or None if filtered out."""
+def _path_excluded(path: str, patterns: list[str]) -> bool:
+    """Glob-aware substring match. `**/X/**` 는 `/X/` 부분문자열로 단순화한다."""
+    for pattern in patterns:
+        # `**/segment/**` → `/segment/` 부분 매칭
+        core = pattern.strip("*/")
+        if not core:
+            continue
+        needle = f"/{core}/"
+        if needle in path or path.startswith(f"{core}/"):
+            return True
+    return False
+
+
+def issue_classification(
+    issue: dict[str, Any], allow: Allowlist
+) -> tuple[str | None, str | None]:
+    """Return (classification, gate_reason).
+
+    classification: 최종 분류 (`auto_safe` / `auto_with_review` / `manual_only`)
+                    또는 룰이 allowlist 에 없으면 None.
+    gate_reason:    분류는 매칭됐으나 게이팅으로 제외됐을 때의 사유 ("effort" /
+                    "age" / "assignee" / "path"). 매칭 실패면 None.
+    """
     rule = issue.get("rule", "")
     cls = allow.classify(rule)
     if cls is None:
-        return None
+        return None, None
+    if cls == "manual_only":
+        return cls, None
+    # 게이팅 — auto_safe / auto_with_review 만 적용
     if effort_minutes(issue.get("effort", "")) > allow.max_effort_minutes:
-        return None
+        return None, "effort"
     if days_since(issue.get("creationDate", "")) < allow.min_age_days:
-        return None
-    if issue.get("assignee"):
-        return None
+        return None, "age"
+    assignee = issue.get("assignee")
+    if allow.required_assignee is None:
+        if assignee:
+            return None, "assignee"
+    elif assignee != allow.required_assignee:
+        return None, "assignee"
     path = parse_path(issue.get("component", ""))
-    if "/test/" in path or "/testFixtures/" in path:
-        return None
+    if _path_excluded(path, allow.exclude_paths):
+        return None, "path"
     # BUG type — even on auto_safe rules, force review
     if issue.get("type") == "BUG" and cls == "auto_safe":
-        return "auto_with_review"
-    return cls
+        return "auto_with_review", None
+    return cls, None
 
 
 def group_issues(
     issues: list[dict[str, Any]], allow: Allowlist
-) -> tuple[dict[tuple[str, str, str], list[dict[str, Any]]], list[dict[str, Any]]]:
+) -> tuple[
+    dict[tuple[str, str, str], list[dict[str, Any]]],
+    list[dict[str, Any]],
+    list[tuple[dict[str, Any], str]],
+]:
     """Group filtered issues by (classification, rule, module).
 
-    Returns (groups, excluded) where excluded contains issues that were filtered out
-    but matched a manual_only rule or were otherwise informational.
+    Returns (groups, excluded, silently_filtered):
+      - groups:            처리 대상 그룹
+      - excluded:          manual_only — 정보 노출용
+      - silently_filtered: allowlist 에는 있으나 게이팅(effort/age/assignee/path)으로
+                           제외된 이슈와 그 사유. total_count 정확도를 위해 추적.
     """
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     excluded: list[dict[str, Any]] = []
+    silently_filtered: list[tuple[dict[str, Any], str]] = []
     for issue in issues:
-        cls = issue_classification(issue, allow)
-        rule = issue.get("rule", "")
-        # manual_only is informational — never group, always excluded
+        cls, gate = issue_classification(issue, allow)
         if cls == "manual_only":
             excluded.append(issue)
             continue
         if cls is None:
-            if allow.classify(rule) == "manual_only":
-                excluded.append(issue)
+            if gate is not None:
+                silently_filtered.append((issue, gate))
             continue
         module = parse_module(issue.get("component", ""))
-        groups[(cls, rule, module)].append(issue)
-    return groups, excluded
+        groups[(cls, issue.get("rule", ""), module)].append(issue)
+    return groups, excluded, silently_filtered
 
 
 def detect_file_conflicts(
@@ -296,8 +335,12 @@ CLASS_BADGE = {
 def render_json(
     groups: dict[tuple[str, str, str], list[dict[str, Any]]],
     excluded: list[dict[str, Any]],
+    silently_filtered: list[tuple[dict[str, Any], str]],
     allow: Allowlist,
 ) -> str:
+    silent_counts: dict[str, int] = defaultdict(int)
+    for _, gate in silently_filtered:
+        silent_counts[gate] += 1
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "groups": [
@@ -323,6 +366,7 @@ def render_json(
             }
             for i in excluded
         ],
+        "silently_filtered": dict(silent_counts),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
@@ -330,6 +374,7 @@ def render_json(
 def render_markdown(
     groups: dict[tuple[str, str, str], list[dict[str, Any]]],
     excluded: list[dict[str, Any]],
+    silently_filtered: list[tuple[dict[str, Any], str]],
     conflicts: list[tuple[str, str, str]],
     allow: Allowlist,
     project: str,
@@ -338,8 +383,14 @@ def render_markdown(
     for key, items in groups.items():
         by_class[key[0]].append((key, items))
 
+    silent_counts: dict[str, int] = defaultdict(int)
+    for _, gate in silently_filtered:
+        silent_counts[gate] += 1
+    silent_total = sum(silent_counts.values())
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    total_count = sum(len(v) for v in groups.values()) + len(excluded)
+    actionable_total = sum(len(v) for v in groups.values()) + len(excluded)
+    total_count = actionable_total + silent_total
     safe_count = sum(len(v) for k, v in groups.items() if k[0] == "auto_safe")
     review_count = sum(len(v) for k, v in groups.items() if k[0] == "auto_with_review")
     manual_count = len(excluded)
@@ -352,13 +403,16 @@ def render_markdown(
     out.append(
         f"> 총 **{total_count}건** → 🟢 Auto-safe {safe_count} / "
         f"🟡 Auto-with-review {review_count} / 🔴 Manual {manual_count}"
+        + (f" / ⚪ Filtered {silent_total}" if silent_total else "")
     )
+    if silent_total:
+        breakdown = ", ".join(f"{k}={v}" for k, v in sorted(silent_counts.items()))
+        out.append(f"> Filtered breakdown: {breakdown}")
     out.append("")
     out.append("## 사용법")
-    out.append("- 체크박스 선택 후 댓글에 `/sonar-fix run` → 선택된 그룹 동시 처리")
+    out.append("- 체크박스 선택 후 댓글에 `/sonar-fix run` → 선택된 그룹 직렬 처리")
     out.append("- 🟢 = PR 자동 머지 / 🟡 = PR 만 생성 (사람 리뷰 필수) / 🔴 = 작업 안 함")
-    out.append("- 같은 파일을 건드리는 그룹은 직렬 처리")
-    out.append("- 그룹별 최대 2회 재시도, 실패 시 이 Issue 에 escalate 코멘트")
+    out.append("- 실패 시 이 Issue 에 escalate 코멘트")
     out.append("")
 
     if not by_class:
@@ -461,13 +515,17 @@ def main() -> int:
             print(f"::error::SonarCloud fetch failed: {exc}", file=sys.stderr)
             return 1
 
-    groups, excluded = group_issues(issues, allow)
+    groups, excluded, silently_filtered = group_issues(issues, allow)
     conflicts = detect_file_conflicts(groups)
 
     if args.output == "json":
-        print(render_json(groups, excluded, allow))
+        print(render_json(groups, excluded, silently_filtered, allow))
     else:
-        print(render_markdown(groups, excluded, conflicts, allow, args.project))
+        print(
+            render_markdown(
+                groups, excluded, silently_filtered, conflicts, allow, args.project
+            )
+        )
     return 0
 
 

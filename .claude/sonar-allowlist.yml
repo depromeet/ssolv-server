@@ -54,11 +54,11 @@ manual_only:
   - rule: kotlin:S138
     reason: "Function too long — 분리 결정은 사람 판단"
 
-# 공통 필터 (auto_safe / auto_with_review 양쪽에 적용)
+# 공통 필터 (auto_safe / auto_with_review 양쪽에 적용 — manual_only 는 정보 노출용이라 미적용)
 filters:
   max_effort_minutes: 30
   min_age_days: 7              # 갓 만든 이슈는 작성자가 직접 고치도록 유예
-  exclude_paths:
+  exclude_paths:               # `**/X/**` 는 `/X/` 부분 매칭으로 단순화됨
     - "**/test/**"
     - "**/testFixtures/**"
-  required_assignee: null      # null = unassigned 만 대상
+  required_assignee: null      # null = unassigned 만 대상, 문자열 = 해당 사용자 배정만

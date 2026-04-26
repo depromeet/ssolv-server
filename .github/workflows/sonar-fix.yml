@@ -9,8 +9,8 @@ name: Sonar Auto-Fix Dispatch
 #   3. 코멘트 작성자가 repo 의 write 권한 보유
 #
 # 안전장치:
-#   - 그룹별 worktree 분리, 동일 파일 충돌 시 직렬화 (parse 단계에서 감지)
-#   - 그룹별 최대 2회 재시도, 실패 시 이슈에 escalate 코멘트
+#   - max-parallel: 1 로 직렬 실행 — 동일 파일 충돌/race 방지
+#   - 실패 시 이슈에 escalate 코멘트
 #   - 🟡 그룹은 PR 만 생성, auto-merge 라벨 안 붙임
 #   - BUG 또는 VULNERABILITY 가 섞이면 자동 머지 차단
 
@@ -47,7 +47,8 @@ jobs:
     outputs:
       group_ids: ${{ steps.extract.outputs.group_ids }}
       issue_number: ${{ steps.extract.outputs.issue_number }}
-      authorized: ${{ steps.authz.outputs.authorized }}
+      # workflow_dispatch / issue_comment 두 경로 중 하나만 채워지므로 OR 결합.
+      authorized: ${{ steps.authz.outputs.authorized || steps.authz_dispatch.outputs.authorized }}
 
     steps:
       - name: Authorize commenter
@@ -69,9 +70,9 @@ jobs:
           fi
 
       - name: Authorize dispatch
+        id: authz_dispatch
         if: github.event_name == 'workflow_dispatch'
         run: echo "authorized=true" >> "$GITHUB_OUTPUT"
-        id: authz_dispatch
 
       - name: Checkout (for issue body parsing)
         if: github.event_name == 'issue_comment'
@@ -127,24 +128,13 @@ jobs:
           GROUP_IDS: ${{ needs.parse.outputs.group_ids }}
         run: |
           python3 .claude/scripts/sonar-fetch.py --output json > sonar.json
-          # 선택된 group_ids 만 남기고 file conflict 가 있으면 직렬화 마킹
+          # 선택된 group_ids 만 매트릭스로 변환. 직렬 실행은 strategy.max-parallel: 1
+          # 에서 일괄 적용하므로 그룹별 conflict_with 메타데이터는 채우지 않는다.
           python3 - "$GROUP_IDS" <<'PY' >> "$GITHUB_OUTPUT"
-          import json, sys, os
+          import json, sys
           ids = set(s.strip() for s in sys.argv[1].split(',') if s.strip())
           with open('sonar.json') as f: data = json.load(f)
           selected = [g for g in data['groups'] if g['id'] in ids]
-          # conflict detection: 같은 파일 등장 그룹 → conflict_with 채움
-          file_owners = {}
-          for g in selected:
-              for f in g['files']:
-                  file_owners.setdefault(f, []).append(g['id'])
-          for g in selected:
-              conflicts = set()
-              for f in g['files']:
-                  for other in file_owners[f]:
-                      if other != g['id']:
-                          conflicts.add(other)
-              g['conflicts_with'] = sorted(conflicts)
           matrix = {'include': selected}
           print(f"matrix={json.dumps(matrix)}")
           PY
@@ -157,7 +147,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 3
+      # 같은 파일을 건드리는 그룹이 동시에 push 되면 race / rebase 가 발생하므로
+      # 안전하게 직렬화한다. 빈도가 주 1회 수준이라 처리량보다 안전성을 우선.
+      max-parallel: 1
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
 
     steps:
@@ -182,6 +174,19 @@ jobs:
           echo "BRANCH=$branch" >> "$GITHUB_ENV"
           git checkout -b "$branch"
 
+      # GitHub Actions expression 의 `'\n'` 은 리터럴 백슬래시-n 으로 해석되므로
+      # 파일 목록을 별도 step 에서 JSON 배열을 풀어 multiline 문자열로 만든다.
+      - name: Format file list
+        id: files
+        env:
+          FILES_JSON: ${{ toJson(matrix.files) }}
+        run: |
+          {
+            echo 'list<<__EOF__'
+            python3 -c "import json,os; print('\n'.join(json.loads(os.environ['FILES_JSON'])))"
+            echo '__EOF__'
+          } >> "$GITHUB_OUTPUT"
+
       # ─────────────────────────────────────────────────────────────
       # 활성화 모드: ANTHROPIC_API_KEY 가 secrets 에 있으면 Claude Code Action 으로 수정.
       # 비활성화 모드 (기본): stub 만 실행, PR 생성 안 함. 안전한 dry-run.
@@ -203,7 +208,7 @@ jobs:
             Module: ${{ matrix.module }}
             Reason: ${{ matrix.reason }}
             Files to fix:
-            ${{ join(matrix.files, '\n') }}
+            ${{ steps.files.outputs.list }}
 
             Constraints:
             - Only modify the listed files. Do not refactor unrelated code.
