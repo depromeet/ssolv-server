@@ -437,26 +437,25 @@ def render_markdown(
         ):
             group_id = f"{cls}-{rule.replace(':', '_')}-{module}"
             sample = issues[0]
+            effort_total = sum(effort_minutes(i.get("effort", "")) for i in issues)
             out.append(
-                f"### `[ ]` `{group_id}` · `{rule}` × `{module}` ({len(issues)}건)"
+                f"- [ ] `{group_id}` · `{rule}` × `{module}` ({len(issues)}건)"
+                f" — {sample.get('message','')[:80]} _(~{effort_total}min)_"
             )
             out.append("")
-            out.append(f"**메시지**: {sample.get('message','')[:120]}")
-            out.append(f"**근거**: {allow.reason(rule)}")
-            effort_total = sum(effort_minutes(i.get("effort", "")) for i in issues)
-            out.append(f"**Effort**: ~{effort_total}min (예상)")
+            out.append(f"  **근거**: {allow.reason(rule)}")
             out.append("")
-            out.append("<details><summary>대상 파일</summary>")
+            out.append("  <details><summary>대상 파일</summary>")
             out.append("")
-            out.append("| 파일 | 라인 |")
-            out.append("|---|---:|")
+            out.append("  | 파일 | 라인 |")
+            out.append("  |---|---:|")
             for i in issues[:20]:
                 path = parse_path(i.get("component", ""))
-                out.append(f"| `{path}` | {i.get('line', '-')} |")
+                out.append(f"  | `{path}` | {i.get('line', '-')} |")
             if len(issues) > 20:
-                out.append(f"| ...{len(issues)-20}건 더 | |")
+                out.append(f"  | ...{len(issues)-20}건 더 | |")
             out.append("")
-            out.append("</details>")
+            out.append("  </details>")
             out.append("")
 
     if excluded:

@@ -94,7 +94,7 @@ jobs:
           fi
           body=$(gh issue view "$ISSUE_NUMBER" --json body --jq '.body')
           # `[x]` 또는 `[X]` 가 체크된 라인에서 group ID (백틱으로 감싼 첫 토큰) 추출
-          ids=$(echo "$body" | grep -E '^### `\[[xX]\]`' \
+          ids=$(echo "$body" | grep -E '^- \[[xX]\]' \
             | grep -oE '`[a-z_]+-[a-zA-Z0-9_]+-ssolv-[a-z-]+`' \
             | tr -d '`' \
             | sort -u \
