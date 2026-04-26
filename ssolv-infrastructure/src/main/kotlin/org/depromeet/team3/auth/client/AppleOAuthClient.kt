@@ -50,14 +50,25 @@ class AppleOAuthClient(
 
     private val apiTimeoutMillis = 5_000L
 
-    suspend fun requestToken(accessCode: String, redirectUri: String): AppleResponse.OAuthToken {
-        val trimmedRedirectUri = redirectUri.trim()
-        if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
-            log.error("허용되지 않은 redirect_uri: {}", trimmedRedirectUri)
-            throw AuthException(ErrorCode.APPLE_INVALID_REDIRECT_URI)
+    suspend fun requestToken(accessCode: String, redirectUri: String?): AppleResponse.OAuthToken {
+        val trimmedRedirectUri = redirectUri?.trim().orEmpty()
+        val isAppFlow = trimmedRedirectUri.isBlank()
+
+        val clientId = if (isAppFlow) {
+            if (appleProperties.bundleId.isBlank()) {
+                log.error("앱 로그인 요청이지만 apple.bundle-id가 설정되지 않았습니다")
+                throw AuthException(ErrorCode.APPLE_AUTH_FAILED)
+            }
+            appleProperties.bundleId
+        } else {
+            if (!getAllowedRedirectUris().contains(trimmedRedirectUri)) {
+                log.error("허용되지 않은 redirect_uri: {}", trimmedRedirectUri)
+                throw AuthException(ErrorCode.APPLE_INVALID_REDIRECT_URI)
+            }
+            appleProperties.clientId
         }
 
-        val clientSecret = generateClientSecret()
+        val clientSecret = generateClientSecret(clientId)
 
         return try {
             withTimeout(apiTimeoutMillis) {
@@ -65,10 +76,12 @@ class AppleOAuthClient(
                     url = appleProperties.tokenUri,
                     formParameters = parameters {
                         append("grant_type", "authorization_code")
-                        append("client_id", appleProperties.clientId)
+                        append("client_id", clientId)
                         append("client_secret", clientSecret)
                         append("code", accessCode)
-                        append("redirect_uri", trimmedRedirectUri)
+                        if (!isAppFlow) {
+                            append("redirect_uri", trimmedRedirectUri)
+                        }
                     },
                 ).body<AppleResponse.OAuthToken>()
             }
@@ -108,10 +121,18 @@ class AppleOAuthClient(
                     publicKeyCache[k] ?: throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
                 }
                 .requireIssuer("https://appleid.apple.com")
-                .requireAudience(appleProperties.clientId)
                 .build()
                 .parseSignedClaims(idToken)
                 .payload
+
+            val allowedAudiences = setOfNotNull(
+                appleProperties.clientId.takeIf { it.isNotBlank() },
+                appleProperties.bundleId.takeIf { it.isNotBlank() },
+            )
+            if (claims.audience.none { it in allowedAudiences }) {
+                log.error("애플 ID 토큰 audience 불일치: actual={}, allowed={}", claims.audience, allowedAudiences)
+                throw AuthException(ErrorCode.APPLE_INVALID_ID_TOKEN)
+            }
 
             return AppleResponse.IdTokenPayload(
                 iss = claims.issuer,
@@ -167,7 +188,7 @@ class AppleOAuthClient(
         return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
-    private fun generateClientSecret(): String = try {
+    private fun generateClientSecret(subject: String): String = try {
         val now = Date()
         Jwts.builder()
             .header().keyId(appleProperties.keyId).and()
@@ -175,7 +196,7 @@ class AppleOAuthClient(
             .issuedAt(now)
             .expiration(Date(now.time + 3600000 * 6))
             .audience().add("https://appleid.apple.com").and()
-            .subject(appleProperties.clientId)
+            .subject(subject)
             .signWith(getPrivateKey(), Jwts.SIG.ES256)
             .compact()
     } catch (e: Exception) {

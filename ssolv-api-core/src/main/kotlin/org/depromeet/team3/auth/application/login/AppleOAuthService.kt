@@ -3,10 +3,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.depromeet.team3.auth.client.AppleOAuthClient
 import org.depromeet.team3.auth.command.AppleLoginCommand
 import org.depromeet.team3.auth.dto.LoginResponse
-import org.depromeet.team3.auth.exception.AuthException
 import org.depromeet.team3.auth.model.AppleResponse
-import org.depromeet.team3.auth.properties.AppleProperties
-import org.depromeet.team3.common.exception.ErrorCode
 import org.depromeet.team3.common.util.withTracingContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -18,14 +15,14 @@ import org.springframework.stereotype.Service
 class AppleOAuthService(
     private val appleOAuthClient: AppleOAuthClient,
     private val createAppleUserService: CreateAppleUserService,
-    private val appleProperties: AppleProperties,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(AppleOAuthService::class.java)
 
     suspend fun login(command: AppleLoginCommand): LoginResponse = withTracingContext {
         val code = command.authorizationCode
-        val redirectUri = command.redirectUri ?: getDefaultRedirectUri()
+        // redirectUri가 비어있으면 네이티브 앱 흐름 (Bundle ID 사용), 아니면 웹 흐름 (Services ID 사용)
+        val redirectUri = command.redirectUri?.takeIf { it.isNotBlank() }
 
         // 1. 애플 OAuth 토큰 요청
         val oAuthToken = appleOAuthClient.requestToken(code, redirectUri)
@@ -46,12 +43,6 @@ class AppleOAuthService(
 
         // 5. DB 작업 위임 (자체적으로 IO 디스패처/VT를 사용할 수 있지만 여기서는 순차 실행)
         createAppleUserService.saveUserAndGenerateTokens(email, nickname, profileImage, socialId)
-    }
-
-    private fun getDefaultRedirectUri(): String = when {
-        appleProperties.redirectUris.isNotEmpty() -> appleProperties.redirectUris.first()
-        !appleProperties.redirectUri.isNullOrBlank() -> appleProperties.redirectUri
-        else -> throw AuthException(errorCode = ErrorCode.APPLE_REDIRECT_URI_NOT_CONFIGURED)
     }
 
     private fun parseUserInfo(userJson: String): AppleResponse.UserInfo = try {
