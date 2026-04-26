@@ -30,6 +30,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  id-token: write
 
 env:
   ISSUE_LABEL: sonar-auto-fix-queue
@@ -216,6 +217,27 @@ jobs:
               before committing. If tests fail, retry once with adjusted approach.
             - Commit message: `refactor(sonar): fix ${{ matrix.rule }} in ${{ matrix.module }}`
             - Do NOT touch the allowlist or workflow files.
+
+            After fixing, compounding (조건부):
+            - 수정이 단순 문법 치환(1줄 변경)이면 생략.
+            - 비자명한 판단이 필요했거나 패턴이 반복될 것 같으면
+              `.claude/docs/solutions/sonar-${{ matrix.rule }}.md` 에 아래 형식으로 기록:
+              ```
+              ---
+              rule: ${{ matrix.rule }}
+              module: ${{ matrix.module }}
+              date: (오늘 날짜)
+              ---
+              ## 문제
+              (룰이 잡는 패턴 한 줄 요약)
+
+              ## 접근법
+              (어떻게 고쳤는지, 왜 이 방법을 선택했는지)
+
+              ## 주의사항
+              (엣지 케이스나 실패했던 접근법이 있으면 기록)
+              ```
+            - 파일이 이미 존재하면 덮어쓰지 말고 하단에 append.
 
       - name: Dry-run notice
         if: vars.SONAR_FIX_ACTIVE != 'true'
