@@ -24,54 +24,25 @@
 
 <img width="1996" height="970" alt="infrastructure diagram" src="https://github.com/user-attachments/assets/7c6a6f0c-e5c3-42ec-818c-9830010502bb" />
 
-
-```
-[ Instance A ] ap-northeast-2a / EIP: 3.34.32.206
-  ├── nginx (80/443, Let's Encrypt)
-  └── app-server (Spring Boot, -Xmx400m)
-
-[ Instance B ] ap-northeast-2c / EIP: 52.79.62.33
-  ├── nginx (80/443 — api + registry)
-  ├── app-server (Spring Boot, -Xmx400m)
-  ├── redis:7-alpine
-  ├── registry (registry.ssolv.site)
-  └── alloy + node/nginx/redis-exporter
-
-[ RDS ] MySQL 8.0.43 / db.t3.micro / private subnet
-[ Route53 ] api.ssolv.site — Multivalue Answer + health-check based failover
-```
-
-**IaC**: Terraform (`deploy/terraform/`) — `app_instance_count` 변수로 단일↔멀티 서버 전환
-
-```bash
-cd deploy/terraform
-terraform plan
-terraform apply
-```
-
-> 인프라 설계 배경 및 의사결정: `.claude/infra/DECISIONS.md`
+**IaC**: Terraform (`deploy/terraform/`)
 
 ---
 
 
-## CI/CD
+## Claude Architecture
 
-| Workflow | Trigger | Description |
+Claude Code를 단순 코드 생성 도구가 아닌 **팀의 코드 품질 루프에 통합된 에이전트**로 운영합니다.
+
+<img width="100%" alt="claude architecture" src="docs/assets/claude-architecture.png" />
+
+| 레이어 | 구성 요소 | 역할 |
 |---|---|---|
-| **CI** | PR → `dev` | Build + Test + Jacoco coverage + SonarQube |
-| **CD** | Push → `main` | Jib image build → Rolling deploy (A → B) |
-
-**배포 흐름 (무중단 롤링)**
-```
-main push
-  └── Jib build & push → registry.ssolv.site
-        └── Deploy Instance A
-              └── health check 통과 확인
-                    └── Deploy Instance B
-```
-
-> Instance A를 먼저 배포하고 healthy 상태 확인 후 B를 배포합니다.
-> Route53 Multivalue Answer가 A 헬스체크 실패를 감지하는 동안 B가 트래픽을 처리합니다.
+| **기준/규칙** | `CLAUDE.md` | 프로젝트 컨벤션, 금지 패턴, 아키텍처 규칙을 Claude가 참조 |
+| **실행** | Skills / Commands | 도메인별 작업 단위 — API 패턴, 테스트, 인증, 배포 등 |
+| **로컬 Harness** | pre-commit / pre-push Hook | ktlint 검증 + 전체 테스트. 위반 시 푸시 차단 |
+| **Remote Harness** | CI (GitHub Actions) | Lint · Build · Test · SonarQube 분석 |
+| **Fix-Feedback Loop** | Sonar → Issue → PR | SonarQube 이슈를 GitHub Issue로 수집 → 담당자 승인 → Claude가 Worktree별 자동 수정 PR 생성 |
+| **Compounding Layer** | Memory · Skill · Hook · Command | 유의미한 결과(실수 포함)를 축적해 다음 판단에 반영 |
 
 ---
 
@@ -95,3 +66,25 @@ ssolv-api-core  ──┐
                   ├──▶ ssolv-api-common ──▶ ssolv-domain        ──▶ ssolv-global-utils
 ssolv-api-place ──┘                     ──▶ ssolv-infrastructure ──▶ ssolv-domain
 ```
+
+---
+
+
+## CI/CD
+
+| Workflow | Trigger | Description |
+|---|---|---|
+| **CI** | PR → `dev` | Build + Test + Jacoco coverage + SonarQube |
+| **CD** | Push → `main` | Jib image build → Rolling deploy (A → B) |
+
+**배포 흐름 (무중단 롤링)**
+```
+main push
+  └── Jib build & push → registry.ssolv.site
+        └── Deploy Instance A
+              └── health check 통과 확인
+                    └── Deploy Instance B
+```
+
+> Instance A를 먼저 배포하고 healthy 상태 확인 후 B를 배포합니다.
+> Route53 Multivalue Answer가 A 헬스체크 실패를 감지하는 동안 B가 트래픽을 처리합니다.
