@@ -49,6 +49,19 @@ feat: migrate external clients from WebClient to Ktor Client
 - 메시지는 영문 소문자로 시작, 마침표 없음
 - 제목은 72자 이내
 
+## 작업 시작 순서 (중요)
+
+PR 작성 전에 **반드시 이슈를 먼저 만든다** — 브랜치 네이밍이 이슈 번호를 요구하기 때문.
+
+```
+1. gh issue create  → 이슈 번호 확보 (예: #187)
+2. git checkout -b feat/#187  → 이슈 번호로 브랜치
+3. 작업 → commit → push
+4. gh pr create  → PR 본문에 "Close #187" 또는 "Resolves #187"
+```
+
+이슈 없이 작업이 시작된 경우(예: 핫픽스): 작업 도중에라도 이슈를 만들고 브랜치명을 맞춘다. 이미 push 한 PR 이라도 다음 PR 부터는 이 순서를 지킨다.
+
 ## 브랜치 네이밍
 
 ```
@@ -60,18 +73,29 @@ feat: migrate external clients from WebClient to Ktor Client
 - `fix/#456`
 - `refactor/#169`
 
+❌ 안티 패턴: `feat/sonar-auto-fix-workflow` (이슈 번호 없이 설명형 슬러그) — PR #186 회고 참조
+
 ## PR 작성
 
 `.github/PULL_REQUEST_TEMPLATE.md` 양식은 **무시하고** 아래 형식을 사용한다. 가치 중심 서술이 핵심 — "무엇을 바꿨는가"보다 "왜 이 변경이 필요했는가"를 먼저 전달한다.
 
+### 언어 규칙
+
+- **PR 제목**: 영문 (Conventional Commits 와 동일 규약 — `type(scope): message`, 소문자 시작, 72자 이내)
+- **PR 본문**: **한국어로 작성** (헤딩은 영문 `## Summary` / `## Test plan` 유지, 본문 내용은 한국어)
+- **커밋 메시지**: 영문 (commit-msg-check.sh 훅이 강제)
+- **이슈 본문**: 한국어
+
+### 본문 형식
+
 ```markdown
 ## Summary
 
-<변경의 맥락과 목적을 1~2문장으로>
+<변경의 맥락과 목적을 1~2문장의 한국어로>
 
 ### <변경 묶음 1 제목> (커밋이 여러 개거나 주제가 나뉠 때만 ### 사용)
 
-- 핵심 변경 사항과 이유
+- 핵심 변경 사항과 이유 (한국어)
 - 설계 결정이 있으면 why를 포함
 
 ### <변경 묶음 2 제목>
@@ -94,6 +118,7 @@ feat: migrate external clients from WebClient to Ktor Client
 - 커밋이 여러 개이거나 주제가 나뉠 때만 `###` 서브섹션 사용
 - 설계 결정이 있으면 **(a) / (b) / ...** 형식으로 명시 (왜 다른 방법이 아닌지 포함)
 - Test plan은 실제로 검증한 것만 — 형식적 체크리스트 금지
+- 헤딩은 영문 그대로(`## Summary`, `## Test plan`), 본문 텍스트만 한국어
 
 **PR 머지 대상**: `dev` 브랜치 (CI는 `dev` 브랜치 PR에서 트리거됨)
 
