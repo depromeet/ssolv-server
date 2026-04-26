@@ -1,0 +1,269 @@
+name: Sonar Auto-Fix Dispatch
+
+# Sonar Auto-Fix Queue 이슈에서 `/sonar-fix run` 코멘트가 달리면, 체크된 그룹을 파싱해
+# 그룹별로 브랜치를 만들고 Claude 가 수정한 PR 을 자동 생성한다.
+#
+# 활성화 조건 (모두 만족 필요):
+#   1. ANTHROPIC_API_KEY secret 설정
+#   2. Sonar Auto-Fix Queue 이슈가 sonar-issue.yml 로 생성되어 있어야 함
+#   3. 코멘트 작성자가 repo 의 write 권한 보유
+#
+# 안전장치:
+#   - max-parallel: 1 로 직렬 실행 — 동일 파일 충돌/race 방지
+#   - 실패 시 이슈에 escalate 코멘트
+#   - 🟡 그룹은 PR 만 생성, auto-merge 라벨 안 붙임
+#   - BUG 또는 VULNERABILITY 가 섞이면 자동 머지 차단
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      group_ids:
+        description: 'Comma-separated group IDs (e.g. auto_safe-kotlin_S6518-ssolv-api-common)'
+        required: true
+      issue_number:
+        description: 'Source issue number for status reporting'
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  ISSUE_LABEL: sonar-auto-fix-queue
+  TRIGGER_PHRASE: '/sonar-fix run'
+
+jobs:
+  # ── Job 1: Parse approval & extract group IDs ─────────────────────
+  parse:
+    name: Parse approval
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request == null &&
+       contains(github.event.comment.body, '/sonar-fix run'))
+    outputs:
+      group_ids: ${{ steps.extract.outputs.group_ids }}
+      issue_number: ${{ steps.extract.outputs.issue_number }}
+      # workflow_dispatch / issue_comment 두 경로 중 하나만 채워지므로 OR 결합.
+      authorized: ${{ steps.authz.outputs.authorized || steps.authz_dispatch.outputs.authorized }}
+
+    steps:
+      - name: Authorize commenter
+        id: authz
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          REPO: ${{ github.repository }}
+        run: |
+          # write 권한 이상만 허용
+          permission=$(gh api "/repos/$REPO/collaborators/$ACTOR/permission" \
+            --jq '.permission' 2>/dev/null || echo "none")
+          if [[ "$permission" == "admin" || "$permission" == "write" || "$permission" == "maintain" ]]; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "authorized=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::User $ACTOR (permission=$permission) is not authorized."
+          fi
+
+      - name: Authorize dispatch
+        id: authz_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "authorized=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout (for issue body parsing)
+        if: github.event_name == 'issue_comment'
+        uses: actions/checkout@v4
+
+      - name: Extract checked group IDs
+        id: extract
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          DISPATCH_IDS: ${{ github.event.inputs.group_ids }}
+          DISPATCH_ISSUE: ${{ github.event.inputs.issue_number }}
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            echo "group_ids=$DISPATCH_IDS" >> "$GITHUB_OUTPUT"
+            echo "issue_number=$DISPATCH_ISSUE" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          body=$(gh issue view "$ISSUE_NUMBER" --json body --jq '.body')
+          # `[x]` 또는 `[X]` 가 체크된 라인에서 group ID (백틱으로 감싼 첫 토큰) 추출
+          ids=$(echo "$body" | grep -E '^### `\[[xX]\]`' \
+            | grep -oE '`[a-z_]+-[a-zA-Z0-9_]+-ssolv-[a-z-]+`' \
+            | tr -d '`' \
+            | sort -u \
+            | tr '\n' ',' | sed 's/,$//')
+          echo "Detected group IDs: $ids"
+          echo "group_ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+  # ── Job 2: Build fix matrix ───────────────────────────────────────
+  build-matrix:
+    name: Build fix matrix
+    needs: parse
+    if: needs.parse.outputs.authorized == 'true' && needs.parse.outputs.group_ids != ''
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build matrix
+        id: build
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GROUP_IDS: ${{ needs.parse.outputs.group_ids }}
+        run: |
+          python3 .claude/scripts/sonar-fetch.py --output json > sonar.json
+          # 선택된 group_ids 만 매트릭스로 변환. 직렬 실행은 strategy.max-parallel: 1
+          # 에서 일괄 적용하므로 그룹별 conflict_with 메타데이터는 채우지 않는다.
+          python3 - "$GROUP_IDS" <<'PY' >> "$GITHUB_OUTPUT"
+          import json, sys
+          ids = set(s.strip() for s in sys.argv[1].split(',') if s.strip())
+          with open('sonar.json') as f: data = json.load(f)
+          selected = [g for g in data['groups'] if g['id'] in ids]
+          matrix = {'include': selected}
+          print(f"matrix={json.dumps(matrix)}")
+          PY
+
+  # ── Job 3: Fix each group ─────────────────────────────────────────
+  fix:
+    name: Fix ${{ matrix.id }}
+    needs: [parse, build-matrix]
+    if: needs.build-matrix.outputs.matrix != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # 같은 파일을 건드리는 그룹이 동시에 push 되면 race / rebase 가 발생하므로
+      # 안전하게 직렬화한다. 빈도가 주 1회 수준이라 처리량보다 안전성을 우선.
+      max-parallel: 1
+      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Create branch
+        env:
+          GROUP_ID: ${{ matrix.id }}
+        run: |
+          branch="auto/sonar-fix/${GROUP_ID}"
+          # Sanitize: replace anything but [a-zA-Z0-9/_-]
+          branch=$(echo "$branch" | tr -c 'a-zA-Z0-9/_-' '-')
+          echo "BRANCH=$branch" >> "$GITHUB_ENV"
+          git checkout -b "$branch"
+
+      # GitHub Actions expression 의 `'\n'` 은 리터럴 백슬래시-n 으로 해석되므로
+      # 파일 목록을 별도 step 에서 JSON 배열을 풀어 multiline 문자열로 만든다.
+      - name: Format file list
+        id: files
+        env:
+          FILES_JSON: ${{ toJson(matrix.files) }}
+        run: |
+          {
+            echo 'list<<__EOF__'
+            python3 -c "import json,os; print('\n'.join(json.loads(os.environ['FILES_JSON'])))"
+            echo '__EOF__'
+          } >> "$GITHUB_OUTPUT"
+
+      # ─────────────────────────────────────────────────────────────
+      # 활성화 모드: ANTHROPIC_API_KEY 가 secrets 에 있으면 Claude Code Action 으로 수정.
+      # 비활성화 모드 (기본): stub 만 실행, PR 생성 안 함. 안전한 dry-run.
+      #
+      # 활성화 절차:
+      #   1. ANTHROPIC_API_KEY secret 등록
+      #   2. repo variable SONAR_FIX_ACTIVE = 'true' 설정
+      # ─────────────────────────────────────────────────────────────
+      - name: Run Claude Code Action
+        if: vars.SONAR_FIX_ACTIVE == 'true'
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are fixing SonarCloud issues for a single (rule × module) group.
+
+            Group ID: ${{ matrix.id }}
+            Rule: ${{ matrix.rule }}
+            Module: ${{ matrix.module }}
+            Reason: ${{ matrix.reason }}
+            Files to fix:
+            ${{ steps.files.outputs.list }}
+
+            Constraints:
+            - Only modify the listed files. Do not refactor unrelated code.
+            - Run `./gradlew :${{ matrix.module }}:ktlintFormat :${{ matrix.module }}:test`
+              before committing. If tests fail, retry once with adjusted approach.
+            - Commit message: `refactor(sonar): fix ${{ matrix.rule }} in ${{ matrix.module }}`
+            - Do NOT touch the allowlist or workflow files.
+
+      - name: Dry-run notice
+        if: vars.SONAR_FIX_ACTIVE != 'true'
+        env:
+          GROUP_ID: ${{ matrix.id }}
+        run: |
+          echo "::notice::Dry-run mode (SONAR_FIX_ACTIVE != 'true'). No PR will be created."
+          echo "Group: $GROUP_ID"
+          echo "Files: ${{ join(matrix.files, ' ') }}"
+
+      - name: Run local harness
+        if: vars.SONAR_FIX_ACTIVE == 'true'
+        run: ./gradlew ktlintCheck test --continue
+
+      - name: Push & open PR
+        if: vars.SONAR_FIX_ACTIVE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push -u origin "$BRANCH"
+          classification="${{ matrix.classification }}"
+          labels="sonar-auto-fix"
+          if [[ "$classification" == "auto_safe" ]]; then
+            labels="$labels,auto-merge"
+          else
+            labels="$labels,review-required"
+          fi
+          gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --title "refactor(sonar): fix ${{ matrix.rule }} in ${{ matrix.module }}" \
+            --body "Auto-generated by sonar-fix.yml. Source issue: #${{ needs.parse.outputs.issue_number }}. Group: \`${{ matrix.id }}\` (${{ matrix.count }}건)." \
+            --label "$labels"
+
+  # ── Job 4: Report back to source issue ────────────────────────────
+  report:
+    name: Report to issue
+    needs: [parse, fix]
+    if: always() && needs.parse.outputs.issue_number != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ needs.parse.outputs.issue_number }}
+          FIX_RESULT: ${{ needs.fix.result }}
+        run: |
+          status_emoji='✅'
+          [[ "$FIX_RESULT" != "success" ]] && status_emoji='⚠️'
+          gh issue comment "$ISSUE_NUMBER" --body \
+            "$status_emoji sonar-fix run finished — result: \`$FIX_RESULT\`. See workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

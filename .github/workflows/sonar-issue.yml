@@ -1,0 +1,82 @@
+name: Sonar Auto-Fix Queue (Issue)
+
+# 매일 00:00 KST (= 전날 15:00 UTC) 또는 수동 트리거 시 SonarCloud 결과를
+# 그룹화하여 GitHub Issue 체크리스트로 갱신한다.
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 15:00 UTC = 00:00 KST (다음날)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sonar-auto-fix-queue
+  cancel-in-progress: false
+
+env:
+  ISSUE_LABEL: sonar-auto-fix-queue
+  ISSUE_TITLE: '[Sonar] Auto-Fix Queue'
+
+jobs:
+  upsert-issue:
+    name: Upsert Sonar Issue
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate issue body
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          python3 .claude/scripts/sonar-fetch.py --output markdown > issue-body.md
+          echo "----- preview -----"
+          head -20 issue-body.md
+          echo "----- (truncated) -----"
+
+      - name: Ensure label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh label list --limit 200 | grep -q "^${ISSUE_LABEL}\b"; then
+            gh label create "$ISSUE_LABEL" \
+              --description "Sonar auto-fix queue (managed by sonar-issue.yml)" \
+              --color BFD4F2
+          fi
+
+      - name: Find existing open issue
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          number=$(gh issue list \
+            --label "$ISSUE_LABEL" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Update or create issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXISTING: ${{ steps.find.outputs.number }}
+        run: |
+          if [ -n "$EXISTING" ]; then
+            echo "Updating issue #$EXISTING"
+            gh issue edit "$EXISTING" --body-file issue-body.md
+          else
+            echo "Creating new issue"
+            gh issue create \
+              --title "$ISSUE_TITLE" \
+              --body-file issue-body.md \
+              --label "$ISSUE_LABEL"
+          fi
