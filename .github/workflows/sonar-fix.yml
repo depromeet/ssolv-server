@@ -200,7 +200,7 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
+          direct_prompt: |
             You are fixing SonarCloud issues for a single (rule × module) group.
 
             Group ID: ${{ matrix.id }}
