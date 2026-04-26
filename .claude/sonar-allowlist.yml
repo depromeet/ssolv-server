@@ -1,0 +1,64 @@
+# SonarCloud auto-fix allowlist
+#
+# 이 파일은 sonar-fetch.py 가 읽어서 자동화 범위를 결정한다.
+# 룰을 추가/제거할 때는 반드시 PR 머지 이력(회귀 발생 여부)을 근거로 한다.
+#
+# 분류 기준:
+#   auto_safe        — Claude 가 수정 후 자동 머지까지 진행
+#   auto_with_review — Claude 가 PR 만 생성, 사람 리뷰 후 머지
+#   manual_only      — 자동화 제외, GitHub Issue 에 알림만 노출
+#
+# 처음 등록 기준은 실제 SonarCloud 결과(2026-04-25 30건)를 보고 안전성 평가한 결과다.
+
+auto_safe:
+  - rule: kotlin:S6518
+    reason: "Replace function call with indexed accessor — `.get(k)` → `[k]` 순수 문법 치환"
+  - rule: kotlin:S1144
+    reason: "Remove unused private method — 호출자 grep 으로 안전 확인 가능"
+  - rule: kotlin:S1172
+    reason: "Use `_` for unused lambda parameter — 의미 보존"
+  - rule: kotlin:S1125
+    reason: "Remove unnecessary boolean literal — `if (x) true else false` → `x`"
+  - rule: kotlin:S1481
+    reason: "Remove unused local variable"
+  - rule: kotlin:S125
+    reason: "Remove commented-out code"
+  - rule: kotlin:S6605
+    reason: "Use isEmpty/isNotEmpty — 의미 보존"
+  - rule: kotlin:S1155
+    reason: "Use isNotEmpty instead of size > 0"
+  - rule: kotlin:S1128
+    reason: "Remove unused imports"
+  - rule: kotlin:S6611
+    reason: "Use indexed access on map — 안전한 문법 치환"
+
+auto_with_review:
+  - rule: kotlin:S6524
+    reason: "Make collection immutable — 호출자가 add() 호출 시 깨질 위험"
+  - rule: kotlin:S6619
+    reason: "Remove useless non-null check — 흐름 분석 변경 시 깨질 수 있음"
+  - rule: kotlin:S6532
+    reason: "Replace if/throw with require/error — 예외 타입 변경됨"
+  - rule: kotlin:S6517
+    reason: "Functional interface 변환 — public API 시그니처 영향"
+
+manual_only:
+  - rule: kotlin:S6311
+    reason: "Dispatcher 결정은 비동기 설계 영향, 도메인 맥락 필요"
+  - rule: kotlin:S6310
+    reason: "Hardcoded dispatcher — 동일"
+  - rule: kotlin:S1874
+    reason: "Deprecated API 사용 — 대체 API 결정은 도메인 결정"
+  - rule: kotlin:S3776
+    reason: "Cognitive complexity — 리팩토링은 도메인 맥락 필요"
+  - rule: kotlin:S138
+    reason: "Function too long — 분리 결정은 사람 판단"
+
+# 공통 필터 (auto_safe / auto_with_review 양쪽에 적용)
+filters:
+  max_effort_minutes: 30
+  min_age_days: 7              # 갓 만든 이슈는 작성자가 직접 고치도록 유예
+  exclude_paths:
+    - "**/test/**"
+    - "**/testFixtures/**"
+  required_assignee: null      # null = unassigned 만 대상
