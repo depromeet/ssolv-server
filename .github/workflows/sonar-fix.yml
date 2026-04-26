@@ -171,7 +171,8 @@ jobs:
         run: |
           branch="auto/sonar-fix/${GROUP_ID}"
           # Sanitize: replace anything but [a-zA-Z0-9/_-]
-          branch=$(echo "$branch" | tr -c 'a-zA-Z0-9/_-' '-')
+          # printf '%s' avoids echo's trailing newline being converted to '-' by tr
+          branch=$(printf '%s' "$branch" | tr -c 'a-zA-Z0-9/_-' '-')
           echo "BRANCH=$branch" >> "$GITHUB_ENV"
           git checkout -b "$branch"
 
@@ -252,13 +253,20 @@ jobs:
 
       - name: Run local harness
         if: vars.SONAR_FIX_ACTIVE == 'true'
-        run: ./gradlew ktlintCheck test --continue
+        run: ./gradlew :${{ matrix.module }}:ktlintFormat :${{ matrix.module }}:test
 
       - name: Push & open PR
         if: vars.SONAR_FIX_ACTIVE == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # claude-code-action may have committed to a detached or different branch;
+          # make sure we are on our intended branch before pushing.
+          git checkout "$BRANCH" 2>/dev/null || true
+          if git diff --quiet "origin/dev...HEAD"; then
+            echo "::warning::No commits beyond dev — Claude may not have made changes. Skipping PR."
+            exit 0
+          fi
           git push -u origin "$BRANCH"
           classification="${{ matrix.classification }}"
           labels="sonar-auto-fix"
@@ -268,6 +276,7 @@ jobs:
             labels="$labels,review-required"
           fi
           gh pr create \
+            --repo ${{ github.repository }} \
             --base dev \
             --head "$BRANCH" \
             --title "refactor(sonar): fix ${{ matrix.rule }} in ${{ matrix.module }}" \
@@ -289,5 +298,6 @@ jobs:
         run: |
           status_emoji='✅'
           [[ "$FIX_RESULT" != "success" ]] && status_emoji='⚠️'
-          gh issue comment "$ISSUE_NUMBER" --body \
-            "$status_emoji sonar-fix run finished — result: \`$FIX_RESULT\`. See workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue comment "$ISSUE_NUMBER" \
+            --repo ${{ github.repository }} \
+            --body "$status_emoji sonar-fix run finished — result: \`$FIX_RESULT\`. See workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
