@@ -157,11 +157,9 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Create branches & post instructions
+      - name: Create branches & write run guide to summary
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MATRIX_JSON: ${{ needs.build-matrix.outputs.matrix }}
-          ISSUE_NUMBER: ${{ needs.parse.outputs.issue_number }}
           REPO: ${{ github.repository }}
         run: |
           cat > /tmp/prepare.py << 'PYEOF'
@@ -169,19 +167,19 @@ jobs:
 
           matrix = json.loads(os.environ['MATRIX_JSON'])
           groups = matrix['include']
-          issue_number = os.environ.get('ISSUE_NUMBER', '')
           repo = os.environ['REPO']
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
           allowed = 'Edit,MultiEdit,Glob,Grep,LS,Read,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(./gradlew:*)'
 
           blocks = []
           for g in groups:
-              gid       = g['id']
-              rule      = g['rule']
-              module    = g['module']
-              reason    = g.get('reason', '')
-              files     = g.get('files', [])
-              classif   = g.get('classification', 'auto_with_review')
-              count     = g.get('count', len(files))
+              gid     = g['id']
+              rule    = g['rule']
+              module  = g['module']
+              reason  = g.get('reason', '')
+              files   = g.get('files', [])
+              classif = g.get('classification', 'auto_with_review')
+              count   = g.get('count', len(files))
 
               branch = re.sub(r'[^a-zA-Z0-9/_-]', '-', f'auto/sonar-fix/{gid}')
 
@@ -197,7 +195,7 @@ jobs:
               prompt = (
                   f'Fix SonarCloud rule {rule} in module {module}. '
                   f'{reason}. '
-                  f'Only modify: {chr(34)}{", ".join(files)}{chr(34)}. '
+                  f'Only modify: {", ".join(files)}. '
                   f'Run ./gradlew :{module}:ktlintFormat :{module}:test before committing. '
                   f'Commit message: refactor(sonar): fix {rule} in {module}.'
               )
@@ -219,17 +217,9 @@ jobs:
               )
               blocks.append(block)
 
-          body = '🔧 Fix 브랜치 생성 완료. 로컬에서 각 그룹 순서대로 실행하세요:\n\n' + '\n\n---\n'.join(blocks)
+          body = '## 🔧 Sonar Fix 브랜치 생성 완료\n\n로컬에서 각 그룹 순서대로 실행하세요.\n\n' + '\n\n---\n'.join(blocks)
 
-          if issue_number:
-              result = subprocess.run(
-                  ['gh', 'issue', 'comment', issue_number, '--repo', repo, '--body', body],
-                  capture_output=True, text=True
-              )
-              if result.returncode != 0:
-                  print(result.stderr, file=sys.stderr)
-                  sys.exit(1)
-          else:
-              print(body)
+          with open(summary_file, 'a') as f:
+              f.write(body + '\n')
           PYEOF
           python3 /tmp/prepare.py
