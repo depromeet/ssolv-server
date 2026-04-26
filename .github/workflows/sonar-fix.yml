@@ -201,6 +201,8 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # gradle 실행 허용 + GitHub issue comment MCP 제외 (댓글 스팸 방지)
+          allowed_tools: "Edit,MultiEdit,Glob,Grep,LS,Read,Write,Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(./gradlew:*)"
           direct_prompt: |
             You are fixing SonarCloud issues for a single (rule × module) group.
 
