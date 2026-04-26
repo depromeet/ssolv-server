@@ -161,20 +161,14 @@ jobs:
           fetch-depth: 0
 
       - name: Configure git
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-      - name: Create branch
         env:
           GROUP_ID: ${{ matrix.id }}
         run: |
-          branch="auto/sonar-fix/${GROUP_ID}"
-          # Sanitize: replace anything but [a-zA-Z0-9/_-]
-          # printf '%s' avoids echo's trailing newline being converted to '-' by tr
-          branch=$(printf '%s' "$branch" | tr -c 'a-zA-Z0-9/_-' '-')
-          echo "BRANCH=$branch" >> "$GITHUB_ENV"
-          git checkout -b "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Target branch name — action creates its own claude/... branch, we rename it after.
+          target="auto/sonar-fix/$(printf '%s' "$GROUP_ID" | tr -c 'a-zA-Z0-9/_-' '-')"
+          echo "BRANCH=$target" >> "$GITHUB_ENV"
 
       # GitHub Actions expression 의 `'\n'` 은 리터럴 백슬래시-n 으로 해석되므로
       # 파일 목록을 별도 step 에서 JSON 배열을 풀어 multiline 문자열로 만든다.
@@ -196,6 +190,9 @@ jobs:
       # 활성화 절차:
       #   1. ANTHROPIC_API_KEY secret 등록
       #   2. repo variable SONAR_FIX_ACTIVE = 'true' 설정
+      #
+      # 주의: claude-code-action 은 항상 자체 claude/issue-{N}-{date} 브랜치를 생성한다.
+      # 따라서 "Create branch" step 은 없애고, action 완료 후 해당 브랜치를 rename 한다.
       # ─────────────────────────────────────────────────────────────
       - name: Run Claude Code Action
         if: vars.SONAR_FIX_ACTIVE == 'true'
@@ -220,6 +217,7 @@ jobs:
               before committing. If tests fail, retry once with adjusted approach.
             - Commit message: `refactor(sonar): fix ${{ matrix.rule }} in ${{ matrix.module }}`
             - Do NOT touch the allowlist or workflow files.
+            - Do NOT run git push. The CI pipeline will handle pushing.
 
             After fixing, compounding (조건부):
             - 수정이 단순 문법 치환(1줄 변경)이면 생략.
@@ -248,26 +246,26 @@ jobs:
           GROUP_ID: ${{ matrix.id }}
         run: |
           echo "::notice::Dry-run mode (SONAR_FIX_ACTIVE != 'true'). No PR will be created."
-          echo "Group: $GROUP_ID"
+          echo "Group: ${{ matrix.id }}"
           echo "Files: ${{ join(matrix.files, ' ') }}"
-
-      - name: Run local harness
-        if: vars.SONAR_FIX_ACTIVE == 'true'
-        run: ./gradlew :${{ matrix.module }}:ktlintFormat :${{ matrix.module }}:test
 
       - name: Push & open PR
         if: vars.SONAR_FIX_ACTIVE == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # claude-code-action may have committed to a detached or different branch;
-          # make sure we are on our intended branch before pushing.
-          git checkout "$BRANCH" 2>/dev/null || true
-          if git diff --quiet "origin/dev...HEAD"; then
-            echo "::warning::No commits beyond dev — Claude may not have made changes. Skipping PR."
+          # claude-code-action creates its own claude/issue-... branch and commits there.
+          # Rename it to our target branch name, then push.
+          current=$(git branch --show-current)
+          echo "Current branch after action: $current"
+          if [ -z "$current" ] || git diff --quiet "origin/dev...HEAD"; then
+            echo "::warning::No commits beyond dev — Claude made no changes. Skipping PR."
             exit 0
           fi
+          git branch -m "$current" "$BRANCH"
           git push -u origin "$BRANCH"
+          # If Claude pushed the old branch name, delete it from remote.
+          [ -n "$current" ] && git push origin --delete "$current" 2>/dev/null || true
           classification="${{ matrix.classification }}"
           labels="sonar-auto-fix"
           if [[ "$classification" == "auto_safe" ]]; then
