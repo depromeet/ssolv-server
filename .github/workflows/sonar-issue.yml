@@ -5,7 +5,7 @@ name: Sonar Auto-Fix Queue (Issue)
 
 on:
   schedule:
-    - cron: '0 15 * * *'   # 15:00 UTC = 00:00 KST (다음날)
+    - cron: '0 15 */3 * *'  # 15:00 UTC = 00:00 KST, 3일마다
   workflow_dispatch:
 
 permissions:
@@ -53,30 +53,28 @@ jobs:
               --color BFD4F2
           fi
 
-      - name: Find existing open issue
-        id: find
+      - name: Create issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          number=$(gh issue list \
+          issue_number=$(gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body-file issue-body.md \
             --label "$ISSUE_LABEL" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-          echo "number=${number}" >> "$GITHUB_OUTPUT"
+            --json number --jq '.number')
+          echo "Created issue #$issue_number"
 
-      - name: Update or create issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EXISTING: ${{ steps.find.outputs.number }}
-        run: |
-          if [ -n "$EXISTING" ]; then
-            echo "Updating issue #$EXISTING"
-            gh issue edit "$EXISTING" --body-file issue-body.md
-          else
-            echo "Creating new issue"
-            gh issue create \
-              --title "$ISSUE_TITLE" \
-              --body-file issue-body.md \
-              --label "$ISSUE_LABEL"
-          fi
+          {
+            echo '## 실행 방법'
+            echo ''
+            echo '체크할 항목 선택 후 아래 명령어를 로컬에서 실행하세요.'
+            echo ''
+            echo '```bash'
+            echo "python3 .claude/scripts/sonar-fix-local.py --issue ${issue_number}"
+            echo '```'
+            echo ''
+            echo '---'
+            echo ''
+            cat issue-body.md
+          } > issue-body-final.md
+          gh issue edit "$issue_number" --body-file issue-body-final.md

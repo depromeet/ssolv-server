@@ -5,7 +5,10 @@ import org.depromeet.team3.common.BaseTimeEntity
 import org.depromeet.team3.notification.domain.DevicePlatform
 
 @Entity
-@Table(name = "tb_device_tokens")
+@Table(
+    name = "tb_device_tokens",
+    uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "platform"])],
+)
 class DeviceTokenEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

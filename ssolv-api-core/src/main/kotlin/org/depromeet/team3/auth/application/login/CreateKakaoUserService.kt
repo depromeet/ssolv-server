@@ -10,6 +10,7 @@ import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
+import kotlin.random.Random
 
 @Service
 class CreateKakaoUserService(
@@ -29,28 +30,21 @@ class CreateKakaoUserService(
                 val userEntity: UserEntity = if (existingBySocial != null) {
                     existingBySocial
                 } else {
-                    // 2. 닉네임 중복 확인
-                    userJpaRepository.findByNickname(nickname)?.let {
-                        throw AuthException(
-                            errorCode = ErrorCode.DUPLICATE_NICKNAME,
-                            detail = mapOf("nickname" to nickname),
-                        )
-                    }
-
-                    // 3. 이메일 중복 확인 (다른 로그인이면 중석 체크)
+                    // 2. 이메일 중복 확인 (다른 로그인이면 중복 체크)
                     userJpaRepository.findByEmail(userEmail)?.let {
                         throw AuthException(
                             errorCode = ErrorCode.ALREADY_REGISTERED_WITH_OTHER_LOGIN,
                             detail = mapOf("provider" to it.provider.name),
                         )
                     }
-                    // 3. 신규 회원 생성
+                    // 3. 신규 회원 생성 (닉네임 충돌 시 suffix 자동 부여)
+                    val uniqueNickname = resolveUniqueNickname(nickname)
                     userJpaRepository.save(
                         UserEntity(
                             provider = AuthProvider.KAKAO,
                             socialId = socialId,
                             email = userEmail,
-                            nickname = nickname,
+                            nickname = uniqueNickname,
                             profileImage = profileImage,
                             refreshToken = null,
                         ),
@@ -79,4 +73,11 @@ class CreateKakaoUserService(
                 )
             }!!
         }
+
+    private fun resolveUniqueNickname(base: String): String {
+        if (userJpaRepository.findByNickname(base) == null) return base
+        var candidate: String
+        do { candidate = "$base${Random.nextInt(1000, 9999)}" } while (userJpaRepository.findByNickname(candidate) != null)
+        return candidate
+    }
 }

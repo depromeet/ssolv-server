@@ -1,61 +1,43 @@
 name: Sonar Auto-Fix Dispatch
 
-# Sonar Auto-Fix Queue 이슈에서 `/sonar-fix run` 코멘트가 달리면, 체크된 그룹을
-# 파싱해 그룹별 브랜치를 생성하고 이슈에 로컬 실행 가이드를 코멘트로 남긴다.
+# /sonar-fix run 코멘트 또는 workflow_dispatch 로 트리거.
+# 이슈에서 체크된 group ID를 파싱해 Actions Summary에 로컬 실행 명령 한 줄을 출력한다.
 #
-# 흐름:
-#   1. 이슈에서 체크된 group ID 파싱
-#   2. SonarCloud에서 그룹 메타 조회 (sonar-fetch.py)
-#   3. 그룹별 auto/sonar-fix/<id> 브랜치 생성 & push
-#   4. 이슈에 `claude -p "..."` 로컬 실행 가이드 코멘트
+# 로컬 실행 (이 워크플로가 출력하는 명령):
+#   python3 .claude/scripts/sonar-fix-local.py --issue <issue_number>
 #
-# 로컬 실행:
-#   git fetch && git checkout auto/sonar-fix/<id>
-#   claude -p "..." --allowedTools "..."
-#   git push
-#   gh pr create ...
-#
-# 활성화 조건:
-#   - 코멘트 작성자가 repo write 권한 보유
+# sonar-fix-local.py 가 각 그룹에 대해:
+#   1. auto/sonar-fix/<id> 브랜치 생성 (origin/dev 기준)
+#   2. claude -p "..." 로컬 실행 (Claude.ai 구독 사용 — API 크레딧 불필요)
+#   3. git push + gh pr create 자동화
 
 on:
   issue_comment:
     types: [created]
   workflow_dispatch:
     inputs:
-      group_ids:
-        description: 'Comma-separated group IDs (e.g. auto_safe-kotlin_S6518-ssolv-api-common)'
-        required: true
       issue_number:
-        description: 'Source issue number for status reporting'
-        required: false
+        description: 'Source issue number'
+        required: true
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
+  issues: read
 
 env:
-  ISSUE_LABEL: sonar-auto-fix-queue
   TRIGGER_PHRASE: '/sonar-fix run'
 
 jobs:
-  # ── Job 1: Parse approval & extract group IDs ─────────────────────
-  parse:
-    name: Parse approval
+  dispatch:
+    name: Dispatch local fix
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.issue.pull_request == null &&
        contains(github.event.comment.body, '/sonar-fix run'))
-    outputs:
-      group_ids: ${{ steps.extract.outputs.group_ids }}
-      issue_number: ${{ steps.extract.outputs.issue_number }}
-      authorized: ${{ steps.authz.outputs.authorized || steps.authz_dispatch.outputs.authorized }}
 
     steps:
       - name: Authorize commenter
-        id: authz
         if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,162 +46,36 @@ jobs:
         run: |
           permission=$(gh api "/repos/$REPO/collaborators/$ACTOR/permission" \
             --jq '.permission' 2>/dev/null || echo "none")
-          if [[ "$permission" == "admin" || "$permission" == "write" || "$permission" == "maintain" ]]; then
-            echo "authorized=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "authorized=false" >> "$GITHUB_OUTPUT"
+          if [[ "$permission" != "admin" && "$permission" != "write" && "$permission" != "maintain" ]]; then
             echo "::warning::User $ACTOR (permission=$permission) is not authorized."
+            exit 1
           fi
 
-      - name: Authorize dispatch
-        id: authz_dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: echo "authorized=true" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout (for issue body parsing)
-        if: github.event_name == 'issue_comment'
-        uses: actions/checkout@v4
-
-      - name: Extract checked group IDs
-        id: extract
+      - name: Resolve issue number
+        id: issue
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT: ${{ github.event_name }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          DISPATCH_IDS: ${{ github.event.inputs.group_ids }}
+          COMMENT_ISSUE: ${{ github.event.issue.number }}
           DISPATCH_ISSUE: ${{ github.event.inputs.issue_number }}
         run: |
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
-            echo "group_ids=$DISPATCH_IDS" >> "$GITHUB_OUTPUT"
-            echo "issue_number=$DISPATCH_ISSUE" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "number=$DISPATCH_ISSUE" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=$COMMENT_ISSUE" >> "$GITHUB_OUTPUT"
           fi
-          body=$(gh issue view "$ISSUE_NUMBER" --json body --jq '.body')
-          ids=$(echo "$body" | grep -E '^- \[[xX]\]' \
-            | grep -oE '`[a-z_]+-[a-zA-Z0-9_]+-ssolv-[a-z-]+`' \
-            | tr -d '`' \
-            | sort -u \
-            | tr '\n' ',' | sed 's/,$//')
-          echo "Detected group IDs: $ids"
-          echo "group_ids=$ids" >> "$GITHUB_OUTPUT"
-          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
 
-  # ── Job 2: Build fix matrix ───────────────────────────────────────
-  build-matrix:
-    name: Build fix matrix
-    needs: parse
-    if: needs.parse.outputs.authorized == 'true' && needs.parse.outputs.group_ids != ''
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.build.outputs.matrix }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Build matrix
-        id: build
+      - name: Write run command to summary
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          GROUP_IDS: ${{ needs.parse.outputs.group_ids }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
         run: |
-          python3 .claude/scripts/sonar-fetch.py --output json > sonar.json
-          python3 - "$GROUP_IDS" <<'PY' >> "$GITHUB_OUTPUT"
-          import json, sys
-          ids = set(s.strip() for s in sys.argv[1].split(',') if s.strip())
-          with open('sonar.json') as f: data = json.load(f)
-          selected = [g for g in data['groups'] if g['id'] in ids]
-          matrix = {'include': selected}
-          print(f"matrix={json.dumps(matrix)}")
-          PY
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Sonar Fix 실행 명령
 
-  # ── Job 3: Create branches & post local run guide ─────────────────
-  prepare:
-    name: Create branches & guide
-    needs: [parse, build-matrix]
-    if: needs.build-matrix.outputs.matrix != ''
-    runs-on: ubuntu-latest
+          아래 명령어 하나로 이슈 #${ISSUE_NUMBER}의 체크된 그룹을 모두 자동 처리합니다.
 
-    steps:
-      - name: Checkout dev
-        uses: actions/checkout@v4
-        with:
-          ref: dev
-          fetch-depth: 0
+          \`\`\`bash
+          python3 .claude/scripts/sonar-fix-local.py --issue ${ISSUE_NUMBER}
+          \`\`\`
 
-      - name: Configure git
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-      - name: Create branches & write run guide to summary
-        env:
-          MATRIX_JSON: ${{ needs.build-matrix.outputs.matrix }}
-          REPO: ${{ github.repository }}
-        run: |
-          cat > /tmp/prepare.py << 'PYEOF'
-          import json, os, re, subprocess, sys
-
-          matrix = json.loads(os.environ['MATRIX_JSON'])
-          groups = matrix['include']
-          repo = os.environ['REPO']
-          summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
-          allowed = 'Edit,MultiEdit,Glob,Grep,LS,Read,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(./gradlew:*)'
-
-          blocks = []
-          for g in groups:
-              gid     = g['id']
-              rule    = g['rule']
-              module  = g['module']
-              reason  = g.get('reason', '')
-              files   = g.get('files', [])
-              classif = g.get('classification', 'auto_with_review')
-              count   = g.get('count', len(files))
-
-              branch = re.sub(r'[^a-zA-Z0-9/_-]', '-', f'auto/sonar-fix/{gid}')
-
-              r = subprocess.run(['git', 'checkout', '-b', branch],
-                                 capture_output=True, text=True)
-              if r.returncode != 0:
-                  print(f'[warn] {branch}: {r.stderr.strip()}', file=sys.stderr)
-              subprocess.run(['git', 'push', '-u', 'origin', branch], check=True)
-              subprocess.run(['git', 'checkout', 'dev'], check=True)
-
-              labels = 'sonar-auto-fix,' + ('auto-merge' if classif == 'auto_safe' else 'review-required')
-              files_md = '\n'.join(f'  - `{f}`' for f in files)
-              prompt = (
-                  f'Fix SonarCloud rule {rule} in module {module}. '
-                  f'{reason}. '
-                  f'Only modify: {", ".join(files)}. '
-                  f'Run ./gradlew :{module}:ktlintFormat :{module}:test before committing. '
-                  f'Commit message: refactor(sonar): fix {rule} in {module}.'
-              )
-              pr_cmd = (
-                  f'gh pr create --repo {repo} --base dev --head {branch} '
-                  f'--title "refactor(sonar): fix {rule} in {module}" '
-                  f'--label "{labels}"'
-              )
-
-              block = (
-                  f'\n### `{gid}` — `{rule}` × `{module}` ({count}건)\n\n'
-                  f'파일:\n{files_md}\n\n'
-                  f'```bash\n'
-                  f'git fetch && git checkout {branch}\n'
-                  f'claude -p "{prompt}" --allowedTools "{allowed}"\n'
-                  f'git push\n'
-                  f'{pr_cmd}\n'
-                  f'```'
-              )
-              blocks.append(block)
-
-          body = '## 🔧 Sonar Fix 브랜치 생성 완료\n\n로컬에서 각 그룹 순서대로 실행하세요.\n\n' + '\n\n---\n'.join(blocks)
-
-          with open(summary_file, 'a') as f:
-              f.write(body + '\n')
-          PYEOF
-          python3 /tmp/prepare.py
+          각 그룹에 대해 브랜치 생성 → Claude 로컬 실행 → push → PR 생성이 자동으로 진행됩니다.
+          EOF
