@@ -3,8 +3,8 @@ package org.depromeet.team3.auth.application
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.depromeet.team3.annotation.UnitTest
-import org.depromeet.team3.auth.UserCommandRepository
-import org.depromeet.team3.auth.UserQueryRepository
+import org.depromeet.team3.auth.UserEntity
+import org.depromeet.team3.auth.UserRepository
 import org.depromeet.team3.auth.application.token.UpdateTokenService
 import org.depromeet.team3.auth.command.RefreshTokenCommand
 import org.depromeet.team3.auth.dto.TokenResponse
@@ -17,16 +17,15 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.Mock
 import org.mockito.kotlin.*
+import org.mockito.Mockito.doReturn
 import org.springframework.transaction.support.TransactionCallback
+import java.util.Optional
 import org.springframework.transaction.support.TransactionTemplate
-import java.time.LocalDateTime
 
 @UnitTest
 class UpdateTokenServiceTest {
 
-    @Mock private lateinit var userQueryRepository: UserQueryRepository
-
-    @Mock private lateinit var userCommandRepository: UserCommandRepository
+    @Mock private lateinit var userJpaRepository: UserRepository
 
     @Mock private lateinit var jwtTokenProvider: JwtTokenProvider
 
@@ -41,8 +40,7 @@ class UpdateTokenServiceTest {
             callback.doInTransaction(mock())
         }
         updateTokenService = UpdateTokenService(
-            userQueryRepository,
-            userCommandRepository,
+            userJpaRepository,
             jwtTokenProvider,
             transactionTemplate,
         )
@@ -50,23 +48,19 @@ class UpdateTokenServiceTest {
 
     @Test
     fun `토큰 갱신 실패 - 유효하지 않은 Refresh Token`() = runTest {
-        // given
         val command = RefreshTokenCommand(refreshToken = "invalid-refresh-token")
         whenever(jwtTokenProvider.validateRefreshToken(command.refreshToken)).thenReturn(false)
 
-        // when & then
         val exception = assertThrows<AuthException> { updateTokenService.refresh(command) }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.REFRESH_TOKEN_INVALID)
     }
 
     @Test
     fun `토큰 갱신 실패 - 사용자 정보 없음`() = runTest {
-        // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         whenever(jwtTokenProvider.validateRefreshToken(command.refreshToken)).thenReturn(true)
         whenever(jwtTokenProvider.getUserIdFromToken(command.refreshToken)).thenReturn(null)
 
-        // when & then
         val exception = assertThrows<AuthException> { updateTokenService.refresh(command) }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.TOKEN_USER_ID_INVALID)
     }
@@ -77,7 +71,7 @@ class UpdateTokenServiceTest {
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
         whenever(jwtTokenProvider.validateRefreshToken(command.refreshToken)).thenReturn(true)
         whenever(jwtTokenProvider.getUserIdFromToken(command.refreshToken)).thenReturn("1")
-        whenever(userQueryRepository.findById(1L)).thenReturn(null)
+        whenever(userJpaRepository.findById(1L)).thenReturn(Optional.empty())
 
         // when & then
         val exception = assertThrows<AuthException> { updateTokenService.refresh(command) }
@@ -88,10 +82,10 @@ class UpdateTokenServiceTest {
     fun `토큰 갱신 실패 - Refresh Token 불일치`() = runTest {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
-        val userWithDifferentToken = UserFixture.create(id = 1L, refreshToken = "different-refresh-token")
+        val entity = UserFixture.createEntity(id = 1L, refreshToken = "different-refresh-token")
         whenever(jwtTokenProvider.validateRefreshToken(command.refreshToken)).thenReturn(true)
         whenever(jwtTokenProvider.getUserIdFromToken(command.refreshToken)).thenReturn("1")
-        whenever(userQueryRepository.findById(1L)).thenReturn(userWithDifferentToken)
+        whenever(userJpaRepository.findById(1L)).thenReturn(Optional.of(entity))
 
         // when & then
         val exception = assertThrows<AuthException> { updateTokenService.refresh(command) }
@@ -102,15 +96,13 @@ class UpdateTokenServiceTest {
     fun `토큰 갱신 성공`() = runTest {
         // given
         val command = RefreshTokenCommand(refreshToken = "valid-refresh-token")
-        val user = UserFixture.create(id = 1L, email = "test@example.com", refreshToken = command.refreshToken)
-        val updatedUser = user.copy(refreshToken = "new-refresh-token", updatedAt = LocalDateTime.now())
-
+        val entity = UserFixture.createEntity(id = 1L, email = "test@example.com", refreshToken = command.refreshToken)
         whenever(jwtTokenProvider.validateRefreshToken(command.refreshToken)).thenReturn(true)
         whenever(jwtTokenProvider.getUserIdFromToken(command.refreshToken)).thenReturn("1")
-        whenever(userQueryRepository.findById(1L)).thenReturn(user)
+        whenever(userJpaRepository.findById(1L)).thenReturn(Optional.of(entity))
         whenever(jwtTokenProvider.generateAccessToken(1L, "test@example.com")).thenReturn("new-access-token")
         whenever(jwtTokenProvider.generateRefreshToken(1L)).thenReturn("new-refresh-token")
-        whenever(userCommandRepository.save(any())).thenReturn(updatedUser)
+        doReturn(entity).whenever(userJpaRepository).save(any<UserEntity>())
 
         // when
         val result = updateTokenService.refresh(command)
@@ -121,6 +113,6 @@ class UpdateTokenServiceTest {
         assertThat(result.refreshToken).isEqualTo("new-refresh-token")
         verify(jwtTokenProvider).generateAccessToken(1L, "test@example.com")
         verify(jwtTokenProvider).generateRefreshToken(1L)
-        verify(userCommandRepository).save(any())
+        verify(userJpaRepository).save(any<UserEntity>())
     }
 }
