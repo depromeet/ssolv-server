@@ -10,6 +10,7 @@ import org.depromeet.team3.common.util.withTracingContext
 import org.depromeet.team3.security.jwt.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
+import kotlin.random.Random
 
 /**
  * 애플 로그인 Save Service
@@ -31,15 +32,7 @@ class CreateAppleUserService(
                 val userEntity: UserEntity = if (existingBySocial != null) {
                     existingBySocial
                 } else {
-                    // 2. 닉네임 중복 확인
-                    userJpaRepository.findByNickname(nickname)?.let {
-                        throw AuthException(
-                            errorCode = ErrorCode.DUPLICATE_NICKNAME,
-                            detail = mapOf("nickname" to nickname),
-                        )
-                    }
-
-                    // 3. 이메일 중복 확인
+                    // 2. 이메일 중복 확인
                     if (email != null) {
                         userJpaRepository.findByEmail(email)?.let {
                             throw AuthException(
@@ -48,13 +41,14 @@ class CreateAppleUserService(
                             )
                         }
                     }
-                    // 3. 신규 회원 생성
+                    // 3. 신규 회원 생성 (닉네임 충돌 시 suffix 자동 부여)
+                    val uniqueNickname = resolveUniqueNickname(nickname)
                     userJpaRepository.save(
                         UserEntity(
                             provider = AuthProvider.APPLE,
                             socialId = socialId,
                             email = email ?: "apple_$socialId@privaterelay.appleid.com",
-                            nickname = nickname,
+                            nickname = uniqueNickname,
                             profileImage = profileImage,
                             refreshToken = null,
                         ),
@@ -82,8 +76,13 @@ class CreateAppleUserService(
                     ),
                 )
             }
-                ?: throw org.depromeet.team3.auth.exception.AuthException(
-                    org.depromeet.team3.common.exception.ErrorCode.INTERNAL_SERVER_ERROR,
-                )
+                ?: throw AuthException(errorCode = ErrorCode.INTERNAL_SERVER_ERROR)
         }
+
+    private fun resolveUniqueNickname(base: String): String {
+        if (userJpaRepository.findByNickname(base) == null) return base
+        var candidate: String
+        do { candidate = "$base${Random.nextInt(1000, 9999)}" } while (userJpaRepository.findByNickname(candidate) != null)
+        return candidate
+    }
 }
