@@ -28,6 +28,8 @@ export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://3.34.32.206:4318
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+# cumulative: Prometheus 호환 백엔드가 delta temporality를 무음 드롭하는 것 방지
+export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
 export OTEL_RESOURCE_ATTRIBUTES=service.name=claude-code,developer=<본인-github-id>
 
 # 커스텀 훅 이벤트 엔드포인트 (네이티브 OTel과 동일 엔드포인트)
@@ -46,17 +48,6 @@ source ~/.zshrc
 ```
 ~/.claude/telemetry/events.jsonl
 ```
-
-## EC2 배포 시 필요한 env 키
-
-`deploy/.env`에 추가 필요한 환경 변수:
-
-```env
-GRAFANA_CLOUD_OTLP_ENDPOINT=https://otlp-gateway-prod-ap-southeast-0.grafana.net/otlp
-GRAFANA_CLOUD_INSTANCE_ID=<grafana-cloud-instance-id>
-```
-
-> `GRAFANA_CLOUD_API_KEY`는 기존 키 재사용.
 
 ## 구조
 
