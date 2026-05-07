@@ -100,6 +100,8 @@ else
     echo "   → 커밋 메시지는 영문으로 작성해야 합니다. (CLAUDE.md 규칙)"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
+    bash "$(dirname "$0")/telemetry-emit.sh" "hook.blocked" \
+        "hook_name=commit-msg-check" "reason=non-ascii" &
     exit 2
 fi
 
@@ -123,5 +125,7 @@ else
     echo "     refactor: remove unused benchmark dependencies"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
+    bash "$(dirname "$0")/telemetry-emit.sh" "hook.blocked" \
+        "hook_name=commit-msg-check" "reason=conventional-commits-violation" &
     exit 2
 fi

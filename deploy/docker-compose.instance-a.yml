@@ -81,6 +81,10 @@ services:
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     env_file:
       - .env
+    ports:
+      # EC2 Security Group에서 팀 개발자 IP만 허용 필요 (4317/4318 unauthenticated)
+      - "4317:4317" # OTLP gRPC — Claude Code 텔레메트리 수신
+      - "4318:4318" # OTLP HTTP — Claude Code 텔레메트리 수신
     networks:
       - ssolv_prod_network
     mem_limit: 192m
