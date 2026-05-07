@@ -24,12 +24,14 @@ HOOKS_DIR="$(dirname "$0")"
 # 차단 신호(exit 2)는 반드시 상위로 전파되어야 함 — 안 그러면 모든 blocking 훅이 무음 실패함.
 # 정책: 하나라도 exit 2 면 최종 exit 2. 그 외 비정상은 로그만 남기고 통과.
 FINAL_EXIT=0
+BLOCKED_HOOKS=()
 run_hook() {
     local hook="$1"
     echo "$TOOL_INPUT" | bash "$HOOKS_DIR/$hook"
     local rc=$?
     if [ "$rc" -eq 2 ]; then
         FINAL_EXIT=2
+        BLOCKED_HOOKS+=("$hook")
     elif [ "$rc" -ne 0 ]; then
         echo "⚠️  $hook exited with code $rc (non-blocking)" >&2
     fi
@@ -49,5 +51,13 @@ case "$FILE_PATH" in
         run_hook module-import-check.sh
         ;;
 esac
+
+if [ "$FINAL_EXIT" -eq 2 ]; then
+    for hook in "${BLOCKED_HOOKS[@]}"; do
+        bash "$HOOKS_DIR/telemetry-emit.sh" "hook.blocked" \
+            "hook_name=${hook%.sh}" \
+            "file_path=$FILE_PATH" &
+    done
+fi
 
 exit "$FINAL_EXIT"

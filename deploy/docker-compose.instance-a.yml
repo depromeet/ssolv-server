@@ -81,6 +81,9 @@ services:
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     env_file:
       - .env
+    ports:
+      - "4317:4317" # OTLP gRPC — Claude Code 텔레메트리 수신
+      - "4318:4318" # OTLP HTTP — Claude Code 텔레메트리 수신
     networks:
       - ssolv_prod_network
     mem_limit: 192m

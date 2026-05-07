@@ -1,6 +1,58 @@
-// Instance A 전용 Alloy 설정 — 로그 수집만 담당
+// Instance A 전용 Alloy 설정
+// - 로그 수집: Docker 컨테이너 로그 → Grafana Cloud Loki
+// - OTLP 수신: Claude Code 텔레메트리(메트릭 + 로그) → Grafana Cloud
 // 메트릭 스크레이프는 Instance B의 Alloy가 원격으로 처리하므로 중복 수집 안 함
 // 트레이스도 Instance A의 app-server가 Instance B Alloy(OTLP :4318)로 직접 전송
+
+// ─── Claude Code 텔레메트리 수신 (OTLP) ──────────────────────────────────────
+
+otelcol.receiver.otlp "claude_code" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    metrics = [otelcol.processor.batch.claude_code.input]
+    logs    = [otelcol.processor.batch.claude_code.input]
+  }
+}
+
+otelcol.processor.batch "claude_code" {
+  output {
+    metrics = [otelcol.exporter.prometheus.claude_code.input]
+    logs    = [otelcol.exporter.otlphttp.claude_code_loki.input]
+  }
+}
+
+// Claude Code 메트릭 → Grafana Cloud Prometheus (remote_write)
+otelcol.exporter.prometheus "claude_code" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
+
+// Claude Code 로그(훅 이벤트, 스킬 호출) → Grafana Cloud Loki
+otelcol.exporter.otlphttp "claude_code_loki" {
+  client {
+    endpoint = sys.env("GRAFANA_CLOUD_OTLP_ENDPOINT")
+    auth     = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
+  password = sys.env("GRAFANA_CLOUD_API_KEY")
+}
 
 // ─── 로그 수집 ────────────────────────────────────────────────────────────────
 
