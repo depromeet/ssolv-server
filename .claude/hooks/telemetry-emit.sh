@@ -1,31 +1,35 @@
 #!/bin/bash
 # Claude Code 텔레메트리 이벤트 전송 헬퍼
 #
-# 용도: 스킬 호출, 훅 차단 등 커스텀 이벤트를 OTLP HTTP로 Alloy에 전송.
+# Grafana Cloud Loki에 직접 푸시 (EC2/OTLP 경유 없음 — Security Group 불필요)
 # 네이티브 claude_code.* 메트릭(토큰/비용/tool decision)은 CLAUDE_CODE_ENABLE_TELEMETRY로 별도 처리.
 #
 # 사용법:
-#   CLAUDE_OTLP_ENDPOINT=http://host:4318 telemetry-emit.sh <event_name> [key=value ...]
+#   telemetry-emit.sh <event_name> [key=value ...]
 #
 # 예시:
 #   telemetry-emit.sh hook.blocked hook_name=commit-msg-check reason=non-ascii
 #   telemetry-emit.sh skill.invoked skill_name=git-conventions
+#
+# 필요 환경변수 (~/. claude/settings.json env 블록에 설정):
+#   GRAFANA_CLOUD_LOKI_URL  — Loki push URL
+#   GRAFANA_CLOUD_LOKI_USER — Loki basic auth username
+#   GRAFANA_CLOUD_API_KEY   — Grafana Cloud API key
 
 EVENT_NAME="${1:-unknown}"
 shift
 
-# CLAUDE_OTLP_ENDPOINT가 설정되지 않으면 OTLP 전송 생략 (로컬 JSONL만 기록)
-OTLP_ENDPOINT="${CLAUDE_OTLP_ENDPOINT:-}"
+LOKI_URL="${GRAFANA_CLOUD_LOKI_URL:-}"
+LOKI_USER="${GRAFANA_CLOUD_LOKI_USER:-}"
+LOKI_KEY="${GRAFANA_CLOUD_API_KEY:-}"
 LOG_FILE="${HOME}/.claude/telemetry/events.jsonl"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# key=value 쌍을 Python으로 안전하게 처리 (셸 인젝션 방지)
-# 모든 값은 환경변수와 argv를 통해 Python으로 전달
+# key=value → JSON attrs (Python으로 안전하게 처리, 셸 인젝션 방지)
 ATTRS_JSON=$(python3 - "$@" <<'PYEOF'
-import sys, json, os
-
+import sys, json
 pairs = sys.argv[1:]
 attrs = {}
 for p in pairs:
@@ -37,55 +41,52 @@ PYEOF
 )
 ATTRS_JSON="${ATTRS_JSON:-{}}"
 
-# 로컬 JSONL에 항상 기록 (OTLP 실패해도 유실 없음)
+# 로컬 JSONL 기록 (Loki 실패해도 유실 없음)
 printf '{"ts":"%s","event":"%s","attrs":%s}\n' \
     "$TIMESTAMP" "$EVENT_NAME" "$ATTRS_JSON" >> "$LOG_FILE"
 
-# OTLP 엔드포인트 미설정 시 종료
-[ -z "$OTLP_ENDPOINT" ] && exit 0
+# Loki 크레덴셜 미설정 시 종료
+[ -z "$LOKI_URL" ] || [ -z "$LOKI_KEY" ] && exit 0
 
-# OTLP HTTP 전송 (백그라운드 — 느려도 훅 차단 안 함)
-NOW_NS="$(date +%s)000000000"
-BODY=$(EVENT_NAME="$EVENT_NAME" \
-       ATTRS_JSON="$ATTRS_JSON" \
-       DEVELOPER="${USER:-unknown}" \
-       NOW_NS="$NOW_NS" \
-       python3 - <<'PYEOF'
-import json, os
+# Loki 직접 푸시 (백그라운드 — 훅 차단 안 함)
+EVENT_NAME="$EVENT_NAME" \
+ATTRS_JSON="$ATTRS_JSON" \
+LOKI_URL="$LOKI_URL" \
+LOKI_USER="$LOKI_USER" \
+LOKI_KEY="$LOKI_KEY" \
+python3 - <<'PYEOF' > /dev/null 2>&1 &
+import json, os, time, urllib.request, urllib.error, base64
 
 event_name = os.environ["EVENT_NAME"]
 attrs      = json.loads(os.environ["ATTRS_JSON"])
-developer  = os.environ["DEVELOPER"]
-now_ns     = os.environ["NOW_NS"]
+loki_url   = os.environ["LOKI_URL"]
+loki_user  = os.environ["LOKI_USER"]
+loki_key   = os.environ["LOKI_KEY"]
+developer  = os.environ.get("USER", "unknown")
 
-kv_list = [{"key": k, "value": {"stringValue": v}} for k, v in attrs.items()]
+now_ns  = str(int(time.time() * 1e9))
+log_line = json.dumps({"event": event_name, "developer": developer, **attrs}, ensure_ascii=False)
 
-payload = {
-    "resourceLogs": [{
-        "resource": {
-            "attributes": [
-                {"key": "service.name", "value": {"stringValue": "claude-code"}},
-                {"key": "developer",    "value": {"stringValue": developer}},
-            ]
+payload = json.dumps({
+    "streams": [{
+        "stream": {
+            "service_name": "claude-code",
+            "developer":    developer,
+            "event":        event_name,
         },
-        "scopeLogs": [{
-            "logRecords": [{
-                "timeUnixNano": now_ns,
-                "severityText": "INFO",
-                "body": {"stringValue": event_name},
-                "attributes": kv_list,
-            }]
-        }]
+        "values": [[now_ns, log_line]],
     }]
-}
-print(json.dumps(payload))
-PYEOF
-)
+}).encode()
 
-if [ -n "$BODY" ]; then
-    curl -sf -X POST "${OTLP_ENDPOINT}/v1/logs" \
-        -H "Content-Type: application/json" \
-        -d "$BODY" \
-        --max-time 2 \
-        > /dev/null 2>&1 &
-fi
+creds = base64.b64encode(f"{loki_user}:{loki_key}".encode()).decode()
+req = urllib.request.Request(
+    loki_url,
+    data=payload,
+    headers={"Content-Type": "application/json", "Authorization": f"Basic {creds}"},
+    method="POST",
+)
+try:
+    urllib.request.urlopen(req, timeout=3)
+except Exception:
+    pass
+PYEOF
