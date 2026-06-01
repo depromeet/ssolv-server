@@ -15,6 +15,14 @@ api:
       api-key: test-api-key-for-testing
       base-url: https://places.googleapis.com
       proxy-base-url: https://test-proxy.example.com
+      request-semaphore-size: 4
+      rate-limit:
+        enabled: true
+        refill-rate-per-second: 15
+        bucket-capacity: 30
+        token-acquire-timeout-ms: 800
+        adaptive:
+          enabled: false
 
 kakao:
   client-id: test-client-id

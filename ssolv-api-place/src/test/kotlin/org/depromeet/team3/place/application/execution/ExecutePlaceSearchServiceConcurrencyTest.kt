@@ -12,12 +12,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Semaphore
 import org.depromeet.team3.common.GooglePlacesApiProperties
 import org.depromeet.team3.common.util.DistributedLockService
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
+import org.depromeet.team3.place.application.ratelimit.GooglePlacesApiResult
+import org.depromeet.team3.place.application.ratelimit.GooglePlacesTokenBucketService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.model.PlacesTextSearchResponse
@@ -50,8 +51,8 @@ class ExecutePlaceSearchServiceConcurrencyTest {
     @MockK
     lateinit var meterRegistry: MeterRegistry
 
-    @MockK(relaxed = true)
-    lateinit var globalApiSemaphore: Semaphore
+    @MockK
+    lateinit var tokenBucketService: GooglePlacesTokenBucketService
 
     @MockK
     lateinit var lockService: DistributedLockService
@@ -70,9 +71,6 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         // Mocking global objects
         MockKAnnotations.init(this)
 
-        // Mock globalApiSemaphore (it's internal or injected)
-        // Note: The service uses it in its execute logic.
-
         every { googlePlacesApiProperties.apiKey } returns "test-key"
         every { googlePlacesApiProperties.photoFallbackBuffer } returns 5
         every { googlePlacesApiProperties.totalFetchSize } returns 10
@@ -84,6 +82,8 @@ class ExecutePlaceSearchServiceConcurrencyTest {
         every { meterRegistry.counter(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { meterRegistry.timer(any<String>(), *anyVararg()) } returns mockk(relaxed = true)
         every { redisTemplate.executePipelined(any<org.springframework.data.redis.core.RedisCallback<*>>()) } returns listOf(0L, false)
+        coEvery { tokenBucketService.acquire(any(), any()) } returns true
+        every { tokenBucketService.recordApiResult(any<GooglePlacesApiResult>()) } just Runs
 
         // Redis ValueOps 및 ObjectMapper 모킹 추가
         val valueOps = mockk<org.springframework.data.redis.core.ValueOperations<String, String>>(relaxed = true)

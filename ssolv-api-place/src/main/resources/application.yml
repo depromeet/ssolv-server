@@ -32,6 +32,24 @@ api:
     places:
       api-key: ${GOOGLE_PLACES_API_KEY}
       base-url: https://places.googleapis.com
+      request-semaphore-size: ${GOOGLE_PLACES_REQUEST_SEMAPHORE_SIZE:4}
+      rate-limit:
+        enabled: ${GOOGLE_PLACES_RATE_LIMIT_ENABLED:true}
+        bucket-key: ${GOOGLE_PLACES_RATE_LIMIT_BUCKET_KEY:google:places:token-bucket}
+        refill-rate-per-second: ${GOOGLE_PLACES_RATE_LIMIT_REFILL_RATE:15}
+        bucket-capacity: ${GOOGLE_PLACES_RATE_LIMIT_BUCKET_CAPACITY:30}
+        token-acquire-timeout-ms: ${GOOGLE_PLACES_RATE_LIMIT_ACQUIRE_TIMEOUT_MS:800}
+        retry-delay-ms: ${GOOGLE_PLACES_RATE_LIMIT_RETRY_DELAY_MS:50}
+        bucket-ttl-seconds: ${GOOGLE_PLACES_RATE_LIMIT_BUCKET_TTL_SECONDS:120}
+        adaptive:
+          enabled: ${GOOGLE_PLACES_RATE_LIMIT_ADAPTIVE_ENABLED:true}
+          min-rate-per-second: ${GOOGLE_PLACES_RATE_LIMIT_MIN_RATE:5}
+          max-rate-per-second: ${GOOGLE_PLACES_RATE_LIMIT_MAX_RATE:20}
+          evaluation-interval-ms: ${GOOGLE_PLACES_RATE_LIMIT_EVALUATION_INTERVAL_MS:30000}
+          timeout-ratio-threshold: ${GOOGLE_PLACES_RATE_LIMIT_TIMEOUT_RATIO_THRESHOLD:0.05}
+          decrease-on-429-ratio: ${GOOGLE_PLACES_RATE_LIMIT_DECREASE_ON_429_RATIO:0.5}
+          decrease-on-timeout-ratio: ${GOOGLE_PLACES_RATE_LIMIT_DECREASE_ON_TIMEOUT_RATIO:0.7}
+          increase-step: ${GOOGLE_PLACES_RATE_LIMIT_INCREASE_STEP:1}
 
 # WAS 헬스 체크 및 모니터링 관련
 management:

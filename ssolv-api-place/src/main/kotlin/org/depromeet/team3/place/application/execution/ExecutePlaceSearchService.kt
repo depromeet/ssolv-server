@@ -30,6 +30,8 @@ import org.depromeet.team3.place.PlaceEntity
 import org.depromeet.team3.place.PlaceQuery
 import org.depromeet.team3.place.application.model.PlaceSearchPlan
 import org.depromeet.team3.place.application.plan.CreateSurveyKeywordService
+import org.depromeet.team3.place.application.ratelimit.GooglePlacesApiResult
+import org.depromeet.team3.place.application.ratelimit.GooglePlacesTokenBucketService
 import org.depromeet.team3.place.dto.request.PlacesSearchRequest
 import org.depromeet.team3.place.dto.response.PlacesSearchResponse
 import org.depromeet.team3.place.exception.PlaceSearchException
@@ -50,7 +52,7 @@ class ExecutePlaceSearchService(
     private val createSurveyKeywordService: CreateSurveyKeywordService,
     private val googlePlacesApiProperties: GooglePlacesApiProperties,
     private val redisTemplate: StringRedisTemplate,
-    private val globalApiSemaphore: Semaphore,
+    private val tokenBucketService: GooglePlacesTokenBucketService,
     private val meterRegistry: MeterRegistry,
     private val lockService: DistributedLockService,
     private val objectMapper: ObjectMapper,
@@ -348,7 +350,13 @@ class ExecutePlaceSearchService(
                         if (addedCount < allocation && selectedPlaces.size < totalFetchSize && !candidate.fallbackKeyword.isNullOrBlank()) {
                             runCatching {
                                 val fbResponse =
-                                    fetchPlacesFromGoogle(candidate.fallbackKeyword, plan.stationCoordinates, dispatcher, requestSemaphore)
+                                    fetchPlacesFromGoogle(
+                                        candidate.fallbackKeyword,
+                                        plan.stationCoordinates,
+                                        dispatcher,
+                                        requestSemaphore,
+                                        priority = "fallback",
+                                    )
                                 filterPlacesByKeyword(
                                     fbResponse.places ?: emptyList(),
                                     candidate,
@@ -431,6 +439,7 @@ class ExecutePlaceSearchService(
         stationCoordinates: MeetingQuery.StationCoordinates?,
         dispatcher: CoroutineDispatcher,
         requestSemaphore: Semaphore,
+        priority: String = "primary",
     ): PlacesTextSearchResponse {
         val sanitizedQuery = CreateSurveyKeywordService.normalizeKeyword(query)
         if (sanitizedQuery.isBlank()) throw PlaceSearchException(ErrorCode.PLACE_INVALID_QUERY)
@@ -445,11 +454,11 @@ class ExecutePlaceSearchService(
          * 2-tier Semaphore 중첩 적용
          *
          * [외부] requestSemaphore: 단일 모임방 내 fan-out 제한.
-         * [내부] globalApiSemaphore: 서버 전체 동시 호출 수 제한 (QPS 상한 방어).
+         * [전역] Redis Token Bucket: 멀티 서버/Lambda 전체의 Google Places QPS 예산 제한.
          *
-         * 중첩 순서: 모임별(외부) → 전역(내부)
-         * 이유: 모임방 내부 쿼터에 당첨된 요청만 전역 슬롯을 요청하도록 하여
-         *       전역 자원 기아 현상(Starvation)을 방지함.
+         * 중첩 순서: 모임별(로컬) → 전역 토큰 획득
+         * 이유: 한 모임 요청이 내부 fan-out으로 전역 호출권을 독점하지 않도록 먼저
+         *       요청 단위 병렬성을 제한한 뒤, 실제 외부 호출 직전에 전역 토큰을 소비한다.
          */
         return try {
             withContext(Context.current().with(fetchSpan).asContextElement()) {
@@ -461,57 +470,64 @@ class ExecutePlaceSearchService(
                             .record(requestWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
                         fetchSpan.setAttribute("semaphore.request.wait_ms", requestWaitNanos / 1_000_000L)
 
-                        val globalWaitStart = System.nanoTime()
-                        globalApiSemaphore.withPermit {
-                            val globalWaitNanos = System.nanoTime() - globalWaitStart
-                            meterRegistry.timer("google.api.semaphore.wait")
-                                .record(globalWaitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
-                            // per-request 세마포어 대기 시간을 span attribute로 기록 — aggregate metric만으로는
-                            // 어떤 특정 trace가 병목이었는지 알 수 없으므로 per-trace로도 남김
-                            fetchSpan.setAttribute("semaphore.wait_ms", globalWaitNanos / 1_000_000L)
-                            fetchSpan.setAttribute("semaphore.global.available", globalApiSemaphore.availablePermits.toLong())
-                            withContext(dispatcher) {
-                                try {
-                                    logger.info(
-                                        "Google API 검색 실행: query={}, coords=({}, {})",
-                                        query,
+                        val acquired = tokenBucketService.acquire(cost = 1, priority = priority)
+                        fetchSpan.setAttribute("token_bucket.acquired", acquired)
+                        fetchSpan.setAttribute("token_bucket.priority", priority)
+                        if (!acquired) {
+                            recordMetric("token_timeout")
+                            tokenBucketService.recordApiResult(GooglePlacesApiResult.TIMEOUT)
+                            logger.warn("Google API 호출권 획득 실패: query={}, priority={}", query, priority)
+                            throw PlaceSearchException(
+                                ErrorCode.PLACE_API_QUOTA_EXCEEDED,
+                                detail = mapOf("query" to query, "priority" to priority, "source" to "redis_token_bucket"),
+                            )
+                        }
+
+                        withContext(dispatcher) {
+                            try {
+                                logger.info(
+                                    "Google API 검색 실행: query={}, coords=({}, {})",
+                                    query,
+                                    stationCoordinates?.latitude,
+                                    stationCoordinates?.longitude,
+                                )
+                                val apiStart = System.nanoTime()
+                                val response = withTimeout(googleApiTimeoutMs) {
+                                    placeQuery.textSearch(
+                                        sanitizedQuery,
+                                        keywordFetchSize,
                                         stationCoordinates?.latitude,
                                         stationCoordinates?.longitude,
+                                        3000.0,
                                     )
-                                    val apiStart = System.nanoTime()
-                                    val response = withTimeout(googleApiTimeoutMs) {
-                                        placeQuery.textSearch(
-                                            sanitizedQuery,
-                                            keywordFetchSize,
-                                            stationCoordinates?.latitude,
-                                            stationCoordinates?.longitude,
-                                            3000.0,
-                                        )
-                                    }
-                                    meterRegistry.timer("google.api.response.latency", "result", "success")
-                                        .record(System.nanoTime() - apiStart, java.util.concurrent.TimeUnit.NANOSECONDS)
-                                    recordMetric("success")
-                                    response
-                                } catch (e: TimeoutCancellationException) {
-                                    meterRegistry.timer("google.api.response.latency", "result", "timeout")
-                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                                    recordMetric("timeout")
-                                    logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
-                                    throw e
-                                } catch (e: PlaceSearchException) {
-                                    val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
-                                    meterRegistry.timer("google.api.response.latency", "result", reason)
-                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                                    recordMetric(reason)
-                                    logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
-                                    throw e
-                                } catch (e: Exception) {
-                                    meterRegistry.timer("google.api.response.latency", "result", "unknown_error")
-                                        .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                                    recordMetric("unknown_error")
-                                    logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
-                                    throw e
                                 }
+                                meterRegistry.timer("google.api.response.latency", "result", "success")
+                                    .record(System.nanoTime() - apiStart, java.util.concurrent.TimeUnit.NANOSECONDS)
+                                recordMetric("success")
+                                tokenBucketService.recordApiResult(GooglePlacesApiResult.SUCCESS)
+                                response
+                            } catch (e: TimeoutCancellationException) {
+                                meterRegistry.timer("google.api.response.latency", "result", "timeout")
+                                    .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                recordMetric("timeout")
+                                tokenBucketService.recordApiResult(GooglePlacesApiResult.TIMEOUT)
+                                logger.error("Google API 호출 타임아웃 ($googleApiTimeoutMs ms): query=$query")
+                                throw e
+                            } catch (e: PlaceSearchException) {
+                                val reason = if (e.errorCode == ErrorCode.PLACE_API_ERROR) "api_error" else "business_error"
+                                meterRegistry.timer("google.api.response.latency", "result", reason)
+                                    .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                recordMetric(reason)
+                                tokenBucketService.recordApiResult(e.toGooglePlacesApiResult())
+                                logger.warn("Google API 비즈니스 오류 발생: ${e.errorCode}, query=$query")
+                                throw e
+                            } catch (e: Exception) {
+                                meterRegistry.timer("google.api.response.latency", "result", "unknown_error")
+                                    .record(googleApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                recordMetric("unknown_error")
+                                tokenBucketService.recordApiResult(GooglePlacesApiResult.ERROR)
+                                logger.error("Google API 알 수 없는 오류 발생: query=$query, message=${e.message}")
+                                throw e
                             }
                         }
                     }
@@ -528,6 +544,15 @@ class ExecutePlaceSearchService(
 
     private fun recordMetric(result: String) {
         meterRegistry.counter("google.api.call.count", listOf(Tag.of("result", result))).increment()
+    }
+
+    private fun PlaceSearchException.toGooglePlacesApiResult(): GooglePlacesApiResult {
+        val statusCode = detail?.get("statusCode") as? Int
+        return when {
+            errorCode == ErrorCode.PLACE_API_QUOTA_EXCEEDED -> GooglePlacesApiResult.RATE_LIMITED
+            statusCode == 429 -> GooglePlacesApiResult.RATE_LIMITED
+            else -> GooglePlacesApiResult.ERROR
+        }
     }
 
     private suspend fun getPlaceStringIdToDbIdMap(googlePlaceIds: List<String>, dispatcher: CoroutineDispatcher): Map<String, Long> =
