@@ -13,16 +13,11 @@ import org.depromeet.team3.common.constants.RedisStreamConstants.MEETING_NOTIFIC
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import org.springframework.data.domain.Range
-import org.springframework.data.redis.connection.RedisStreamCommands.XClaimOptions
-import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.MapRecord
-import org.springframework.data.redis.connection.stream.PendingMessage
-import org.springframework.data.redis.connection.stream.PendingMessages
 import org.springframework.data.redis.connection.stream.RecordId
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StreamOperations
 import org.springframework.data.redis.core.StringRedisTemplate
-import java.time.Duration
 
 @DisplayName("[RecoveryScheduler] 알림 스트림 복구 스케줄러 테스트")
 class NotificationStreamRecoverySchedulerTest {
@@ -41,12 +36,17 @@ class NotificationStreamRecoverySchedulerTest {
         every { stringRedisTemplate.opsForStream<String, String>() } returns streamOps
     }
 
-    private fun pendingMessage(id: String, idleSeconds: Long, deliveryCount: Long = 1L) = PendingMessage(
-        RecordId.of(id),
-        Consumer.from(MEETING_NOTIFICATION_GROUP, "consumer-1"),
-        Duration.ofSeconds(idleSeconds),
-        deliveryCount,
-    )
+    private fun autoClaimResponse(vararg records: MapRecord<String, String, String>): List<Any> {
+        val claimedRecords = records.map { record ->
+            listOf(
+                record.id.value.toByteArray(),
+                record.value.flatMap { (key, value) ->
+                    listOf(key.toByteArray(), value.toByteArray())
+                },
+            )
+        }
+        return listOf("0-0".toByteArray(), claimedRecords, emptyList<Any>())
+    }
 
     private fun claimedRecord(id: String, meetingId: Long?, userId: Long?): MapRecord<String, String, String> {
         val fields = buildMap<String, String> {
@@ -57,37 +57,21 @@ class NotificationStreamRecoverySchedulerTest {
     }
 
     @Test
-    @DisplayName("pending 메시지가 없으면 claim을 호출하지 않는다")
-    fun `pending 메시지가 없으면 claim을 호출하지 않는다`() {
-        val emptyPending = PendingMessages(MEETING_NOTIFICATION_GROUP, emptyList())
-        every { streamOps.pending(any<String>(), any<String>(), any<Range<*>>(), any<Long>()) } returns emptyPending
+    @DisplayName("XAUTOCLAIM 결과가 비어 있으면 서비스를 호출하지 않는다")
+    fun `XAUTOCLAIM 결과가 비어 있으면 서비스를 호출하지 않는다`() {
+        every { stringRedisTemplate.execute(any<RedisCallback<Any>>()) } returns autoClaimResponse()
 
         scheduler.recoverPendingMessages()
 
-        verify(exactly = 0) { streamOps.claim(any<String>(), any<String>(), any<String>(), any<XClaimOptions>()) }
+        coVerify(exactly = 0) { sendMeetingResultNotificationService.send(any(), any()) }
     }
 
     @Test
-    @DisplayName("threshold 미만인 메시지는 idle로 판정하지 않아 claim을 호출하지 않는다")
-    fun `idle threshold 미만 메시지는 claim하지 않는다`() {
-        val recentMessage = pendingMessage("1-0", idleSeconds = 30) // 1분 미만
-        val pending = PendingMessages(MEETING_NOTIFICATION_GROUP, listOf(recentMessage))
-        every { streamOps.pending(any<String>(), any<String>(), any<Range<*>>(), any<Long>()) } returns pending
-
-        scheduler.recoverPendingMessages()
-
-        verify(exactly = 0) { streamOps.claim(any<String>(), any<String>(), any<String>(), any<XClaimOptions>()) }
-    }
-
-    @Test
-    @DisplayName("idle 메시지가 있으면 XCLAIM 후 서비스를 호출하고 성공 시 ACK한다")
+    @DisplayName("idle 메시지가 있으면 XAUTOCLAIM 후 서비스를 호출하고 성공 시 ACK한다")
     fun `idle 메시지 재처리 성공 시 ACK한다`() = runTest {
-        val idleMessage = pendingMessage("2-0", idleSeconds = 120)
-        val pending = PendingMessages(MEETING_NOTIFICATION_GROUP, listOf(idleMessage))
         val claimed = claimedRecord("2-0", meetingId = 10L, userId = 20L)
 
-        every { streamOps.pending(any<String>(), any<String>(), any<Range<*>>(), any<Long>()) } returns pending
-        every { streamOps.claim(any<String>(), any<String>(), any<String>(), any<XClaimOptions>()) } returns listOf(claimed)
+        every { stringRedisTemplate.execute(any<RedisCallback<Any>>()) } returns autoClaimResponse(claimed)
         coEvery { sendMeetingResultNotificationService.send(10L, 20L) } just Runs
         every { streamOps.acknowledge(any<String>(), any<String>(), any<RecordId>()) } returns 1L
 
@@ -100,12 +84,9 @@ class NotificationStreamRecoverySchedulerTest {
     @Test
     @DisplayName("서비스 호출 실패 시 ACK를 호출하지 않아 PEL에 잔류시킨다")
     fun `서비스 실패 시 ACK하지 않는다`() = runTest {
-        val idleMessage = pendingMessage("3-0", idleSeconds = 120)
-        val pending = PendingMessages(MEETING_NOTIFICATION_GROUP, listOf(idleMessage))
         val claimed = claimedRecord("3-0", meetingId = 10L, userId = 20L)
 
-        every { streamOps.pending(any<String>(), any<String>(), any<Range<*>>(), any<Long>()) } returns pending
-        every { streamOps.claim(any<String>(), any<String>(), any<String>(), any<XClaimOptions>()) } returns listOf(claimed)
+        every { stringRedisTemplate.execute(any<RedisCallback<Any>>()) } returns autoClaimResponse(claimed)
         coEvery { sendMeetingResultNotificationService.send(any(), any()) } throws RuntimeException("FCM 장애")
 
         scheduler.recoverPendingMessages()
@@ -116,12 +97,9 @@ class NotificationStreamRecoverySchedulerTest {
     @Test
     @DisplayName("meetingId 또는 userId가 없는 메시지는 서비스 호출 없이 즉시 ACK 폐기한다")
     fun `파싱 불가 메시지는 즉시 ACK 처리한다`() = runTest {
-        val idleMessage = pendingMessage("4-0", idleSeconds = 120)
-        val pending = PendingMessages(MEETING_NOTIFICATION_GROUP, listOf(idleMessage))
         val claimed = claimedRecord("4-0", meetingId = 10L, userId = null) // userId 누락
 
-        every { streamOps.pending(any<String>(), any<String>(), any<Range<*>>(), any<Long>()) } returns pending
-        every { streamOps.claim(any<String>(), any<String>(), any<String>(), any<XClaimOptions>()) } returns listOf(claimed)
+        every { stringRedisTemplate.execute(any<RedisCallback<Any>>()) } returns autoClaimResponse(claimed)
         every { streamOps.acknowledge(any<String>(), any<String>(), any<RecordId>()) } returns 1L
 
         scheduler.recoverPendingMessages()

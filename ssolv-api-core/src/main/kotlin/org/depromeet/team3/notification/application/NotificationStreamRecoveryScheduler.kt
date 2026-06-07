@@ -7,9 +7,10 @@ import org.depromeet.team3.common.filter.MdcLoggingFilter
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.context.annotation.Profile
-import org.springframework.data.domain.Range
-import org.springframework.data.redis.connection.RedisStreamCommands.XClaimOptions
+import org.springframework.data.redis.connection.RedisConnection
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.RecordId
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -17,13 +18,12 @@ import java.time.Duration
 import java.util.UUID
 
 /**
- * meeting_notification_stream 의 idle 메시지를 XCLAIM 으로 소유권 이전 후 직접 재처리하는 복구 스케줄러.
+ * meeting_notification_stream 의 idle 메시지를 XAUTOCLAIM 으로 소유권 이전 후 직접 재처리하는 복구 스케줄러.
  *
  * 흐름:
- * 1. XPENDING 으로 그룹 전체의 미처리 메시지 조회
- * 2. RECLAIM_THRESHOLD 이상 idle 한 메시지를 XCLAIM (소유권 이전 + deliveryCount 증가)
- * 3. 직접 서비스 호출 후 성공 시 XACK, 실패 시 PEL 에 남겨 다음 사이클에 재시도
- * 4. deliveryCount 가 MAX_DELIVERY_COUNT 를 초과하면 PendingMessageScheduler(batch) 가 데드레터 처리
+ * 1. XAUTOCLAIM 으로 RECLAIM_THRESHOLD 이상 idle 한 메시지를 회수
+ * 2. 직접 서비스 호출 후 성공 시 XACK, 실패 시 PEL 에 남겨 다음 사이클에 재시도
+ * 3. deliveryCount 가 MAX_DELIVERY_COUNT 를 초과하면 PendingMessageScheduler(batch) 가 데드레터 처리
  */
 @Component
 @Profile("!test")
@@ -49,22 +49,10 @@ class NotificationStreamRecoveryScheduler(
             val streamKey = RedisStreamConstants.MEETING_NOTIFICATION_STREAM
             val groupName = RedisStreamConstants.MEETING_NOTIFICATION_GROUP
 
-            val pendingMessages = stringRedisTemplate.opsForStream<String, String>()
-                .pending(streamKey, groupName, Range.unbounded<String>(), BATCH_SIZE)
-            if (pendingMessages.isEmpty()) return
+            val claimed = autoClaimPendingMessages(streamKey, groupName)
+            if (claimed.isEmpty()) return
 
-            val idleMessages = pendingMessages.filter {
-                it.elapsedTimeSinceLastDelivery >= RECLAIM_THRESHOLD
-            }.toList()
-            if (idleMessages.isEmpty()) return
-
-            logger.debug("[notification-recovery] idle 메시지 {} 건 발견 → XCLAIM 시작", idleMessages.size)
-
-            val recordIds = idleMessages.map { RecordId.of(it.idAsString) }.toTypedArray()
-            val claimOptions = XClaimOptions.minIdle(RECLAIM_THRESHOLD).ids(*recordIds)
-            val claimed = stringRedisTemplate.opsForStream<String, String>()
-                .claim(streamKey, groupName, recoveryConsumerName, claimOptions)
-                ?: return
+            logger.debug("[notification-recovery] idle 메시지 {} 건 XAUTOCLAIM 회수", claimed.size)
 
             claimed.forEach { message ->
                 val meetingId = message.value["meetingId"]?.toLongOrNull()
@@ -97,5 +85,58 @@ class NotificationStreamRecoveryScheduler(
         } finally {
             MDC.clear()
         }
+    }
+
+    private fun autoClaimPendingMessages(
+        streamKey: String,
+        groupName: String,
+    ): List<MapRecord<String, String, String>> {
+        val response = stringRedisTemplate.execute(
+            RedisCallback<Any> { connection: RedisConnection ->
+                connection.execute(
+                    "XAUTOCLAIM",
+                    streamKey.bytes(),
+                    groupName.bytes(),
+                    recoveryConsumerName.bytes(),
+                    RECLAIM_THRESHOLD.toMillis().toString().bytes(),
+                    "0-0".bytes(),
+                    "COUNT".bytes(),
+                    BATCH_SIZE.toString().bytes(),
+                )
+            },
+        ) ?: return emptyList()
+
+        return parseAutoClaimResponse(streamKey, response)
+    }
+
+    private fun parseAutoClaimResponse(
+        streamKey: String,
+        response: Any,
+    ): List<MapRecord<String, String, String>> {
+        val parts = response as? List<*> ?: return emptyList()
+        val records = parts.getOrNull(1) as? List<*> ?: return emptyList()
+
+        return records.mapNotNull { rawRecord ->
+            val recordParts = rawRecord as? List<*> ?: return@mapNotNull null
+            val id = recordParts.getOrNull(0).asRedisString() ?: return@mapNotNull null
+            val fieldValues = recordParts.getOrNull(1) as? List<*> ?: return@mapNotNull null
+            val fields = fieldValues.chunked(2).mapNotNull { pair ->
+                val key = pair.getOrNull(0).asRedisString()
+                val value = pair.getOrNull(1).asRedisString()
+                if (key == null || value == null) null else key to value
+            }.toMap()
+
+            MapRecord
+                .create(streamKey, fields)
+                .withId(RecordId.of(id))
+        }
+    }
+
+    private fun String.bytes(): ByteArray = toByteArray(Charsets.UTF_8)
+
+    private fun Any?.asRedisString(): String? = when (this) {
+        is ByteArray -> String(this, Charsets.UTF_8)
+        null -> null
+        else -> toString()
     }
 }
