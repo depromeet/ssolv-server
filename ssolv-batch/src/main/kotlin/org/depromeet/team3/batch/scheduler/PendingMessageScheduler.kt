@@ -42,6 +42,7 @@ class PendingMessageScheduler(
     private val streams = listOf(
         RedisStreamConstants.MEETING_NOTIFICATION_STREAM to RedisStreamConstants.MEETING_NOTIFICATION_GROUP,
         RedisStreamConstants.MEETING_CALCULATION_STREAM to RedisStreamConstants.MEETING_CALCULATION_GROUP,
+        RedisStreamConstants.RESTAURANT_ENRICHMENT_STREAM to RedisStreamConstants.RESTAURANT_ENRICHMENT_GROUP,
     )
 
     @Scheduled(fixedDelay = 60_000)

@@ -73,6 +73,14 @@ ssolv-infrastructure/ngrinder/
 /benchmark/
 ssolv-batch/src/test/kotlin/org/depromeet/team3/batch/benchmark/
 
+# Local batch source files
+/data/**/*.csv
+/data/**/*.xlsx
+/data/**/*.xls
+/data/**/*.json
+/data/**/*.xml
+/data/**/*.txt
+
 # Test infrastructure
 docker-compose.test-dev.yml
 # Benchmark

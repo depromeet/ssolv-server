@@ -18,6 +18,21 @@ output "rds_endpoint" {
   value       = module.database.rds_endpoint
 }
 
+output "restaurant_import_bucket_name" {
+  description = "배치 원천 파일 업로드 및 RESTAURANT_IMPORT_S3_BUCKET 값으로 사용"
+  value       = module.restaurant_pipeline.bucket_name
+}
+
+output "restaurant_pipeline_state_machine_arn" {
+  description = "식당 데이터 파이프라인 Step Functions ARN"
+  value       = module.restaurant_pipeline.state_machine_arn
+}
+
+output "restaurant_batch_ecs_cluster_name" {
+  description = "식당 배치 ECS Cluster 이름"
+  value       = module.restaurant_pipeline.ecs_cluster_name
+}
+
 output "route53_name_servers" {
   description = "가비아 네임서버에 입력할 NS 레코드 4개"
   value       = module.dns.name_servers

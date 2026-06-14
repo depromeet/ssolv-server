@@ -1,0 +1,89 @@
+{
+  "Comment": "Restaurant import pipeline",
+  "StartAt": "LoadManifest",
+  "States": {
+    "LoadManifest": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+      "Parameters": {
+        "Bucket.$": "$.detail.bucket.name",
+        "Key.$": "$.detail.object.key"
+      },
+      "ResultSelector": {
+        "manifest.$": "States.StringToJson($.Body)"
+      },
+      "ResultPath": "$.manifest",
+      "Next": "IngestFiles"
+    },
+    "IngestFiles": {
+      "Type": "Map",
+      "ItemsPath": "$.manifest.manifest.files",
+      "MaxConcurrency": ${ingest_max_concurrency},
+      "ItemSelector": {
+        "file.$": "$$.Map.Item.Value",
+        "sourceType.$": "$.manifest.manifest.sourceType",
+        "importMonth.$": "$.manifest.manifest.importMonth",
+        "charset.$": "$.manifest.manifest.charset",
+        "chunkSize.$": "$.manifest.manifest.chunkSize",
+        "manifestKey.$": "$.detail.object.key"
+      },
+      "Iterator": {
+        "StartAt": "RunIngestTask",
+        "States": {
+          "RunIngestTask": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::ecs:runTask.sync",
+            "Parameters": {
+              "Cluster": "${cluster_arn}",
+              "TaskDefinition": "${task_definition_arn}",
+              "LaunchType": "FARGATE",
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "Subnets": ${subnet_ids},
+                  "SecurityGroups": ${security_group_ids},
+                  "AssignPublicIp": "${assign_public_ip}"
+                }
+              },
+              "Overrides": {
+                "ContainerOverrides": [
+                  {
+                    "Name": "${container_name}",
+                    "Command.$": "States.Array('--spring.batch.job.name=restaurantIngestJob', States.Format('manifestKey={}', $.manifestKey), States.Format('s3Key={}', $.file.s3Key), States.Format('sourceType={}', $.sourceType), States.Format('importMonth={}', $.importMonth), States.Format('charset={}', $.charset), States.Format('chunkSize={}', $.chunkSize))"
+                  }
+                ]
+              }
+            },
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.ingestResults",
+      "Next": "RunFinalizeTask"
+    },
+    "RunFinalizeTask": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "Cluster": "${cluster_arn}",
+        "TaskDefinition": "${task_definition_arn}",
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": ${subnet_ids},
+            "SecurityGroups": ${security_group_ids},
+            "AssignPublicIp": "${assign_public_ip}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${container_name}",
+              "Command.$": "States.Array('--spring.batch.job.name=restaurantFinalizeJob', States.Format('manifestKey={}', $.detail.object.key), States.Format('sourceType={}', $.manifest.manifest.sourceType), States.Format('importMonth={}', $.manifest.manifest.importMonth))"
+            }
+          ]
+        }
+      },
+      "End": true
+    }
+  }
+}

@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 5.100"
     }
   }
 }
@@ -47,6 +47,27 @@ module "database" {
 
   private_subnet_ids = module.network.private_subnet_ids
   rds_sg_id          = module.network.rds_sg_id
+}
+
+module "restaurant_pipeline" {
+  source = "./modules/restaurant-pipeline"
+
+  project                 = var.project
+  aws_region              = var.aws_region
+  bucket_name             = var.restaurant_import_bucket_name
+  vpc_id                  = module.network.vpc_id
+  subnet_ids              = [module.network.public_subnet_a_id, module.network.public_subnet_c_id]
+  rds_security_group_id   = module.network.rds_sg_id
+  batch_container_image   = var.restaurant_batch_container_image
+  batch_cpu               = var.restaurant_batch_cpu
+  batch_memory            = var.restaurant_batch_memory
+  ingest_max_concurrency  = var.restaurant_ingest_max_concurrency
+  raw_expiration_days     = var.restaurant_import_raw_expiration_days
+  reports_expiration_days = var.restaurant_import_reports_expiration_days
+  db_endpoint             = module.database.rds_endpoint
+  db_name                 = var.db_name
+  db_username             = var.db_username
+  db_password             = var.db_password
 }
 
 module "dns" {

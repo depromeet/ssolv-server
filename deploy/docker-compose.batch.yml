@@ -1,0 +1,97 @@
+services:
+  batch-mysql:
+    container_name: ssolv-batch-mysql
+    image: mysql:8.0.43
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --performance-schema=ON
+      - --innodb_monitor_enable=all
+    environment:
+      MYSQL_DATABASE: ${DEFAULT_SCHEMA:-ssolv_batch}
+      MYSQL_USER: ${DB_USERNAME:-ssolv}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-ssolv}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: Asia/Seoul
+    ports:
+      - "${BATCH_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - batch_mysql_data:/var/lib/mysql
+    networks:
+      - ssolv_batch_network
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  batch-redis:
+    container_name: ssolv-batch-redis
+    image: redis:7-alpine
+    command: redis-server --maxmemory ${BATCH_REDIS_MAXMEMORY:-512mb} --maxmemory-policy noeviction
+    ports:
+      - "${BATCH_REDIS_PORT:-6380}:6379"
+    volumes:
+      - batch_redis_data:/data
+    networks:
+      - ssolv_batch_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  batch-adminer:
+    container_name: ssolv-batch-adminer
+    image: adminer:4
+    ports:
+      - "${BATCH_ADMINER_PORT:-18080}:8080"
+    networks:
+      - ssolv_batch_network
+    depends_on:
+      batch-mysql:
+        condition: service_healthy
+
+  batch-runner:
+    container_name: ssolv-batch-runner
+    image: eclipse-temurin:21-jdk
+    working_dir: /workspace
+    command: [ "sleep", "infinity" ]
+    environment:
+      DEFAULT_SCHEMA: ${DEFAULT_SCHEMA:-ssolv_batch}
+      DB_USERNAME: ${DB_USERNAME:-ssolv}
+      DB_PASSWORD: ${DB_PASSWORD:-ssolv}
+      REDIS_HOST: batch-redis
+      REDIS_PORT: 6379
+      RESTAURANT_IMPORT_S3_BUCKET: ${RESTAURANT_IMPORT_S3_BUCKET:-solv-166611709560-ap-northeast-2-an}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_PROFILE: ${AWS_PROFILE:-qkralsdma}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      BATCH_DB_POOL_SIZE: ${BATCH_DB_POOL_SIZE:-10}
+      RESTAURANT_IMPORT_CHUNK_SIZE: ${RESTAURANT_IMPORT_CHUNK_SIZE:-3000}
+      RESTAURANT_ENRICHMENT_PUBLISH_LIMIT: ${RESTAURANT_ENRICHMENT_PUBLISH_LIMIT:-50000}
+      JAVA_TOOL_OPTIONS: ${BATCH_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1g}
+    volumes:
+      - ..:/workspace
+      - ${HOME}/.aws:/root/.aws:ro
+      - gradle_cache:/root/.gradle
+    networks:
+      - ssolv_batch_network
+    depends_on:
+      batch-mysql:
+        condition: service_healthy
+      batch-redis:
+        condition: service_healthy
+
+volumes:
+  batch_mysql_data:
+    driver: local
+  batch_redis_data:
+    driver: local
+  gradle_cache:
+    driver: local
+
+networks:
+  ssolv_batch_network:
+    driver: bridge

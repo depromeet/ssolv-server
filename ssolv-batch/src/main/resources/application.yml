@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: ssolv-batch
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/${DEFAULT_SCHEMA}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${BATCH_DB_POOL_SIZE:10}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+restaurant:
+  import:
+    enabled: ${RESTAURANT_IMPORT_ENABLED:false}
+    s3:
+      bucket: ${RESTAURANT_IMPORT_S3_BUCKET:}
+      region: ${AWS_REGION:ap-northeast-2}
+    defaults:
+      chunk-size: ${RESTAURANT_IMPORT_CHUNK_SIZE:3000}
+      enrichment-publish-limit: ${RESTAURANT_ENRICHMENT_PUBLISH_LIMIT:50000}
+  enrichment:
+    enabled: ${RESTAURANT_ENRICHMENT_ENABLED:false}
+    max-results: ${RESTAURANT_ENRICHMENT_MAX_RESULTS:5}
+    radius-meter: ${RESTAURANT_ENRICHMENT_RADIUS_METER:500.0}
+
+api:
+  google:
+    places:
+      api-key: ${GOOGLE_PLACES_API_KEY:}
+      base-url: https://places.googleapis.com
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

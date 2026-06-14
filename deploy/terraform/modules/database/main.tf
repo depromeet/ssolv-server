@@ -25,10 +25,10 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [var.rds_sg_id]
 
-  publicly_accessible     = false
-  deletion_protection     = true
-  backup_retention_period = 1  # Free tier 제한: 최대 1일. 계정 업그레이드 후 7로 변경 가능
-  skip_final_snapshot     = false
+  publicly_accessible       = false
+  deletion_protection       = true
+  backup_retention_period   = 1 # Free tier 제한: 최대 1일. 계정 업그레이드 후 7로 변경 가능
+  skip_final_snapshot       = false
   final_snapshot_identifier = "${var.project}-mysql-final"
 
   tags = {
