@@ -73,17 +73,24 @@ ssolv-api-place ──┘                     ──▶ ssolv-infrastructure ─
 
 | Workflow | Trigger | Description |
 |---|---|---|
-| **CI** | PR → `dev` | Build + Test + Jacoco coverage + SonarQube |
-| **CD** | Push → `main` | Jib image build → Rolling deploy (A → B) |
+| **CI** | PR → `dev` | 변경 영향 분석 → 선택 테스트·패키징 + 대상별 Terraform Plan |
+| **CD** | Push → `main` | 선택 이미지 Push + Terraform Plan Gate → 대상별 배포 |
 
 **배포 흐름 (무중단 롤링)**
 ```
 main push
-  └── Jib build & push → registry.ssolv.site
-        └── Deploy Instance A
-              └── health check 통과 확인
-                    └── Deploy Instance B
+  └── 변경 영향 분석
+        ├── api-server / batch-worker 이미지 선택 빌드 (latest + commit SHA)
+        ├── 변경된 Terraform root의 암호화 Plan 생성
+        └── 이미지와 Plan 준비 상태 Gate
+              └── api-server 변경 시 Instance A → B 순차 배포
 ```
 
 > Instance A를 먼저 배포하고 healthy 상태 확인 후 B를 배포합니다.
 > Route53 Multivalue Answer가 A 헬스체크 실패를 감지하는 동안 B가 트래픽을 처리합니다.
+> 배포 시 `latest`가 아니라 commit SHA 태그를 사용하므로 동일 이미지를 재현할 수 있습니다.
+
+Terraform Plan Artifact는 민감 값을 포함할 수 있어 `TERRAFORM_PLAN_ENCRYPTION_KEY`로 암호화하며 1일만 보관합니다.
+Workflow에는 `TF_AMI_ID`, `TF_KEY_NAME`, `TF_PUBLIC_KEY`, `PROD_DB_PASSWORD`,
+`RESTAURANT_IMPORT_BUCKET_NAME` repository secret도 필요합니다.
+Terraform state는 ADR-015에 따라 로컬에서 관리하므로 CD는 Plan을 배포 Gate로 검증하지만 자동 apply하지 않습니다.

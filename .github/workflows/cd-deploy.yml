@@ -4,10 +4,63 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      force_full_deploy:
+        description: Build and deploy every production target
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  build:
+  analyze-changes:
+    name: Analyze deployment scope
     runs-on: ubuntu-latest
+    outputs:
+      image_tasks: ${{ steps.plan.outputs.image_tasks }}
+      deploy_targets: ${{ steps.plan.outputs.deploy_targets }}
+      terraform_targets: ${{ steps.plan.outputs.terraform_targets }}
+      has_image_tasks: ${{ steps.plan.outputs.has_image_tasks }}
+      has_terraform_changes: ${{ steps.plan.outputs.has_terraform_changes }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve deployment diff
+        id: diff
+        shell: bash
+        run: |
+          if [[ "${{ inputs.force_full_deploy }}" == "true" ]]; then
+            printf '%s\n' build.gradle.kts deploy/terraform/main.tf > "$RUNNER_TEMP/deploy-files.txt"
+            echo "args=--changed-files-file $RUNNER_TEMP/deploy-files.txt" >> "$GITHUB_OUTPUT"
+          else
+            previous="$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)"
+            echo "args=${previous}...HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build deployment plan
+        id: plan
+        run: scripts/selective-ci-plan.sh ${{ steps.diff.outputs.args }}
+
+      - name: Write deployment summary
+        run: |
+          {
+            echo "## Deployment Plan"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Image tasks | \`${{ steps.plan.outputs.image_tasks || 'none' }}\` |"
+            echo "| Terraform targets | \`${{ steps.plan.outputs.terraform_targets || 'none' }}\` |"
+            echo "| Deploy targets | \`${{ steps.plan.outputs.deploy_targets || 'none' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-images:
+    name: Build and push selected images
+    runs-on: ubuntu-latest
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.has_image_tasks == 'true'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -15,140 +68,222 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'temurin'
-          cache: 'gradle'
+          distribution: temurin
+          cache: gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build and Push with Jib
+      - name: Build and push immutable images
+        env:
+          IMAGE_TASKS: ${{ needs.analyze-changes.outputs.image_tasks }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
-          ./gradlew :ssolv-api-core:jib \
-            -Djib.to.auth.username=${{ secrets.REGISTRY_USERNAME }} \
-            -Djib.to.auth.password=${{ secrets.REGISTRY_PASSWORD }} \
-            -Djava.net.preferIPv4Stack=true
+          chmod +x gradlew
+          ./gradlew $IMAGE_TASKS \
+            -Djib.to.auth.username="$REGISTRY_USERNAME" \
+            -Djib.to.auth.password="$REGISTRY_PASSWORD" \
+            -Djib.to.tags="latest,${GITHUB_SHA}" \
+            -Djava.net.preferIPv4Stack=true \
+            --stacktrace
 
-  # Instance A 먼저 배포 — Route53 헬스체크가 A를 unhealthy로 감지하는 동안 B가 트래픽 처리
+  terraform-plan:
+    name: Create targeted Terraform plans
+    runs-on: ubuntu-latest
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.has_terraform_changes == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive deploy/terraform
+
+      - name: Save deployment plans
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_ami_id: ${{ secrets.TF_AMI_ID }}
+          TF_VAR_key_name: ${{ secrets.TF_KEY_NAME }}
+          TF_VAR_public_key: ${{ secrets.TF_PUBLIC_KEY }}
+          TF_VAR_db_password: ${{ secrets.PROD_DB_PASSWORD }}
+          TF_VAR_restaurant_import_bucket_name: ${{ secrets.RESTAURANT_IMPORT_BUCKET_NAME }}
+          TF_VAR_bucket_name: ${{ secrets.RESTAURANT_IMPORT_BUCKET_NAME }}
+          TF_VAR_restaurant_batch_container_image: registry.ssolv.site/batch-worker:${{ github.sha }}
+          TF_VAR_batch_container_image: registry.ssolv.site/batch-worker:${{ github.sha }}
+        run: scripts/selective-terraform-plan.sh "${{ needs.analyze-changes.outputs.terraform_targets }}"
+
+      - name: Encrypt deployment plans
+        env:
+          TERRAFORM_PLAN_ENCRYPTION_KEY: ${{ secrets.TERRAFORM_PLAN_ENCRYPTION_KEY }}
+        run: scripts/protect-terraform-plans.sh encrypt build/terraform-plans
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terraform-deployment-plans-${{ github.sha }}
+          path: build/terraform-plans/
+          if-no-files-found: error
+          retention-days: 1
+
+  deployment-gate:
+    name: Verify deployment inputs
+    runs-on: ubuntu-latest
+    needs: [ analyze-changes, build-images, terraform-plan ]
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify image build result
+        if: needs.analyze-changes.outputs.has_image_tasks == 'true'
+        env:
+          BUILD_RESULT: ${{ needs.build-images.result }}
+        run: test "$BUILD_RESULT" = success
+
+      - name: Download exact Terraform plans
+        if: needs.analyze-changes.outputs.has_terraform_changes == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-deployment-plans-${{ github.sha }}
+          path: build/terraform-plans
+
+      - name: Set up Terraform plan reader
+        if: needs.analyze-changes.outputs.has_terraform_changes == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Decrypt exact Terraform plans
+        if: needs.analyze-changes.outputs.has_terraform_changes == 'true'
+        env:
+          TERRAFORM_PLAN_ENCRYPTION_KEY: ${{ secrets.TERRAFORM_PLAN_ENCRYPTION_KEY }}
+        run: scripts/protect-terraform-plans.sh decrypt build/terraform-plans
+
+      - name: Verify Terraform plan manifest
+        if: needs.analyze-changes.outputs.has_terraform_changes == 'true'
+        run: |
+          test "${{ needs.terraform-plan.result }}" = success
+          test -s build/terraform-plans/manifest.tsv
+          while IFS=$'\t' read -r name directory plan; do
+            test -n "$name"
+            test -n "$directory"
+            test -s "build/terraform-plans/$plan"
+            terraform -chdir="$directory" init -backend=false -input=false
+            terraform -chdir="$directory" show -no-color "$GITHUB_WORKSPACE/build/terraform-plans/$plan" > /dev/null
+          done < build/terraform-plans/manifest.tsv
+
+      - name: Confirm deployable target
+        env:
+          DEPLOY_TARGETS: ${{ needs.analyze-changes.outputs.deploy_targets }}
+        run: |
+          if [[ -z "$DEPLOY_TARGETS" ]]; then
+            echo "No application deployment is required."
+          else
+            echo "Deployment inputs are ready for: $DEPLOY_TARGETS"
+          fi
+
   deploy-instance-a:
-    needs: build
+    name: Deploy API to instance A
+    needs: [ analyze-changes, deployment-gate ]
+    if: needs.deployment-gate.result == 'success' && contains(needs.analyze-changes.outputs.deploy_targets, 'api-server')
     runs-on: ubuntu-latest
     environment:
       name: deploy-to-ssolv-prod-server
       url: https://api.ssolv.site
+
     steps:
-      - name: Deploy to Instance A
+      - name: Deploy immutable image to instance A
         uses: appleboy/ssh-action@master
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
+          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD,IMAGE_TAG
           command_timeout: 10m
           request_pty: true
           script: |
             set -e
-
             cd ~/17th-team3-Server
-
             git fetch origin
             git reset --hard origin/main
-
             echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
             chmod 600 firebase-service-account.json
-
             echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
-            docker pull registry.ssolv.site/api-server:latest
-
+            export DOCKER_IMAGE_API="registry.ssolv.site/api-server:$IMAGE_TAG"
+            docker pull "$DOCKER_IMAGE_API"
             docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-a.yml up -d --no-deps --force-recreate app-server
-
-            echo "Waiting for app-server to be healthy (max 5 min)..."
             for i in $(seq 1 30); do
-              STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
-              if [ "$STATUS" = "healthy" ]; then
-                echo "Instance A healthy after ${i}0s"
-                break
-              fi
-              echo "  [$i/21] status=$STATUS, retrying in 10s..."
+              status=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo missing)
+              [[ "$status" == healthy ]] && break
               sleep 10
             done
-
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
-            if [ "$STATUS" != "healthy" ]; then
-              echo "Instance A deployment failed (status=$STATUS)"
+            status=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo missing)
+            if [[ "$status" != healthy ]]; then
               docker logs app-server --tail 80
               exit 1
             fi
-
             docker image prune -f
-            echo "Instance A deployment complete"
+
+  deploy-instance-b:
+    name: Deploy API to instance B
+    needs: [ analyze-changes, deployment-gate, deploy-instance-a ]
+    if: needs.deploy-instance-a.result == 'success' && contains(needs.analyze-changes.outputs.deploy_targets, 'api-server')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy immutable image to instance B
+        uses: appleboy/ssh-action@master
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-
-  # A가 healthy 확인된 후 B 배포 — 롤링 업데이트로 무중단 배포
-  deploy-instance-b:
-
-    needs: deploy-instance-a
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Instance B
-        uses: appleboy/ssh-action@master
+          IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.EC2_HOST_B }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD
+          envs: FIREBASE_SERVICE_ACCOUNT,REGISTRY_USERNAME,REGISTRY_PASSWORD,IMAGE_TAG
           command_timeout: 10m
           request_pty: true
           script: |
             set -e
-
             cd ~/17th-team3-Server
-
             git fetch origin
             git reset --hard origin/main
-
             echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
             chmod 600 firebase-service-account.json
-
             echo "$REGISTRY_PASSWORD" | docker login registry.ssolv.site -u "$REGISTRY_USERNAME" --password-stdin
-            docker pull registry.ssolv.site/api-server:latest
-
+            export DOCKER_IMAGE_API="registry.ssolv.site/api-server:$IMAGE_TAG"
+            docker pull "$DOCKER_IMAGE_API"
             docker compose --project-directory ~/17th-team3-Server -f deploy/docker-compose.instance-b.yml up -d --no-deps --force-recreate app-server
-
-            echo "Waiting for app-server to be healthy (max 5 min)..."
             for i in $(seq 1 30); do
-              STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
-              if [ "$STATUS" = "healthy" ]; then
-                echo "Instance B healthy after ${i}0s"
-                break
-              fi
-              echo "  [$i/21] status=$STATUS, retrying in 10s..."
+              status=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo missing)
+              [[ "$status" == healthy ]] && break
               sleep 10
             done
-
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo "missing")
-            if [ "$STATUS" != "healthy" ]; then
-              echo "Instance B deployment failed (status=$STATUS)"
+            status=$(docker inspect --format='{{.State.Health.Status}}' app-server 2>/dev/null || echo missing)
+            if [[ "$status" != healthy ]]; then
               docker logs app-server --tail 80
               exit 1
             fi
-
             docker image prune -f
-            echo "Instance B deployment complete"
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
-  # Collect diagnostics when any deploy job fails
   diagnose-on-failure:
-    needs: [deploy-instance-a, deploy-instance-b]
+    name: Diagnose failed API rollout
+    needs: [ deploy-instance-a, deploy-instance-b ]
     if: failure()
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose Instance A
+      - name: Diagnose instance A
         if: needs.deploy-instance-a.result == 'failure'
         uses: appleboy/ssh-action@master
         with:
@@ -156,21 +291,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 3m
-          script: |
-            echo "====== DIAGNOSIS: Instance A ======"
-            echo "--- Container status ---"
-            docker ps -a | grep app-server || true
-            echo "--- App server logs (last 100 lines) ---"
-            docker logs app-server --tail 100 2>&1 || true
-            echo "--- Memory ---"
-            free -h
-            echo "--- Docker stats snapshot ---"
-            docker stats --no-stream 2>/dev/null || true
-            echo "--- Disk ---"
-            df -h /
-            echo "======================================"
+          script: docker ps -a && docker logs app-server --tail 100 2>&1 && free -h && df -h /
 
-      - name: Diagnose Instance B
+      - name: Diagnose instance B
         if: needs.deploy-instance-b.result == 'failure'
         uses: appleboy/ssh-action@master
         with:
@@ -178,16 +301,4 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 3m
-          script: |
-            echo "====== DIAGNOSIS: Instance B ======"
-            echo "--- Container status ---"
-            docker ps -a | grep app-server || true
-            echo "--- App server logs (last 100 lines) ---"
-            docker logs app-server --tail 100 2>&1 || true
-            echo "--- Memory ---"
-            free -h
-            echo "--- Docker stats snapshot ---"
-            docker stats --no-stream 2>/dev/null || true
-            echo "--- Disk ---"
-            df -h /
-            echo "======================================"
+          script: docker ps -a && docker logs app-server --tail 100 2>&1 && free -h && df -h /
