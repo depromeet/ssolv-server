@@ -1,3 +1,7 @@
+plugins {
+    id("com.google.cloud.tools.jib")
+}
+
 dependencies {
     implementation(project(":ssolv-api-common"))
     implementation(project(":ssolv-domain"))
@@ -20,6 +24,24 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation(testFixtures(project(":ssolv-api-common")))
     runtimeOnly("com.mysql:mysql-connector-j")
+}
+
+jib {
+    from {
+        image = "eclipse-temurin:21-jre"
+    }
+    to {
+        image = "registry.ssolv.site/batch-worker"
+        tags = setOf("latest", "${project.version}")
+    }
+    container {
+        mainClass = "org.depromeet.team3.BatchApplicationKt"
+        jvmFlags = listOf(
+            "-Duser.timezone=Asia/Seoul",
+            "-XX:MaxRAMPercentage=75.0",
+        )
+        creationTime = "USE_CURRENT_TIMESTAMP"
+    }
 }
 
 tasks {
